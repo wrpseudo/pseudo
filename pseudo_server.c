@@ -102,13 +102,17 @@ pseudo_server_start(int daemonize) {
 
 	/* cd to the data directory */
 	pseudo_path = pseudo_prefix_path(PSEUDO_DATA);
+	if (!pseudo_path) {
+		pseudo_diag("can't find prefix/%s directory.\n", PSEUDO_DATA);
+		return 1;
+	}
 	if (chdir(pseudo_path) == -1) {
 		pseudo_diag("can't get to '%s': %s\n",
 			pseudo_path, strerror(errno));
 		return 1;
 	}
 	free(pseudo_path);
-	/* remove existing socket */
+	/* remove existing socket -- if it exists */
 	unlink(sun.sun_path);
 	if (bind(listen_fd, (struct sockaddr *) &sun, sizeof(sun)) == -1) {
 		pseudo_diag("couldn't bind listening socket: %s\n", strerror(errno));
@@ -120,7 +124,7 @@ pseudo_server_start(int daemonize) {
 	}
 	if (daemonize && ((rc = fork()) != 0)) {
 		if (rc == -1) {
-			pseudo_diag("couldn't spawn server: errno %d\n", errno);
+			pseudo_diag("couldn't spawn server: %s\n", strerror(errno));
 			return 0;
 		}
 		pseudo_debug(2, "started server, pid %d\n", rc);
@@ -129,8 +133,17 @@ pseudo_server_start(int daemonize) {
 	}
 	setsid();
 	pseudo_path = pseudo_prefix_path(PSEUDO_PIDFILE);
+	if (!pseudo_path) {
+		pseudo_diag("Couldn't get path for prefix/%s\n", PSEUDO_PIDFILE);
+		return 1;
+	}
 	fp = fopen(pseudo_path, "w");
-	fprintf(fp, "%d\n", getpid());
+	if (!fp) {
+		pseudo_diag("Couldn't open %s: %s\n",
+			pseudo_path, strerror(errno));
+		return 1;
+	}
+	fprintf(fp, "%lld\n", (long long) getpid());
 	fclose(fp);
 	free(pseudo_path);
 	if (daemonize) {
@@ -140,9 +153,13 @@ pseudo_server_start(int daemonize) {
 		fclose(stdin);
 		fclose(stdout);
 		pseudo_path = pseudo_prefix_path(PSEUDO_LOGFILE);
+		if (!pseudo_path) {
+			pseudo_diag("can't get path for prefix/%s\n", PSEUDO_LOGFILE);
+			return 1;
+		}
 		fd = open(pseudo_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
 		if (fd == -1) {
-			pseudo_diag("help: can't open pseudo.log: %s\n", strerror(errno));
+			pseudo_diag("help: can't open %s: %s\n", PSEUDO_LOGFILE, strerror(errno));
 		} else {
 			pseudo_util_debug_fd = fd;
 			fclose(stderr);

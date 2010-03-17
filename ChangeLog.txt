@@ -1,3 +1,6 @@
+2010-03-16:
+	* (seebs) Fix missing error checking noted by comp.lang.c reader.
+
 2010-03-16: 0.2
 	* first public release
 

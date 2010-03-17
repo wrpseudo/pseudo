@@ -415,7 +415,7 @@ pseudo_setupenv(char *opts) {
  * setting the prefix all set it in the environment.
  */
 char *
-pseudo_prefix_path(char *s) {
+pseudo_prefix_path(char *file) {
 	static char *prefix = NULL;
 	static size_t prefix_len;
 	char *path;
@@ -427,17 +427,28 @@ pseudo_prefix_path(char *s) {
 			exit(1);
 		}
 		prefix_len = strlen(prefix);
-		while ((prefix[prefix_len - 1] == '/') && (prefix_len > 0)) {
-			prefix[--prefix_len] = '\0';
-		}
 	}
-	if (!s) {
+	if (!file) {
 		return strdup(prefix);
 	} else {
-		size_t len = prefix_len + strlen(s) + 2;
+		size_t len = prefix_len + strlen(file) + 2;
 		path = malloc(len);
 		if (path) {
-			snprintf(path, len, "%s/%s", prefix, s);
+			char *endptr;
+			int rc;
+
+			rc = snprintf(path, len, "%s", prefix);
+			/* this certainly SHOULD be impossible */
+			if (rc >= len)
+				rc = len - 1;
+			endptr = path + rc;
+			/* strip extra slashes.
+			 * This probably has no real effect, but I don't like
+			 * seeing "//" in paths.
+			 */
+			while ((endptr > path) && (endptr[-1] == '/'))
+				--endptr;
+			snprintf(endptr, len - (endptr - path), "/%s", file);
 		}
 		return path;
 	}
