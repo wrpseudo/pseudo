@@ -1,0 +1,61 @@
+pseudo -- an analogue to sudo
+
+OVERVIEW:
+
+The pseudo utility offers a way to run commands in a virtualized "root"
+environment, allowing ordinary users to run commands which give the illusion
+of creating device nodes, changing file ownership, and otherwise doing
+things necessary for creating distribution packages or filesystems.
+
+To configure, run the provided configure script.  Note that this is
+NOT an autoconf script.
+
+Configure options:
+	    --prefix=/path/to/install/dir
+	    --with-sqlite=/path/to/sqlite/dir
+	    --bits={32,64}
+	    --suffix=<text>
+
+There is no default prefix.  The default for sqlite is /usr, and for
+bits is 32.  You need a reasonably modern sqlite3 -- it has to have
+sqlite3_clear_bindings(), which at least one default sqlite3 install
+did not.  (But that was dated 2006, so I'm not sure this will affect
+most readers.)
+
+The suffix value can be used to append a particular text string to file
+names (such as libpseudo<suffix>.so).  This was used in the WR environment
+to create libpseudo-<host_libc_md5sum>.so, to ensure that libpseudo was
+rebuilt if the host libc changed.
+
+This code is not particularly portable -- it's never been tried on anything
+but Linux, although it runs on a pretty broad range of Linux systems.
+
+Limited user documentation is provided in the given man page files (these
+are not currently installed, merely provided in the source directory), and
+some documentation on internals is provided in the doc/ directory.
+
+
+FUTURE DIRECTIONS:
+
+* We intend to add chroot() functionality to pseudo, as well as
+  functionality to support user name/uid lookups from an alternative
+  password file.
+* We have no immediate plans to make pseudo work on other targets, but
+  are not opposed to accepting patches to do so.  (It isn't even CLOSE
+  on OS X, largely because of the Linux-specific _STAT_VER stuff.)
+* I have no intention of converting to autoconf.  It is the wrong tool
+  for the job.
+
+Please feel free to send bug feedback, change requests, or general
+commentary.
+
+
+ACKNOWLEDGEMENTS:
+
+My various coworkers, both engineering and management, made this possible.
+While I did most of the actual typing, this code has benefitted greatly
+from detailed code reviews, excellent reproducers for bugs, and the
+consistent support of the whole group for the project.  It's been a great
+deal of fun, and I'm pretty happy that we're finally ready to make it
+available for other people to look at.
+

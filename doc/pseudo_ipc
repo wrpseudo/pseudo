@@ -1,0 +1,76 @@
+MESSAGE PASSING
+
+typedef struct {
+	pseudo_msg_type_t type;
+	op_id_t	op;
+	res_id_t result;
+	int xerrno;
+	int client;
+	dev_t dev;
+	unsigned long long ino;
+	uid_t uid;
+	gid_t gid;
+	unsigned long long mode;
+	dev_t rdev;
+	unsigned int pathlen;
+	int nlink;
+	char path[];
+} pseudo_msg_t;
+
+This structure is used for every communication between the client and the
+server.  The last field is optional (it's a C99ism called a flexible array
+member, allowing a single allocation to hold both the structure and the
+variable-length character data at the end).
+
+All messages contain items up through 'pathlen'.  If pathlen is not zero,
+an additional pathlen bytes containing path are provided; path is
+null-terminated.
+
+Every message from client should get a response from server.  The server
+never really sends a path, currently, but maybe it will someday.  Note that
+all server responses will in general share a single message object,
+and future operations may cause that object to be reallocated; the same
+goes for messages received by the server.  Basically, pseudo_msg_receive
+is not thread-safe; this is part of (but not all of) the reason that there's
+mutex stuff in the wrappers.  (The other part is the "antimagic" being
+able to blow things up.)
+
+type is one of PING, OP, SHUTDOWN, ACK, or NAK.  The client only sends PING or
+OP.  The server should always send ACK.  When run with '-S', the pseudo
+program runs as a client, sending a SHUTDOWN message to a server -- but only
+if it can find one, it does not start a new one.  In this case, the server
+could respond with a NAK, in which case it sends a message in which "path"
+is a list of space-separated PIDs of currently-living clients, for the program
+to print out in an error message.  The server will not shut down while there
+are living clients.  (The request, though, causes it to shut down immediately
+when there are no more clients, rather than waiting for the timeout
+period.)
+
+result is the result of a particular operation.  It applies only in replies
+to OP messages.
+
+client should be the client's PID on send, and the server's client number for
+that client on response.  (The response isn't checked, and this is just a
+debugging feature.)
+
+dev/ino/uid/gid/mode/rdev/path are information about the file.  They should
+all be provided on send if possible, but the server only generally changes
+uid/gid/mode/rdev on response, and never sends a path back.  Dev and inode
+are currently changed by stat-by-path operations, but this may turn out to
+be wrong.
+
+xerrno is used to contain a changed errno if, at some point, the server wants
+to override the default errno.  Normally, the client just uses its existing
+errno.
+
+nlink is used to forward the number of links.  The server DOES NOT modify
+this.  Rather, nlink is used to provide better diagnostics when checking
+paths against inodes.
+
+32/64 bit:  This structure should have the same offsets for every element,
+including path, on both 64-bit and 32-bit machines.  (Check with 'offsets.c'.)
+It is *not* an error if sizeof(pseudo_msg_t) is different; the padding
+happens after the path element.  (Note:  This is contrary to C99, TC1, but is
+correct according to the current standard.  Anyway, gcc's always done it this
+way.)  The data written are always pathlen + offsetof(pseudo_msg_t, path),
+and that's correct.

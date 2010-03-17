@@ -1,0 +1,33 @@
+pseudolog
+	Displays or creates log entries.  This offers a quick first
+	approximation of the sorts of queries one is likely to need to
+	run.
+
+pseudo
+	The pseudo server.  Run on the command line, the default behavior
+	is to set up a pseudo environment (LD_PRELOAD, etc) then run either
+	the specified command or a shell by default.  The -d option specifies
+	a background daemon, and -f specifies a foreground daemon (which
+	may display output directly).  The launcher function isn't really
+	32-bit/64-bit aware, but if you have both types of libraries in
+	suitably-named directories, it'll do the right thing anyway.
+
+	Path may be in environment as PSEUDO_PREFIX, specified on command
+	line with -P path, or inferred from the path to $0.  (The last
+	generates a diagnostic.)
+
+	To stop the pseudo server, either wait a while (the default timeout
+	is 30 seconds, or whatever you specified with "-t" or PSEUDO_OPTS
+	when starting it) or run "pseudo -S".  The server will not exit
+	while clients are active, but requesting a shutdown sets the timeout
+	to one second, so it will exit quickly after the last client
+	disconnects.
+
+libpseudo.so
+	The library providing the wrapper functionality, which spawns
+	the pseudo server automatically if needed.  If the environment
+	variable PSEUDO_ENOSYS_ABORT is set, attempts to call missing
+	system calls will abort() rather than merely emitting a diagnostic.
+
+pseudodb
+	allows browsing and modification of db (not implemented)

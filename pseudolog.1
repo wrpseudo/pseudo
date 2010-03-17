@@ -1,0 +1,335 @@
+.\" 
+.\" pseudolog(1) man page
+.\" 
+.\" Copyright (c) 2010 Wind River Systems, Inc.
+.\"
+.\" This program is free software; you can redistribute it and/or modify
+.\" it under the terms of the Lesser GNU General Public License version 2.1 as
+.\" published by the Free Software Foundation.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.\" See the Lesser GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the Lesser GNU General Public License
+.\" version 2.1 along with this program; if not, write to the Free Software
+.\" Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+.TH pseudolog 1 "pseudo - pretending to be root"
+.SH SYNOPSIS
+.B pseudolog -l
+.RB [ \-Pv ]
+[
+.B \-E
+.I timeformat
+]
+.RI [ SPECIFICATIONS ]
+.PP
+.B pseudolog
+.RB [ \-DPv ]
+[
+.B \-E
+.I timeformat
+]
+[
+.B \-F
+.I format
+]
+.RI [ SPECIFICATIONS ]
+.SH DESCRIPTION
+The
+.I pseudolog
+utility displays log entries created by the
+.I pseudo
+daemon, or creates log entries.  Creation of log entries is useful only to
+create timestamps or notes; for instance, you could create a log entry before
+beginning a process, so there would be a timestamp for the beginning of
+that process.  There are a number of special options used to match or create
+the components of a log entry; these are called
+.IR specifications ,
+and are detailed in the
+.B SPECIFICATIONS
+section below.
+
+The following other options are supported:
+
+.TP 8
+.B \-D
+Restrict query output to distinct rows.  Rows will have members defined by
+the
+.B \-F
+(format) option.  If all members are the same between two rows, only one
+is displayed.  Applies only to queries.
+.TP 8
+.BI \-E \ timeformat
+Specify a format string (for
+.I strptime(3)
+or
+.I strftime(3)
+to use) for displaying or interpreting time stamps.  The same format
+is used both for parsing and displaying stamps.
+.TP 8
+.BI \-F \ format
+Specifies a format string for displaying log entries.  This format cannot
+be used to create log entries, only for display.  The format string is
+a
+.I printf(3)
+type format string, with format specifiers matching the option characters
+used in specifications (see
+.BR SPECIFICATIONS ).
+There are some limitations on allowed formats, and misuse of this feature
+could cause interesting or surprising failures.
+.TP 8
+.B \-l
+Create a log entry.  This option is mutually exclusive with the
+.B \-F
+option, or with any relative specifications (see below).
+.TP 8
+.BI \-P \ path
+Specify that
+.I path
+should be used as the
+.B PSEUDO_PREFIX
+value, overriding any environment setting.
+.TP 8
+.B \-v
+Increase verbosity (debug level).  Not useful except when debugging pseudo.
+
+Other option characters are defined as specifications, and all of those
+require arguments to specify their values.
+
+.SH SPECIFICATIONS
+
+The various components of a log entry can be specified, either as command-line
+options, or as format specifiers.  In either case, the same character is used
+for a given component of a log entry.  When querying values, one of the
+following prefixes may be prepended to a value; otherwise, the value is
+used for a literal match (an SQL
+.B =
+operator).
+
+.TP 8
+.B >
+Greater than; true if the related field is greater than the provided value.
+.TP 8
+.B <
+Less than; true if the related field is less than the provided value.
+.TP 8
+.B &
+Bitwise and; true if the related field, bitwise-and the provided value,
+is non-zero.  (This is useful primarily for permissions or modes.)
+.TP 8
+.B =
+Equal to.  (This is a no-op, as of this writing.)
+.TP 8
+.B !
+Not equal to.
+.TP 8
+.B %
+Similar to
+.BR ~ .
+This is valid only on text fields, and is equivalent to
+the SQL
+.B LIKE
+operator, with 
+.B %
+patterns on the ends; it performs an unanchored, case-insensitive match.
+.TP 8
+.B ~
+Similar to 
+.BR % .
+This is valid only on text fields, and is equivalent
+to the SQL
+.B LIKE
+operator, but performs an anchored match.  The match is
+case-insensitive.  The specifier
+.B ~%foo%
+is equivalent to the specifier
+.BR %foo .
+.TP 8
+.B ^
+Unlike.  This is the inverse of ~; it specifies 
+.BR NOT\ LIKE .
+.TP 8
+.B \\
+Escape the string.  This is useful if you want to have one of the
+other modifiers at the beginning of the string.
+
+.PP
+Only
+.BR = and \\
+modifiers may be used in conjunction with the
+.B \-l
+option.
+
+The following characters correspond to specific fields in a log entry.
+In general, numeric values are parsed in the standard C idiom (where
+a leading
+.B 0
+indicates an octal value, and a leading
+.B 0x
+indicates a hexadecimal value, and any other number is decimal).  A
+few fields are parsed or displayed in other ways, as detailed in their
+entries.
+
+.TP 8
+.B c
+Client ID (the PID of a client).
+.TP 8
+.B d
+Device number (from a stat buffer).
+.TP 8
+.B f
+File descriptor.  In some cases, messages have an associated file descriptor
+identified.
+.TP 8
+.B g
+GID.  The group ID associated with an entry.
+.TP 8
+.B G
+Tag.  This is a text field.  In log entries created by
+.IR pseudo ,
+this field holds the value that the environment variable
+.B PSEUDO_TAG
+had in the client's environment.
+.TP 8
+.B i
+Inode number (from a stat buffer).
+.TP 8
+.TP 8
+.B I
+ID.  This is the database row number.  Normally these are assigned
+as monotonically increasing values as rows are inserted, making them
+a more reliable sorting mechanism than timestamps.  The default
+ordering is by ID.
+.B m
+Permissions.  These can be entered as an octal value or as a symbolic
+mode string, similar to the output of
+.I ls(1)
+.BR -l.
+The file type component is ignored.
+.TP 8
+.B M
+Mode.  This can be entered as an octal value or as a symbolic mode
+string, similar to the output of
+.I ls(1)
+.BR -l.
+This is tested against the whole file mode, including both the type
+and permissions bits.  In general, it is more useful to use the
+.B m
+or
+.B t
+specifiers.
+.TP 8
+.B o
+Operation.  This is the name of the file system operation
+(e.g., "open" or "rename").
+.TP 8
+.B O
+Order.  This takes another specification character as the field
+on which to order results.  A '<' implies a descending order sort,
+a '>' or no modifier specifies an ascending order sort.
+By default, records are sorted by ID.
+.TP 8
+.B p
+File path.  This is a text field.
+.TP 8
+.B r
+Result.  This is the
+.I pseudo
+result code, most often "fail" or
+"succeed".  Note that "fail" doesn't mean that an underlying
+operation failed; for instance, if a "stat" operation fails, it
+usually means that there was no entry in the
+.I pseudo
+database.
+.TP 8
+.B s
+Timestamp.  The format of this field is controlled by the
+.B \-E
+format string, which is used with
+.I strftime(3)
+when displaying entries, or with
+.I strptime(3)
+when interpreting command line values.  There is a small selection of
+common default time formats understood by the parser.  Time fields not
+specified default to the current time.  Note that specifying a time
+stamp when creating a log entry may yield confusing results.
+.TP 8
+.B S
+Severity.  Log messages can have a severity, with the default for file
+operations being "info".
+.B t
+File type.  This corresponds to the first letter of a mode string, or 
+the values accepted by the
+.B \-type
+option to
+.IR find(1) .
+This is compared only against the file type bits of a mode.
+.TP 8
+.B T
+Text.  This is an optional field available for user use when creating
+log entries, or to hold the text of an error message when an error is
+logged.  It is, of course, a text field.
+.TP 8
+.B u
+UID.  The user ID associated with an entry.
+
+.SH EXAMPLES
+The following examples illustrate some of the likely usage patterns for
+.IR pseudolog .
+
+.TP 8
+.B pseudolog -m '&020' -t d
+Report on all directories which are group-writeable.
+.TP 8
+.B pseudolog -m 755 -t f
+Report on all plain files which have the mode rwxr-xr-x.
+.TP 8
+.B pseudolog -s '>03:19:00' -s '<03:20:00'
+Report on all entries created after 03:19:00 and before 03:20:00 on the
+current
+date.
+.TP 8
+.B pseudolog -p '~/usr/bin/%' -F '%-8o %p'
+Report on every entry with a path beginning with the string '/usr/bin', 
+displaying the operation name (in a space-padded field of eight characters,
+left-adjusted) followed by the path.
+.TP 8
+.B pseudolog -l -T 'stamp test'
+Create an entry with all fields zero or blank, except for the
+text field, which is set to the text "stamp test", and the timestamp,
+which is set to the current time.
+.TP 8
+.B pseudolog -D -r succeed -F '%p' -O p
+Display all paths for which operations succeeded, sorted by path value.
+
+.SH ENVIRONMENT
+The only environment variable supported by
+.I pseudolog
+is:
+.TP 8
+.B PSEUDO_PREFIX
+If set, the variable
+.B PSEUDO_PREFIX
+is used to determine the path to use to find the
+.I logs.db
+database file, in
+.BR PSEUDO_PREFIX /var/pseudo.
+
+.SH BUGS
+The user might think our intent is to replace all of SQL.  It's not.  If the
+options here aren't enough, rather than adding more options to this already
+fairly elaborate program, just do raw SQL queries on the
+.I logs.db
+file.
+
+The formatting options are handled by converting them into
+.I printf(3)
+format strings, without much checking.  As a result, it
+is possible for a malformed format string to cause
+.I printf()
+to explode unexpectedly.
+
+.SH SEE ALSO
+pseudo(1), sqlite3(1)

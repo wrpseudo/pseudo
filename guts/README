@@ -1,0 +1,109 @@
+The files in this directory are partially machine-generated, and are
+all covered by the COPYRIGHT file in this directory.
+
+The set of functions covered here may seem surprising.  For instance,
+obviously, fopen(3) simply calls the underlying open(2) syscall.  But...
+There is a problem.  In a few places in glibc, the syscalls are inlined
+such that there is no actual call to the C function open(2), just a raw
+call.  So there are a couple of functions (fopen, freopen) which are
+wrapped with intent only to detect the possible creation of files.
+
+Many of these functions are closely related.  Some programs may have
+calls to openat(), while others have calls to __openat_2().  To reduce
+code duplication, a number of functions are implemented purely as calls
+to other functions.
+
+When a *at() function exists, the regular function is implemented
+as *at() with AT_FDCWD as the directory fd (see the dummy #define of
+this in pseudo_client.h, used for systems which lack these.)  On systems
+where AT_NOFOLLOW_SYMLINKS is not defined, the underlying *at() functions
+don't exist, so we provide a bare implementation which works only when
+the fd is AT_FDCWD...
+
+The creat64 and open64 families are equivalent to the plain versions with
+O_LARGEFILE in mode bits.  (Again, there's a suitable dummy #define
+in pseudo_client.h.)  By contrast, the stat64 functions actually do have
+some difference -- the structure they manipulate is not the same.
+
+The following table shows which functions are merely wrappers around
+other functions:
+
+	chmod:          fchmodat
+	chown:          fchownat
+	creat64:        openat
+	creat:          openat
+	__fxstatat:	__fxstatat64
+	__fxstat:	__fxstat64
+	__lxstat64:     __fxstatat64
+	__lxstat:       __fxstatat
+	mkdir:          mkdirat
+	open64:         openat
+	__openat_2:     openat
+	__openat64_2:   openat
+	openat64:       openat
+	open:           openat
+	rename:         renameat
+	symlink:	symlinkat
+	unlink:         unlinkat
+	__xmknod:       __xmknodat
+	__xstat64:      __fxstatat64
+	__xstat:        __fxstatat
+
+The following functions are full implementations:
+
+	chdir
+	fchdir
+	fchmod
+	fchmodat
+	fchown
+	fchownat
+	__fxstat64
+	__fxstatat64
+	lchown
+	mkdirat
+	openat
+	renameat
+	rmdir
+	symlinkat
+	unlinkat
+	__xmknodat
+
+The following functions provide only partial implementations, to trap special
+cases, to track internal data structures (for instance, close() is tracked so
+that the path to a file descriptor can be dropped when the file descriptor
+is closed),  or to handle functions which may not use the underlying syscall
+wrappers:
+
+	close
+	dup
+	dup2
+	fclose
+	fopen
+	fopen64
+	freopen
+	mkstemp
+	fcntl
+	fork
+	link
+	vfork
+
+The following functions don't have any direct database interactions,
+but are used to simulate the permissions system:
+
+	getegid
+	getuid
+	setgid
+	setreuid
+	geteuid
+	setegid
+	setgroups
+	setuid
+	getgid
+	seteuid
+	setregid
+	getresgid
+	setfsgid
+	setresgid
+	getresuid
+	setfsuid
+	setresuid

@@ -1,0 +1,4 @@
+2010-03-16: 0.2
+	* first public release
+
+(There's no changelog before that, sorry.)

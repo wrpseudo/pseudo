@@ -1,0 +1,353 @@
+.\" 
+.\" pseudo(1) man page
+.\" 
+.\" Copyright (c) 2010 Wind River Systems, Inc.
+.\"
+.\" This program is free software; you can redistribute it and/or modify
+.\" it under the terms of the Lesser GNU General Public License version 2.1 as
+.\" published by the Free Software Foundation.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.\" See the Lesser GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the Lesser GNU General Public License
+.\" version 2.1 along with this program; if not, write to the Free Software
+.\" Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+.TH pseudo 1 "pseudo - pretending to be root"
+.SH SYNOPSIS
+.B pseudo
+.RB [ \-dflv ]
+.RB [ \-P\ prefix ]
+.RB [ \-t\ timeout ]
+.RB [ command ]
+.PP
+.B pseudo
+.RB [ \-P\ prefix ]
+.B \-S
+.PP
+.B pseudo
+.RB [ \-P\ prefix ]
+.B \-V
+.SH DESCRIPTION
+The
+.I pseudo
+utility provides a virtual root environment, hereafter referred to as the
+.IR pseudo\ environment ,
+allowing the creation of file system images and packages by users
+without root privileges.  The pseudo environment is implemented by pushing
+a special library
+.RI ( libpseudo.so )
+into the
+.B LD_PRELOAD
+environment variable.  This library intercepts a large number of common
+filesystem operations and some user-id related operations, and returns
+values that look as though the operations had been performed by a root
+user.  This is in turn managed by a daemon program which keeps a list
+of virtualized file ownership and permissions; this daemon program itself
+is
+.IR pseudo .
+
+The
+.I pseudo
+program itself can also be used as a program launcher.  The launcher
+is used to automatically configure a working environment, then execute
+processes within that environment.  Alternatively, you can bypass this
+by setting up certain environment variables (see the
+.B ENVIRONMENT
+section below).  The
+.I pseudo
+client library
+.RI ( libpseudo.so )
+can then start the server automatically.
+
+The
+.I pseudo
+command can be invoked in one of four possible modes:
+
+.TP 8
+.B \-V
+The
+.B \-V
+option causes
+.I pseudo
+to print configuration information and exit immediately.
+.TP 8
+.B \-S
+The
+.B \-S
+option causes
+.I pseudo
+to try to find an existing server, and if it finds one, instructs that
+server to shut down as soon as all clients are detached from it.  Note
+that the server will not shut down while clients are connected to it;
+in this case,
+.I pseudo
+will print a list of the remaining client PIDs.
+.TP 8
+.B \-d
+The
+.B \-d
+option causes pseudo to immediately detach and run in the background
+as a daemon.  This is rarely useful except for debugging.
+.PP
+Finally, invoked without any of these options,
+.I pseudo
+sets up an emulated root environment, then invokes
+.I command
+if it was provided, otherwise a shell (using the
+.B SHELL
+environment variable if it is set, or
+.I /bin/sh
+otherwise).
+
+The following options modify the behavior of
+.IR pseudo :
+
+.TP 8
+.BI \-d\  (daemonize)
+Run as a daemon;
+.I pseudo
+detaches from the calling environment and runs as a daemon.  The command
+returns successfully if this appears to have succeeded, otherwise it
+produces an error message and returns a failure status.
+
+.BI \-f\  (foreground)
+Run in the foreground;
+.I pseudo
+runs as a server, and does not try to start other commands.  This mode
+is useful for debugging.
+
+.BI \-l\  (log)
+Enable logging.  The
+.I pseudo
+daemon will log every filesystem transaction in the log database.
+
+.B \-t timeout
+Set the timeout of the
+.I pseudo
+daemon, in seconds.  The default is currently 30 seconds.  After this
+long with no attached clients, the
+.I pseudo
+daemon shuts down automatically.  The server never shuts down while it
+has attached clients.  Note that this does not prevent continued use;
+new clients can restart the daemon if they need it.
+
+.BI \-v\  (verbose)
+Increase the verbosity of the
+.I pseudo
+daemon, and the client library for any programs started by this
+invocation of
+.IR pseudo .
+This is equivalent to the
+.B PSEUDO_DEBUG
+environment variable; multiple
+.B \-v
+options increase the debugging level.
+
+.SH EXAMPLES
+The two most common usages of
+.I pseudo
+are using it to run specific commands, and setting up an environment manually
+for running various other commands.
+
+For the first case, the usage is reasonably simple:
+
+.sp
+$
+.I /path/to/pseudo
+.br
+# 
+.I commands which require root privileges
+
+You may have to use the
+.BI \-P prefix
+option to tell
+.I pseudo
+where to look for its database and server.  If you specify a full path,
+.I pseudo
+assumes that
+.B PSEUDO_PREFIX
+should be the path to the directory containing the
+.I pseudo
+program, or to the
+.I /bin
+directory containing the
+.I pseudo
+program.
+
+The other way to use
+.I pseudo
+is by setting up an environment.  This is suitable for use in
+.I Makefiles
+or similar environments, where you want to run a series of commands in
+the
+.I pseudo
+environment, but not to keep invoking the
+.I pseudo
+command.  To do this, set up the
+.BR PSEUDO_PREFIX ,\  LD_PRELOAD ,\ and\ LD_LIBRARY_PATH
+environment variables, then run programs normally.  You do not need to
+separately invoke the
+.I pseudo
+daemon; the client library starts it as needed.
+
+.SH DIAGNOSTICS
+Depending on invocation, diagnostic messages usually go either to standard
+error or to the file
+.B PSEUDO_PREFIX
+.IR /var/pseudo/pseudo.log .
+By default,
+.I pseudo
+daemon messages go into the log file, but messages generated by the client
+code go to standard error.  At the default logging level, only critical
+messages are displayed.  If you have raised the logging level (using the
+.I \-v
+option or the
+.B PSEUDO_DEBUG
+environment variable), additional messages are displayed.  Levels higher
+than 2 are very unlikely to be useful outside of
+.I pseudo
+development.
+
+Diagnostic messages seen by default are those which are believed to indicate
+either a serious internal flaw in
+.I pseudo
+or a completely unexpected failure from the underlying operating system.  In
+normal use, you should see no diagnostic messages.
+
+.SH ENVIRONMENT
+The most significant environment variables for
+.I pseudo
+are
+.B LD_PRELOAD
+and
+.BR LD_LIBRARY_PATH .
+However, these variables have no special meaning to
+.IR pseudo ;
+rather, they are used in the standard way to manipulate the dynamic linker
+into loading the
+.I libpseudo
+library so that it can intercept calls into the underlying C library.
+
+The following environment variables are used directly by
+.IR pseudo :
+
+.TP 8
+.B PSEUDO_DEBUG
+This variable holds the "debug level" for
+.I pseudo
+to run at.  In general, this is useful only for debugging
+.I pseudo
+itself.
+.TP 8
+.B PSEUDO_ENOSYS_ABORT
+If this variable is set, the
+.I pseudo
+client library calls
+.I abort()
+rather than setting
+.I errno
+to
+.B ENOSYS
+in the event of a call to a missing underlying function.  This variable has
+no function outside of debugging
+.I pseudo
+itself.
+.TP 8
+.BR PSEUDO_OPTS
+This variable holds options to be passed to any new
+.I pseudo
+servers started.  Typically, when
+.I pseudo
+is used as a launcher, this will be set automatically; however, you
+can also use it to pass options when using
+.B LD_PRELOAD
+to manually run things in the
+.I pseudo
+environment.
+.TP 8
+.B PSEUDO_PREFIX
+If set, the variable
+.B PSEUDO_PREFIX
+is used to determine the path to use to find the
+.I pseudo
+server, in
+.BR PSEUDO_PREFIX /bin,
+and the
+.I pseudo
+data files, in
+.BR PSEUDO_PREFIX /var/pseudo.
+This variable is automatically set by the
+.I pseudo
+program when it is used as a launcher.
+.TP 8
+.B PSEUDO_RELOADED
+This purely internal variable is used to track state while trying
+to re-execute to get rid of the
+.B LD_PRELOAD
+value when spawning a server.  (The
+.I pseudo
+server itself cannot function running in the
+.I pseudo environment.)
+.TP 8
+.B PSEUDO_TAG
+If this variable is set in a client's environment, its value is
+communicated to the server at the beginning of each client session,
+and recorded in the log database if any logging occurs related to a
+specific client.  Note that different clients may have different tags
+associated with them; the tag value is per-client, not per-server.
+.TP 8
+.BR PSEUDO_UIDS ,\  PSEUDO_GIDS
+These variables are used internally to pass information about the current
+emulated user and group identity from one process to another.
+.TP 8
+.B SHELL
+If set, this will be used when
+.I pseudo
+is invoked without either a command or one of the options which directs
+it to do something other than run a command.  Otherwise,
+.I pseudo
+defaults to
+.I /bin/sh .
+.B
+.SH BUGS
+The
+.I pseudo
+database is not particularly robust in the face of whole directory trees
+being moved, or changes in the underlying device and inode numbers.  It
+has a reasonable chance of recovering if only the path or the device numbers
+have changed, but it is not particularly designed to address this.  A future
+release is expected to have improved resilience in these cases.
+
+The filesystem on which
+.I pseudo
+keeps its database and files must at a minimum support UNIX domain sockets
+and reasonable file locking semantics.  Note that
+.I pseudo
+relies on
+.I flock(2)
+locking semantics; a lock has to persist into a child process.  This should
+probably eventually be fixed.
+
+The
+.I pseudo
+client library is probably thread-safe, but has not been adequately tested
+or debugged in that context.
+
+Filesystem performance is noticably worse under
+.I pseudo
+than it is otherwise.  This is probably because nearly every operation
+(other than reads and writes) involves at least one round-trip network
+communication with the server, and probably some kind of database
+activity.
+
+.SH SEE ALSO
+fakeroot(1), ld.so(8), pseudolog(1), sqlite3(1)
+.SH FURTHER READING
+Documentation of the internals of
+.I pseudo
+may be found in the
+.I doc
+subdirectory of the pseudo source tree.

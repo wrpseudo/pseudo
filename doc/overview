@@ -1,0 +1,96 @@
+Overview:
+
+The pseudo program and library combine to provide an environment which
+provides the illusion of root permissions with respect to file creation,
+ownership, and related functions.  At this time, this does not extend to
+emulating chroot functions or a virtual password database, but these features
+may be added.
+
+The underlying mechanism of pseudo is a library inserted using LD_PRELOAD,
+which provides replacement symbols for core C library functions.  At this
+time, the implementation is specific to modern glibc.  Support for other
+systems is certainly possible, but not currently implemented or immediately
+planned.  The symbols wrapped are generally those that are documented in
+section 2 of the manual -- the ones which are essentially system calls.
+
+The library works by replacing each real function with a wrapper function
+which obtains the addresses of "real" functions (those in the next library
+down in the chain, typically glibc) and then calls custom-written wrappers
+which alter the behavior of these functions and return results corresponding
+to the virtual environment.
+
+Underlying this is access to a server process, which is automatically
+spawned by the library if one is not available.  The server process maintains
+a UNIX domain socket while it is active, and maintains a database (using
+sqlite) of files known to the system.  Files are recorded in the database
+only if they are created within the virtualized environment or have been
+altered by it; files merely read are not added.
+
+There are four layers of logic for performing or wrapping any function,
+although not all functions involve all four layers:
+
+1.  The generic wrapper, which handles details such as thread-synchronization.
+This function handles the mutex used to keep multiple threads from trying to
+write to the same socket at once, and also disables wrappers when a value
+called "antimagic" is set.  The antimagic value is set internally by the
+pseudo client code, and the check for whether or not to use it is controlled
+by the mutex (actually by the mutex owner variable, which is protected by
+the mutex.)  Without that, read operations in another thread during the
+"antimagic" part of an operation would bypass pseudo, yielding erratically
+wrong results!
+2.  The wrapper function itself.  This function may translate a single
+operation into two or more logical operations.  This function has no awareness
+of the database, but can send queries to the general client code.
+3.  The general client code.  This code maintains additional data, such as
+a mapping of file descriptors to paths.  In most cases, this code also
+forwards requests to the server code.  (If the server is unavailable, the
+client can restart it.)
+4.  The server code.  This code is fairly simple; all it does is maintain
+the database of file information.  Operations consist either of a request
+for information (e.g., a stat(2) call) or notification of a change.  The
+server sends back failure or success notices.
+
+As a fairly typical example, the progress of a stat(2) call is:
+
+* The __xstat() wrapper is called.  This wrapper checks the version argument
+  against the _STAT_VER constant in case we some day run into a system where
+  programs call stat with different versions of struct stat.  (Hasn't happened
+  yet.)
+* The __xstat() wrapper calls the __fxstatat() wrapper, which in turn calls
+  the __fxstatat64() wrapper (this allows us to have only one copy of the
+  logic shared among all the path-based stat syscalls).
+* The __fxstatat64() wrapper calls the underlying __fxstatat64() function,
+  which has been mapped to the name real___fxstatat64().  (If this fails,
+  the wrapper function returns immediately.)
+* The __fxstatat64() wrapper passes the resulting stat buffer and path to the
+  client code and asks for a response.
+* The client code converts the stat buffer into a pseudo_msg_t message
+  object, and canonicalizes the path (resolving symlinks and eliminating
+  extra slashes, as well as references to . and ..).
+* The client code now sends the pseudo_msg_t object and converted path to
+  the server as a message.
+* The server receives the message.  Since this is a stat() operation (using
+  a path, not a dev/inode pair, for identification), the server searches its
+  database for existing entries with the corresponding name.
+* If the server finds an object, it updates the contents of the pseudo_msg_t
+  with the recorded values for uid, gid, mode, and raw device number, and
+  sends the message back with status SUCCEED.
+* The server also performs sanity checks to see whether there may be other
+  suspiciously-similar entries in the database, in which case it emits
+  diagnostics.  (Usually to pseudo.log.)
+* If the server finds no object, it sends the message back with status FAIL.
+* The client code returns the message to the wrapper function.
+* If the status was SUCCEED, the wrapper function copies the modified
+  fields back into its stat buffer; otherwise, it does not.
+* The wrapper function returns the original exit status from stat.
+
+Most of the functions wrapped are syscalls.  There are a few exceptions, such
+as mkstemp, fopen, and freopen.  These are wrapped because, in glibc, they
+call internal functions which make inline assembly syscalls, rather than
+calling the syscall entry points.  In each case, the wrapper makes the real
+call without intervention, then snoops the results for a file descriptor to
+path mapping.  (This would be done to opendir/fdopendir/closedir as well,
+but the DIR * is opaque and can't be snooped practically.  This is why
+some versions of 'rm -r' can, at higher diagnostic levels, generate a slew
+of warnings about file descriptors being reopened when no close was
+observed.)
