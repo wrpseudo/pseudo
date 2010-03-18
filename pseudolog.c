@@ -77,7 +77,8 @@ usage(int status) {
 	fputs("the following option letters, and value is the value to match.\n", f);
 	fputs("values may be prefixed with ! (not equal to), > (greater than),\n", f);
 	fputs("< (less than), & (bitwise and), ~ (LIKE match, anchored at both\n", f);
-	fputs("ends, text fields only), or % (LIKE match, text fields only).\n", f);
+	fputs("ends, text fields only), ^ (NOT LIKE match, anchored at both\n", f);
+	fputs("ends, or % (LIKE match, text fields only).\n", f);
 	fputs("\n", f);
 	fputs("OPTION LETTERS:\n", f);
 	for (i = 0; options[i]; ++i) {
