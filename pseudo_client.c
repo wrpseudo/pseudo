@@ -162,7 +162,7 @@ client_spawn_server(void) {
 
 	if ((server_pid = fork()) != 0) {
 		if (server_pid == -1) {
-			pseudo_diag("couldn't fork server: errno %d\n", errno);
+			pseudo_diag("couldn't fork server: %s\n", strerror(errno));
 			return 1;
 		}
 		pseudo_debug(4, "spawned server, pid %d\n", server_pid);
@@ -283,7 +283,7 @@ client_ping(void) {
 	errno = 0;
 	pseudo_debug(4, "sending ping\n");
 	if (pseudo_msg_send(connect_fd, &ping, ping.pathlen, tag)) {
-		pseudo_debug(3, "error pinging server: errno %d\n", errno);
+		pseudo_debug(3, "error pinging server: %s\n", strerror(errno));
 		return 1;
 	}
 	ack = pseudo_msg_receive(connect_fd);
@@ -531,7 +531,7 @@ pseudo_client_shutdown(void) {
 	msg.client = getpid();
 	pseudo_debug(2, "sending shutdown request\n");
 	if (pseudo_msg_send(connect_fd, &msg, 0, NULL)) {
-		pseudo_debug(1, "error requesting shutdown: errno %d\n", errno);
+		pseudo_debug(1, "error requesting shutdown: %s\n", strerror(errno));
 		return 1;
 	}
 	ack = pseudo_msg_receive(connect_fd);
@@ -702,7 +702,7 @@ pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, con
 			if (fd == connect_fd) {
 				connect_fd = pseudo_fd(connect_fd, COPY_FD);
 				if (connect_fd == -1) {
-					pseudo_diag("tried to close connection, couldn't dup: errno %d\n", errno);
+					pseudo_diag("tried to close connection, couldn't dup: %s\n", strerror(errno));
 				}
 			} else if (fd == pseudo_util_debug_fd) {
 				pseudo_util_debug_fd = pseudo_fd(fd, COPY_FD);
