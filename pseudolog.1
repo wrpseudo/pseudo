@@ -17,7 +17,7 @@
 .\" Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
 .TH pseudolog 1 "pseudo - pretending to be root"
 .SH SYNOPSIS
-.B pseudolog -l
+.B pseudolog \-l
 .RB [ \-Pv ]
 [
 .B \-E
@@ -35,6 +35,8 @@
 .B \-F
 .I format
 ]
+.PP
+.B pseudolog \-h
 .RI [ SPECIFICATIONS ]
 .SH DESCRIPTION
 The
@@ -53,6 +55,9 @@ section below.
 
 The following other options are supported:
 
+.TP 8
+.B \-h
+Print a usage message and exit.
 .TP 8
 .B \-D
 Restrict query output to distinct rows.  Rows will have members defined by

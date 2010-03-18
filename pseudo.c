@@ -47,11 +47,13 @@ int opt_S = 0;
 static int pseudo_op(pseudo_msg_t *msg, const char *tag);
 
 void
-usage(void) {
-	pseudo_diag("Usage: pseudo [-dflv] [-P prefix] [-t timeout] [command]\n");
-	pseudo_diag("       pseudo [-dflv] [-P prefix] -S\n");
-	pseudo_diag("       pseudo [-dflv] [-P prefix] -V\n");
-	exit(1);
+usage(int status) {
+	FILE *f = status ? stderr : stdout;
+	fputs("Usage: pseudo [-dflv] [-P prefix] [-t timeout] [command]\n", f);
+	fputs("       pseudo -h\n", f);
+	fputs("       pseudo [-dflv] [-P prefix] -S\n", f);
+	fputs("       pseudo [-dflv] [-P prefix] -V\n", f);
+	exit(status);
 }
 
 /* main server process */
@@ -92,7 +94,7 @@ main(int argc, char *argv[]) {
 	 * wrong.  The + suppresses this annoying behavior, but may not
 	 * be compatible with sane option libraries.
 	 */
-	while ((o = getopt(argc, argv, "+dflP:St:vV")) != -1) {
+	while ((o = getopt(argc, argv, "+dfhlP:St:vV")) != -1) {
 		switch (o) {
 		case 'd':
 			/* run as daemon */
@@ -101,6 +103,9 @@ main(int argc, char *argv[]) {
 		case 'f':
 			/* run foregrounded */
 			opt_f = 1;
+			break;
+		case 'h':
+			usage(0);
 			break;
 		case 'l':
 			optptr += snprintf(optptr, PATH_MAX - (optptr - opts),
@@ -117,7 +122,7 @@ main(int argc, char *argv[]) {
 			pseudo_server_timeout = strtol(optarg, &s, 10);
 			if (*s && !isspace(*s)) {
 				pseudo_diag("Timeout must be an integer value.\n");
-				usage();
+				usage(EXIT_FAILURE);
 			}
 			optptr += snprintf(optptr, PATH_MAX - (optptr - opts),
 					"%s-t %d", optptr > opts ? " " : "",
@@ -136,7 +141,7 @@ main(int argc, char *argv[]) {
 			break;
 		case '?':
 			pseudo_diag("unknown/invalid argument (option '%c').\n", optopt);
-			usage();
+			usage(EXIT_FAILURE);
 			break;
 		}
 	}
