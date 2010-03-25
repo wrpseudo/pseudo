@@ -5,7 +5,7 @@
  */
 	pseudo_diag("tempnam() is so ludicrously insecure as to defy implementation.");
 	errno = ENOMEM;
-	rc = 0;
+	rc = NULL;
 
 /*	return rc;
  * }
