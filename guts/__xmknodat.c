@@ -30,8 +30,9 @@
 	rc = real_openat(dirfd, path, O_CREAT | O_WRONLY | O_EXCL,
 		PSEUDO_FS_MODE(mode));
 #endif
-	if (rc == -1)
+	if (rc == -1) {
 		return -1;
+	}
 	real___fxstat64(_STAT_VER, rc, &buf);
 	/* mknod does not really open the file.  We don't have
 	 * to use wrap_close because we've never exposed this file
@@ -43,7 +44,7 @@
 	buf.st_mode = (PSEUDO_DB_MODE(buf.st_mode, mode) & 07777) |
 			(mode & ~07777);
 	buf.st_rdev = *dev;
-	msg = pseudo_client_op(OP_MKNOD, AT_SYMLINK_NOFOLLOW, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_MKNOD, -1, dirfd, path, &buf);
 	if (!msg) {
 		errno = ENOSYS;
 		rc = -1;

@@ -16,7 +16,7 @@
 		errno = save_errno;
 		return rc;
 	}
-	msg = pseudo_client_op(OP_FSTAT, 0, fd, -1, 0, buf);
+	msg = pseudo_client_op(OP_FSTAT, fd, -1, 0, buf);
 	if (msg) {
 		if (msg->result == RESULT_SUCCEED)
 			pseudo_stat_msg(buf, msg);

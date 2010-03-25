@@ -17,7 +17,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
-extern pseudo_msg_t *pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, const struct stat64 *buf, ...);
+extern pseudo_msg_t *pseudo_client_op(op_id_t op, int fd, int dirfd, const char *path, const struct stat64 *buf, ...);
 extern void pseudo_antimagic(void);
 extern void pseudo_magic(void);
 extern void pseudo_client_reset(void);
@@ -40,6 +40,13 @@ extern int pseudo_sgid;
 extern int pseudo_rgid;
 extern int pseudo_fgid;
 extern int pseudo_dir_fd;
+
+/* support related to chroot/getcwd/etc. */
+extern int pseudo_client_getcwd(void);
+extern char *pseudo_root_path(const char *, int, int, const char *, int);
+#define PSEUDO_ROOT_PATH(x, y, z) pseudo_root_path(__func__, __LINE__, (x), (y), (z));
+extern char *pseudo_cwd;
+extern size_t pseudo_cwd_len;
 
 /* Root can read, write, and execute files which have no read, write,
  * or execute permissions.

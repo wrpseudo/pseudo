@@ -16,13 +16,13 @@
 		pseudo_debug(2, "fopen '%s': fd %d\n", path, fd);
 		if (real___fxstat64(_STAT_VER, fd, &buf) != -1) {
 			if (!existed) {
-				pseudo_client_op(OP_CREAT, 0, -1, -1, path, &buf);
+				pseudo_client_op(OP_CREAT, -1, -1, path, &buf);
 			}
-			pseudo_client_op(OP_OPEN, 0, fd, -1, path, &buf);
+			pseudo_client_op(OP_OPEN, fd, -1, path, &buf);
 		} else {
 			pseudo_debug(1, "fopen (fd %d) succeeded, but fstat failed (%s).\n",
 				fd, strerror(errno));
-			pseudo_client_op(OP_OPEN, 0, fd, -1, path, 0);
+			pseudo_client_op(OP_OPEN, fd, -1, path, 0);
 		}
 		errno = save_errno;
 	}

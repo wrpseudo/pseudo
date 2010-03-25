@@ -33,7 +33,7 @@
 	/* purely for debugging purposes:  check whether file
 	 * is already in database.
 	 */
-	msg = pseudo_client_op(OP_STAT, flags, -1, -1, path, &buf);
+	msg = pseudo_client_op(OP_STAT, -1, -1, path, &buf);
 	if (!msg || msg->result != RESULT_SUCCEED) {
 		pseudo_debug(2, "chmodat to 0%o on %d/%s, ino %llu, new file.\n",
 			mode, dirfd, path, (unsigned long long) buf.st_ino);
@@ -54,7 +54,7 @@
 	 */
 
 	buf.st_mode = (buf.st_mode & ~07777) | (mode & 07777);
-	msg = pseudo_client_op(OP_CHMOD, flags, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_CHMOD, -1, dirfd, path, &buf);
 	if (!msg) {
 		errno = ENOSYS;
 		rc = -1;

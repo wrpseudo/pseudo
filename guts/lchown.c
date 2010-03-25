@@ -4,14 +4,17 @@
  */
  	pseudo_msg_t *msg;
 	struct stat64 buf;
-
+	if (!path) {
+		errno = EFAULT;
+		return -1;
+	}
 	pseudo_debug(2, "lchown(%s, %d, %d)\n",
-		path ? path : "<null>", owner, group);
+		path ? path : "<nil>", owner, group);
 	if (real___lxstat64(_STAT_VER, path, &buf) == -1) {
 		return -1;
 	}
 	if (owner == -1 || group == -1) {
-		msg = pseudo_client_op(OP_STAT, AT_SYMLINK_NOFOLLOW, -1, -1, path, &buf);
+		msg = pseudo_client_op(OP_STAT, -1, -1, path, &buf);
 		/* copy in any existing values... */
 		if (msg) {
 			if (msg->result == RESULT_SUCCEED) {
@@ -32,7 +35,7 @@
 	if (group != -1) {
 		buf.st_gid = group;
 	}
-	msg = pseudo_client_op(OP_CHOWN, AT_SYMLINK_NOFOLLOW, -1, -1, path, &buf);
+	msg = pseudo_client_op(OP_CHOWN, -1, -1, path, &buf);
 	if (!msg) {
 		errno = ENOSYS;
 		rc = -1;

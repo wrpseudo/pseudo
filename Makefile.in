@@ -94,7 +94,7 @@ pseudo_server.o: pseudo_server.h
 
 pseudo_wrappers.o: $(GUTS)
 
-wrappers: wrapfuncs.in $(USE_64)
+wrappers: wrapfuncs.in $(USE_64) makewrappers
 	./makewrappers wrapfuncs.in $(USE_64)
 
 .SECONDARY: wrappers

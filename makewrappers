@@ -51,6 +51,11 @@ cat >&5 <<EOF
 #include <string.h>
 #include <errno.h>
 #include <pthread.h>
+#include <dirent.h>
+#include <fts.h>
+#include <ftw.h>
+#include <glob.h>
+#include <utime.h>
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -140,26 +145,64 @@ do
 		\#*)	continue;;
 		esac
 		# obtain return type, name, and arguments
-		args=`expr "$signature" : '.*(\(.*\));'`
-		return_and_name=`expr "$signature" : '\(.*\)('`
+		args=`expr "$signature" : '[^(]*(\(.*\));'`
+		modifiers=`expr "$signature" : '.*; /\* \(.*\) \*/'`
+		return_and_name=`expr "$signature" : '\([^(]*\)('`
 		name=`expr "$return_and_name" : '.*[^a-zA-Z0-9_]\([a-zA-Z0-9_]*\)$'`
 		type=`expr "$return_and_name" : '\(.*[^ ]\) *'"$name"'$'`
 		printf >&2 ' %s' "$name"
+		wrapargnames=''
 		argnames=''
+		# for handling path canonicalization
+		pathnames=''
+		flags='0'
+		dirfd='AT_FDCWD'
+
 		save_IFS=$IFS
 		IFS=,
 		set -- $args
-		IFS=$save_ifs
+		IFS=$save_IFS
 		args=''
 		optional_arg=false
+		prepend=''
+		depth=0
 		for arg
 		do
-			# strip whitespace
-			arg=${arg# }
-			arg=${arg% }
 
 			# handle optional arguments, like the third arg
 			# to open()
+			if [ $depth -gt 0 ]; then
+				case $arg in
+				*\)*)
+					lcount=`echo $arg | tr -cd '(' | wc -c`
+					rcount=`echo $arg | tr -cd ')' | wc -c`
+					depth=`expr $depth + $lcount - $rcount`
+					prepend="${prepend:+$prepend,}$arg"
+					arg=""
+					;;
+				*)	prepend="${prepend:+$prepend,}$arg"
+					arg=""
+					;;
+				esac
+			else
+				case $arg in
+				*\(*)	lcount=`echo $arg | tr -cd '(' | wc -c`
+					rcount=`echo $arg | tr -cd ')' | wc -c`
+					depth=`expr $depth + $lcount - $rcount`
+					prepend="${prepend:+$prepend,}$arg"
+					arg=""
+					;;
+				esac
+			fi
+			# we're inside nested ()s
+			if [ $depth -gt 0 ]; then
+				continue
+			fi
+			arg="$prepend$arg"
+			# strip whitespace
+			arg=${arg# }
+			arg=${arg% }
+			prepend=''
 			case $arg in
 			...*)
 				optional_arg=true
@@ -167,6 +210,7 @@ do
 				arg=`expr "$arg" : '\.\.\.{\(.*\)}'`
 				argname=`expr "$arg" : '.*[^a-zA-Z0-9_]\([a-zA-Z0-9_]*\)$'`
 				argnames="$argnames${argnames:+, }$argname"
+				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
 
 				# we need this to extract and pass the argument
 				optional_decl=$arg
@@ -174,24 +218,61 @@ do
 				optional_name=$argname
 				optional_type=`expr "$arg" : '\(.*[^ ]\) *'"$argname"'$'`
 				;;
-			*)
-				argname=`expr "$arg" : '.*[^a-zA-Z0-9_]\([a-zA-Z0-9_]*\)$'`
+			*\(*)	# function pointer
+				argname=`expr "$arg" : '[^(]*(\*\([a-zA-Z0-9_]*\).*'`
 				args="$args${args:+, }$arg"
+				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
+				argnames="$argnames${argnames:+, }$argname"
+				prev_argname=$argname
+				;;
+			*)
+				argname=`expr "$arg" : '.*[^a-zA-Z0-9_](*\([a-zA-Z0-9_]*\))*(*)*$'`
+				args="$args${args:+, }$arg"
+				# special handling for canonicalization
+				# set this before changing path -> rpath, for guts files
+				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
+				case $argname in
+				*path)	pathnames="${pathnames+${pathnames} }$argname"
+					argname="r$argname"
+					;;
+				dirfd)	dirfd='dirfd';;
+				flags)	flags='flags';;
+				esac
 				argnames="$argnames${argnames:+, }$argname"
 				prev_argname=$argname
 				;;
 			esac
 		done
+		# see whether flags was overridden
+		flags_tmp=`expr "$modifiers" : 'flags=\([^ ]*\)'`
+		if [ -n "$flags_tmp" ]; then
+			flags=$flags_tmp
+		fi
+		decl_paths=''
+		alloc_paths=''
+		free_paths=''
+		# any argument ending in "path" is presumed to need to be
+		# converted to a chroot path.  To avoid this, name the
+		# argument something else (e.g. "template" for mkstemp)
+		for p in $pathnames; do
+			decl_paths="${decl_paths}
+	char *r$p = (char *) $p;"
+			alloc_paths="${alloc_paths}
+			r$p = pseudo_root_path(__func__, __LINE__, $dirfd, $p, $flags);"
+			free_paths="${free_paths}
+			free(r$p);"
+		done
 
 		# determine default return value.
 		case $type in
-		int)
+		int|ssize_t|long)
 			default_value=-1;;
 		uid_t|gid_t)
 			default_value=0;;
-		'FILE *')
+		'FILE *' | 'char *' | 'DIR *' | 'FTS *')
 			default_value=NULL;;
-		*)	echo >&2 "Unknown type '$type'." ; exit 1 ;;
+		*)	echo >&2 "
+Unknown type '$type'." ; exit 1 ;;
 		esac
 		# create the wrappers
 		# first the dummy, and the function pointer:
@@ -226,10 +307,12 @@ EOF
 		fi
 		# and now the body of the wrapper:
 		cat >&5 <<EOF
+	pseudo_debug(4, "called: $name\n");
 	if (pseudo_getlock()) {
 		errno = EBUSY;
 		return $default_value;
 	}
+	$decl_paths
 	if (pseudo_populate_wrappers()) {
 		$type rc = $default_value;
 		int save_errno;
@@ -240,14 +323,18 @@ EOF
 				rc = dummy_$name($argnames);
 			}
 		} else {
+$alloc_paths
 			rc = wrap_$name($argnames);
+$free_paths
 		}
 		save_errno = errno;
 		pseudo_droplock();
 		errno = save_errno;
+		pseudo_debug(4, "completed: $name\n");
 		return rc;
 	} else {
 		pseudo_droplock();
+		pseudo_debug(4, "completed: $name\n");
 		return dummy_$name($argnames);
 	}
 }
@@ -302,7 +389,7 @@ EOF
  *	$type rc = $default_value;
  */
 
-	rc = real_$name($argnames);
+	rc = real_$name($wrapargnames);
 
 /*	return rc;
  * }
@@ -316,7 +403,7 @@ EOF
  *	$type rc = $default_value;
  */
 
-	rc = real_$name($argnames);
+	rc = real_$name($wrapargnames);
 
 /*	return rc;
  * }

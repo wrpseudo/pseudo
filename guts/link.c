@@ -17,11 +17,11 @@
 		 * there is one.  OP_LINK is also used to insert unseen
 		 * files, though, so it can't be implicit.
 		 */
-		msg = pseudo_client_op(OP_STAT, 0, -1, -1, oldpath, &buf);
+		msg = pseudo_client_op(OP_STAT, -1, -1, oldpath, &buf);
 		if (msg) {
 			pseudo_stat_msg(&buf, msg);
 		}
-		pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &buf);
+		pseudo_client_op(OP_LINK, -1, -1, newpath, &buf);
 	}
 
 /*	return rc;

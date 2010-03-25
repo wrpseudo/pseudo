@@ -12,7 +12,7 @@
 		return -1;
 	}
 	buf.st_mode = (buf.st_mode & ~07777) | (mode & 07777);
-	msg = pseudo_client_op(OP_FCHMOD, 0, fd, -1, 0, &buf);
+	msg = pseudo_client_op(OP_FCHMOD, fd, -1, 0, &buf);
 	real_fchmod(fd, PSEUDO_FS_MODE(mode));
 	if (!msg) {
 		errno = ENOSYS;

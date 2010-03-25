@@ -1,6 +1,6 @@
 /* 
  * static int
- * wrap_unlinkat(int dirfd, const char *path, int flags) {
+ * wrap_unlinkat(int dirfd, const char *path, int rflags) {
  *	int rc = -1;
  */
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
@@ -8,18 +8,17 @@
 		errno = ENOSYS;
 		return -1;
 	}
-	if (flags) {
+	if (rflags) {
 		/* the only supported flag is AT_REMOVEDIR.  We'd never call
 		 * with that flag unless the real AT functions exist, so 
 		 * something must have gone horribly wrong....
 		 */
 		pseudo_diag("wrap_unlinkat called with flags (0x%x), path '%s'\n",
-			flags, path ? path : "<nil>");
+			rflags, path ? path : "<nil>");
 		errno = ENOSYS;
 		return -1;
 	}
 #endif
-
  	struct stat64 buf;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
@@ -33,10 +32,10 @@
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	rc = real_unlink(path);
 #else
-	rc = real_unlinkat(dirfd, path, flags);
+	rc = real_unlinkat(dirfd, path, rflags);
 #endif
 	if (rc != -1) {
-		pseudo_client_op(OP_UNLINK, AT_SYMLINK_NOFOLLOW, -1, dirfd, path, &buf);
+		pseudo_client_op(OP_UNLINK, -1, dirfd, path, &buf);
 	}
 
 /*	return rc;

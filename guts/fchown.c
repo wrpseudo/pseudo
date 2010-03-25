@@ -15,7 +15,7 @@
 		return -1;
 	}
 	if (owner == -1 || group == -1) {
-		msg = pseudo_client_op(OP_STAT, 0, fd, -1, NULL, &buf);
+		msg = pseudo_client_op(OP_STAT, fd, -1, NULL, &buf);
 		/* copy in any existing values... */
 		if (msg) {
 			if (msg->result == RESULT_SUCCEED) {
@@ -38,7 +38,7 @@
 	}
 	pseudo_debug(2, "fchown, fd %d: %d:%d -> %d:%d\n",
 		fd, owner, group, buf.st_uid, buf.st_gid);
-	msg = pseudo_client_op(OP_FCHOWN, 0, fd, -1, 0, &buf);
+	msg = pseudo_client_op(OP_FCHOWN, fd, -1, 0, &buf);
 	if (!msg) {
 		errno = ENOSYS;
 		rc = -1;

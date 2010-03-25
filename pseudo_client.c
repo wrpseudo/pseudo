@@ -37,14 +37,16 @@
 #include "pseudo_ipc.h"
 #include "pseudo_client.h"
 
+static char *base_path(int dirfd, const char *path, int leave_last);
+
 static int connect_fd = -1;
 static int server_pid = 0;
 int pseudo_dir_fd = -1;
+char *pseudo_cwd = 0;
+size_t pseudo_cwd_len;
 
 static char **fd_paths = 0;
 static int nfds = 0;
-static char cwdbuf[PATH_MAX * 2], *cwd;
-static int cwdlen = 0;
 static int messages = 0;
 static struct timeval message_time = { 0 };
 static int pseudo_inited = 0;
@@ -75,13 +77,52 @@ pseudo_client_touchgid(void) {
 	setenv("PSEUDO_GIDS", gidbuf, 1);
 }
 
+char *
+pseudo_root_path(const char *func, int line, int dirfd, const char *path, int leave_last) {
+	char *rc;
+	pseudo_antimagic();
+	rc = base_path(dirfd, path, leave_last);
+	pseudo_magic();
+	if (!rc) {
+		pseudo_diag("couldn't allocate absolute path for '%s'.\n",
+			path);
+	}
+	pseudo_debug(3, "root_path [%s, %d]: '%s' from '%s'\n",
+		func, line,
+		rc ? rc : "<nil>",
+		path ? path : "<nil>");
+	return rc;
+}
+
+int
+pseudo_client_getcwd(void) {
+	char *cwd;
+	cwd = malloc(pseudo_path_max());
+	if (!cwd) {
+		pseudo_diag("Can't allocate CWD buffer!\n");
+		return -1;
+	}
+	pseudo_debug(2, "getcwd: trying to find cwd.\n");
+	if (getcwd(cwd, pseudo_path_max())) {
+		/* cwd now holds a canonical path to current directory */
+		pseudo_cwd_len = strlen(cwd);
+		pseudo_debug(3, "getcwd okay: [%s] %d bytes\n", cwd, (int) pseudo_cwd_len);
+		free(pseudo_cwd);
+		pseudo_cwd = cwd;
+		return 0;
+	} else {
+		pseudo_diag("Can't get CWD: %s\n", strerror(errno));
+		return -1;
+	}
+}
+
 static char *
 fd_path(int fd) {
 	if (fd >= 0 && fd < nfds) {
 		return fd_paths[fd];
 	}
 	if (fd == AT_FDCWD) {
-		return cwd;
+		return pseudo_cwd;
 	}
 	return 0;
 }
@@ -130,8 +171,7 @@ pseudo_client_reset() {
 		close(connect_fd);
 		connect_fd = -1;
 	}
-	cwd = getcwd(cwdbuf, PATH_MAX);
-	cwdlen = strlen(cwd);
+	pseudo_client_getcwd();
 	if (!pseudo_inited) {
 		char *env;
 		
@@ -551,39 +591,42 @@ pseudo_client_shutdown(void) {
 static char *
 base_path(int dirfd, const char *path, int leave_last) {
 	char *basepath = 0;
-	size_t pathlen = -1;
-	size_t baselen;
+	size_t baselen = 0;
 	char *newpath;
 
-	if (dirfd != -1 && dirfd != AT_FDCWD) {
-		if (dirfd >= 0) {
-			basepath = fd_path(dirfd);
-			baselen = strlen(basepath);
+	if (path[0] != '/') {
+		if (dirfd != -1 && dirfd != AT_FDCWD) {
+			if (dirfd >= 0) {
+				basepath = fd_path(dirfd);
+				baselen = strlen(basepath);
+			} else {
+				pseudo_diag("got *at() syscall for unknown directory, fd %d\n", dirfd);
+			}
 		} else {
-			pseudo_diag("got *at() syscall for unknown directory, fd %d\n", dirfd);
+			basepath = pseudo_cwd;
+			baselen = pseudo_cwd_len;
 		}
-	} else {
-		basepath = cwd;
-		baselen = cwdlen;
-	}
-	if (!basepath) {
-		pseudo_diag("unknown base path for fd %d, path %s\n", dirfd, path);
-		return 0;
+		if (!basepath) {
+			pseudo_diag("unknown base path for fd %d, path %s\n", dirfd, path);
+			return 0;
+		}
 	}
 
-	pathlen = baselen + strlen(path) + 2;
 	newpath = pseudo_fix_path(basepath, path, baselen, NULL, leave_last);
+	pseudo_debug(4, "base_path: %s</>%s\n",
+		basepath ? basepath : "<nil>",
+		path ? path : "<nil>");
 	return newpath;
 }
 
 pseudo_msg_t *
-pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, const struct stat64 *buf, ...) {
+pseudo_client_op(op_id_t op, int fd, int dirfd, const char *path, const struct stat64 *buf, ...) {
 	pseudo_msg_t *result = 0;
 	pseudo_msg_t msg = { .type = PSEUDO_MSG_OP };
-	char *newpath = 0;
 	size_t pathlen = -1;
 	int do_request = 0;
 	char *oldpath = 0;
+	char *newpath = 0;
 
 	/* disable wrappers */
 	pseudo_antimagic();
@@ -606,43 +649,27 @@ pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, con
 			pseudo_magic();
 			return 0;
 		}
-		if (oldpath[0] != '/') {
-			oldpath = base_path(dirfd, oldpath, 1);
-		} else {
-			oldpath = pseudo_fix_path(NULL, oldpath, 0, NULL, 1);
-		}
 	}
 
 	if (path) {
-		/* fixup relative path */
-		if (*path != '/') {
-			newpath = base_path(dirfd, path, flags);
-		} else {
-			newpath = pseudo_fix_path(NULL, path, 0, NULL, flags);
-		}
-		if (newpath) {
-			pathlen = strlen(newpath) + 1;
-		} else {
-			pseudo_diag("couldn't allocate space for a path (%s).  Sorry.\n", path);
-			free(oldpath);
-			pseudo_magic();
-			return 0;
-		}
+		/* path fixup has to happen in the specific functions,
+		 * because they may have to make calls which have to be
+		 * fixed up for chroot stuff already.
+		 */
+		pathlen = strlen(path) + 1;
 		if (oldpath) {
 			size_t full_len = strlen(oldpath) + 1 + pathlen;
 			char *both_paths = malloc(full_len);
 			if (!both_paths) {
 				pseudo_diag("can't allocate space for paths for a rename operation.  Sorry.\n");
-				free(newpath);
-				free(oldpath);
 				pseudo_magic();
 				return 0;
 			}
 			snprintf(both_paths, full_len, "%s%c%s",
-				newpath, 0, oldpath);
+				path, 0, oldpath);
 			pseudo_debug(2, "rename: %s -> %s [%d]\n",
 				both_paths + pathlen, both_paths, (int) full_len);
-			free(newpath);
+			path = both_paths;
 			newpath = both_paths;
 			pathlen = full_len;
 		}
@@ -660,10 +687,9 @@ pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, con
 		(dirfd != -1 && dirfd != AT_FDCWD && op != OP_DUP) ? "at" : "");
 	if (oldpath) {
 		pseudo_debug(2, " %s ->", (char *) oldpath);
-		free(oldpath);
 	}
-	if (newpath || path) {
-		pseudo_debug(2, " %s", newpath ? newpath : path);
+	if (path) {
+		pseudo_debug(2, " %s", path);
 	}
 	if (fd != -1) {
 		pseudo_debug(2, " [fd %d]", fd);
@@ -688,12 +714,11 @@ pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, con
 	pseudo_debug(4, "processing request [ino %llu]\n", (unsigned long long) msg.ino);
 	switch (msg.op) {
 	case OP_CHDIR:
-		cwd = getcwd(cwdbuf, PATH_MAX);
-		cwdlen = strlen(cwd);
+		pseudo_client_getcwd();
 		do_request = 0;
 		break;
 	case OP_OPEN:
-		pseudo_client_path(fd, newpath ? newpath : path);
+		pseudo_client_path(fd, path);
 		do_request = 1;
 		break;
 	case OP_CLOSE:
@@ -752,7 +777,7 @@ pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, con
 		struct timeval tv1, tv2;
 		pseudo_debug(4, "sending request [ino %llu]\n", (unsigned long long) msg.ino);
 		gettimeofday(&tv1, NULL);
-		result = pseudo_client_request(&msg, pathlen, newpath ? newpath : path);
+		result = pseudo_client_request(&msg, pathlen, path);
 		gettimeofday(&tv2, NULL);
 		++messages;
 		message_time.tv_sec += (tv2.tv_sec - tv1.tv_sec);
@@ -787,6 +812,7 @@ pseudo_client_op(op_id_t op, int flags, int fd, int dirfd, const char *path, con
 	}
 	pseudo_debug(2, "\n");
 
+	/* if not NULL, newpath is the buffer holding both paths */
 	free(newpath);
 
 	if (do_request && (messages % 1000 == 0)) {

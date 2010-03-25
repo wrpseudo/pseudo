@@ -30,7 +30,7 @@
 	}
 	save_errno = errno;
 
-	msg = pseudo_client_op(OP_STAT, flags, -1, -1, path, &buf);
+	msg = pseudo_client_op(OP_STAT, -1, -1, path, &buf);
 	/* copy in any existing values... */
 	if (msg) {
 		if (msg->result == RESULT_SUCCEED) {
@@ -48,7 +48,7 @@
 	if (group != -1) {
 		buf.st_gid = group;
 	}
-	msg = pseudo_client_op(OP_CHOWN, flags, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_CHOWN, -1, dirfd, path, &buf);
 	if (!msg) {
 		errno = ENOSYS;
 		rc = -1;

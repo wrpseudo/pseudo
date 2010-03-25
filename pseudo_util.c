@@ -30,7 +30,9 @@
 #include "pseudo_ipc.h"
 #include "pseudo_db.h"
 
-/* 3 = detailed protocol analysis
+/* 5 = ridiculous levels of duplication
+ * 4 = exhaustive detail
+ * 3 = detailed protocol analysis
  * 2 = higher-level protocol analysis
  * 1 = stuff that might go wrong
  * 0 = fire and arterial bleeding
@@ -43,6 +45,8 @@ static size_t pid_len;
 static int pseudo_append_element(char **newpath, size_t *allocated, char **current, const char *element, size_t elen, int leave_last);
 static int pseudo_append_elements(char **newpath, size_t *allocated, char **current, const char *elements, size_t elen, int leave_last);
 extern char **environ;
+static ssize_t pseudo_max_pathlen = -1;
+static ssize_t pseudo_sys_max_pathlen = -1;
 
 char *pseudo_version = PSEUDO_VERSION;
 
@@ -198,11 +202,11 @@ pseudo_append_element(char **pnewpath, size_t *pallocated, char **pcurrent, cons
 			is_link = 0;
 		}
 		if (is_link) {
-			char linkbuf[PATH_MAX + 1];
+			char linkbuf[pseudo_path_max() + 1];
 			ssize_t linklen;
 			int retval;
 
-			linklen = readlink(newpath, linkbuf, PATH_MAX);
+			linklen = readlink(newpath, linkbuf, pseudo_path_max());
 			if (linklen == -1) {
 				pseudo_diag("uh-oh!  '%s' seems to be a symlink, but I can't read it.  Ignoring.", newpath);
 				return 0;
@@ -459,29 +463,29 @@ pseudo_get_prefix(char *pathname) {
 	char *s;
 	s = getenv("PSEUDO_PREFIX");
 	if (!s) {
-		char mypath[PATH_MAX];
+		char mypath[pseudo_path_max()];
 		char *dir;
 		char *tmp_path;
 
 		if (pathname[0] == '/') {
-			snprintf(mypath, PATH_MAX, "%s", pathname);
+			snprintf(mypath, pseudo_path_max(), "%s", pathname);
 			s = mypath + strlen(mypath);
 		} else {
-			if (!getcwd(mypath, PATH_MAX)) {
+			if (!getcwd(mypath, pseudo_path_max())) {
 				mypath[0] = '\0';
 			}
 			s = mypath + strlen(mypath);
-			s += snprintf(s, PATH_MAX - (s - mypath), "/%s",
+			s += snprintf(s, pseudo_path_max() - (s - mypath), "/%s",
 				pathname);
 		}
-		tmp_path = pseudo_fix_path(NULL, mypath, 0, 0, 0);
+		tmp_path = pseudo_fix_path(NULL, mypath, 0, 0, AT_SYMLINK_NOFOLLOW);
 		/* point s to the end of the fixed path */
-		if (strlen(tmp_path) >= PATH_MAX) {
-			pseudo_diag("Can't expand path '%s' -- expansion exceeds PATH_MAX.\n",
-				mypath);
+		if (strlen(tmp_path) >= pseudo_path_max()) {
+			pseudo_diag("Can't expand path '%s' -- expansion exceeds %d.\n",
+				mypath, (int) pseudo_path_max());
 			free(tmp_path);
 		} else {
-			s = mypath + snprintf(mypath, PATH_MAX, "%s", tmp_path);
+			s = mypath + snprintf(mypath, pseudo_path_max(), "%s", tmp_path);
 			free(tmp_path);
 		}
 
@@ -507,4 +511,58 @@ pseudo_get_prefix(char *pathname) {
 		s = getenv("PSEUDO_PREFIX");
 	}
 	return s;
+}
+
+/* these functions define the sizes pseudo will try to use
+ * when trying to allocate space, or guess how much space
+ * other people will have allocated; see the GNU man page
+ * for realpath(3) for an explanation of why the sys_path_max
+ * functions exists, approximately -- it's there to be a size
+ * that I'm pretty sure the user will have allocated if they
+ * provided a buffer to that defective function.
+ */
+/* I'm pretty sure this will be larger than real PATH_MAX */
+#define REALLY_BIG_PATH 16384
+/* A likely common value for PATH_MAX */
+#define SORTA_BIG_PATH 4096
+ssize_t
+pseudo_path_max(void) {
+	if (pseudo_max_pathlen == -1) {
+		long l = pathconf("/", _PC_PATH_MAX);
+		if (l < 0) {
+			if (_POSIX_PATH_MAX > 0) {
+				pseudo_max_pathlen = _POSIX_PATH_MAX;
+			} else {
+				pseudo_max_pathlen = REALLY_BIG_PATH;
+			}
+		} else {
+			if (l <= REALLY_BIG_PATH) {
+				pseudo_max_pathlen = l;
+			} else {
+				pseudo_max_pathlen = REALLY_BIG_PATH;
+			}
+		}
+	}
+	return pseudo_max_pathlen;
+}
+
+ssize_t
+pseudo_sys_path_max(void) {
+	if (pseudo_sys_max_pathlen == -1) {
+		long l = pathconf("/", _PC_PATH_MAX);
+		if (l < 0) {
+			if (_POSIX_PATH_MAX > 0) {
+				pseudo_sys_max_pathlen = _POSIX_PATH_MAX;
+			} else {
+				pseudo_sys_max_pathlen = SORTA_BIG_PATH;
+			}
+		} else {
+			if (l <= SORTA_BIG_PATH) {
+				pseudo_sys_max_pathlen = l;
+			} else {
+				pseudo_sys_max_pathlen = SORTA_BIG_PATH;
+			}
+		}
+	}
+	return pseudo_sys_max_pathlen;
 }

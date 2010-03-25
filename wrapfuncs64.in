@@ -3,7 +3,7 @@ int openat64(int dirfd, const char *path, int flags, ...{mode_t mode});
 int __openat64_2(int dirfd, const char *path, int flags);
 int creat64(const char *path, mode_t mode);
 int __xstat64(int ver, const char *path, struct stat64 *buf);
-int __lxstat64(int ver, const char *path, struct stat64 *buf);
+int __lxstat64(int ver, const char *path, struct stat64 *buf); /* flags=AT_SYMLINK_NOFOLLOW */
 int __fxstat64(int ver, int fd, struct stat64 *buf);
 int __fxstatat64(int ver, int dirfd, const char *path, struct stat64 *buf, int flags);
 FILE *fopen64(const char *path, const char *mode);

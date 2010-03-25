@@ -64,8 +64,10 @@ main(int argc, char *argv[]) {
 	int lockfd, newfd;
 	char *ld_env = getenv("LD_PRELOAD");
 	int rc;
-	char opts[PATH_MAX] = "", *optptr = opts;
+	char opts[pseudo_path_max()], *optptr = opts;
 	char *lockname;
+
+	opts[0] = '\0';
 
 	s = getenv("PSEUDO_DEBUG");
 	if (s) {
@@ -108,7 +110,7 @@ main(int argc, char *argv[]) {
 			usage(0);
 			break;
 		case 'l':
-			optptr += snprintf(optptr, PATH_MAX - (optptr - opts),
+			optptr += snprintf(optptr, pseudo_path_max() - (optptr - opts),
 					"%s-l", optptr > opts ? " " : "");
 			opt_l = 1;
 			break;
@@ -124,7 +126,7 @@ main(int argc, char *argv[]) {
 				pseudo_diag("Timeout must be an integer value.\n");
 				usage(EXIT_FAILURE);
 			}
-			optptr += snprintf(optptr, PATH_MAX - (optptr - opts),
+			optptr += snprintf(optptr, pseudo_path_max() - (optptr - opts),
 					"%s-t %d", optptr > opts ? " " : "",
 					pseudo_server_timeout);
 			break;

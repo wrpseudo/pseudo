@@ -1,3 +1,9 @@
+2010-03-24:
+	* (seebs) regenerate wrappers when makewrappers is changed.
+	* (seebs) begin prep for chroot
+	* (seebs) standardize path expansion
+	* (seebs) extend makewrappers to handle function pointer args
+
 2010-03-17:
 	* (seebs) fixup help options
 	* (seebs) use strerror() in a couple more places
