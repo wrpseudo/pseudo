@@ -20,6 +20,7 @@
 .B pseudo
 .RB [ \-dflv ]
 .RB [ \-P\ prefix ]
+.RB [ \-rR\ root ]
 .RB [ \-t\ timeout ]
 .RB [ command ]
 .PP
@@ -122,17 +123,35 @@ detaches from the calling environment and runs as a daemon.  The command
 returns successfully if this appears to have succeeded, otherwise it
 produces an error message and returns a failure status.
 
+.TP 8
 .BI \-f\  (foreground)
 Run in the foreground;
 .I pseudo
 runs as a server, and does not try to start other commands.  This mode
 is useful for debugging.
 
+.TP 8
 .BI \-l\  (log)
 Enable logging.  The
 .I pseudo
 daemon will log every filesystem transaction in the log database.
 
+.TP 8
+.BI \-r\  root
+.TP 8
+.BI \-R\  root
+Set the
+.B PSEUDO_CHROOT
+environment variable, running as though the program had called
+.I chroot(2)
+on the specified path.  With
+.BR \-r ,
+this implies changing the working directory to the specified directory;
+with
+.BR \-R ,
+it does not.
+
+.TP 8
 .B \-t timeout
 Set the timeout of the
 .I pseudo
@@ -143,6 +162,7 @@ daemon shuts down automatically.  The server never shuts down while it
 has attached clients.  Note that this does not prevent continued use;
 new clients can restart the daemon if they need it.
 
+.TP 8
 .BI \-v\  (verbose)
 Increase the verbosity of the
 .I pseudo
@@ -243,6 +263,12 @@ library so that it can intercept calls into the underlying C library.
 The following environment variables are used directly by
 .IR pseudo :
 
+.TP 8
+.B PSEUDO_CHROOT
+This variable holds the current emulated
+.I chroot(2)
+path.  Paths that are relative to this are treated as though they were
+instead relative to the filesystem root.
 .TP 8
 .B PSEUDO_DEBUG
 This variable holds the "debug level" for

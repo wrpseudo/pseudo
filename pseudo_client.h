@@ -43,10 +43,14 @@ extern int pseudo_dir_fd;
 
 /* support related to chroot/getcwd/etc. */
 extern int pseudo_client_getcwd(void);
+extern int pseudo_client_chroot(const char *);
 extern char *pseudo_root_path(const char *, int, int, const char *, int);
 #define PSEUDO_ROOT_PATH(x, y, z) pseudo_root_path(__func__, __LINE__, (x), (y), (z));
 extern char *pseudo_cwd;
 extern size_t pseudo_cwd_len;
+extern char *pseudo_cwd_rel;
+extern char *pseudo_chroot;
+extern size_t pseudo_chroot_len;
 
 /* Root can read, write, and execute files which have no read, write,
  * or execute permissions.
@@ -62,28 +66,4 @@ extern size_t pseudo_cwd_len;
  */
 #define PSEUDO_FS_MODE(mode) ((mode) | S_IRUSR | S_IWUSR | S_IXUSR)
 #define PSEUDO_DB_MODE(fs_mode, user_mode) (((fs_mode) & ~0700) | ((user_mode & 0700)))
-
-/* some systems might not have *at().  We like to define operations in
- * terms of each other, and for instance, open(...) is the same as
- * openat(AT_FDCWD, ...).  If no AT_FDCWD is provided, any value that can't
- * be a valid file descriptor will do.  Using -2 because -1 could be
- * mistaken for a failed syscall return.  Similarly, any value which isn't
- * zero will do to fake AT_SYMLINK_NOFOLLOW.  Finally, if this happened,
- * we set our own flag we can use to indicate that dummy implementations
- * of the _at functions are needed.
- */
-#ifndef AT_FDCWD
-#define AT_FDCWD -2
-#define AT_SYMLINK_NOFOLLOW 1
-#define PSEUDO_NO_REAL_AT_FUNCTIONS
-#endif
-
-/* Likewise, someone might not have O_LARGEFILE (the flag equivalent to
- * using open64()).  Since open64() is the same as O_LARGEFILE in flags,
- * we implement it that way... If the system has no O_LARGEFILE, we'll
- * just call open() with nothing special.
- */ 
-#ifndef O_LARGEFILE
-#define O_LARGEFILE 0
-#endif
 

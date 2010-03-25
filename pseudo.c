@@ -42,6 +42,7 @@ int opt_d = 0;
 int opt_f = 0;
 int opt_l = 0;
 long opt_p = 0;
+char *opt_r = NULL;
 int opt_S = 0;
 
 static int pseudo_op(pseudo_msg_t *msg, const char *tag);
@@ -49,7 +50,7 @@ static int pseudo_op(pseudo_msg_t *msg, const char *tag);
 void
 usage(int status) {
 	FILE *f = status ? stderr : stdout;
-	fputs("Usage: pseudo [-dflv] [-P prefix] [-t timeout] [command]\n", f);
+	fputs("Usage: pseudo [-dflv] [-P prefix] [-rR root] [-t timeout] [command]\n", f);
 	fputs("       pseudo -h\n", f);
 	fputs("       pseudo [-dflv] [-P prefix] -S\n", f);
 	fputs("       pseudo [-dflv] [-P prefix] -V\n", f);
@@ -83,12 +84,12 @@ main(int argc, char *argv[]) {
 		pseudo_debug(2, "can't run daemon with libpseudo in LD_PRELOAD\n");
 		if (getenv("PSEUDO_RELOADED")) {
 			pseudo_diag("I can't seem to make LD_PRELOAD go away.  Sorry.\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 		setenv("PSEUDO_RELOADED", "YES", 1);
 		pseudo_dropenv();
 		execve(argv[0], argv, environ);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	unsetenv("PSEUDO_RELOADED");
 
@@ -96,7 +97,7 @@ main(int argc, char *argv[]) {
 	 * wrong.  The + suppresses this annoying behavior, but may not
 	 * be compatible with sane option libraries.
 	 */
-	while ((o = getopt(argc, argv, "+dfhlP:St:vV")) != -1) {
+	while ((o = getopt(argc, argv, "+dfhlP:r:R:St:vV")) != -1) {
 		switch (o) {
 		case 'd':
 			/* run as daemon */
@@ -115,7 +116,21 @@ main(int argc, char *argv[]) {
 			opt_l = 1;
 			break;
 		case 'P':
-			setenv("PSEUDO_PREFIX", optarg, 1);
+			pseudo_client_getcwd();
+			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
+			if (!s)
+				pseudo_diag("Can't resolve path '%s'\n", optarg);
+			setenv("PSEUDO_PREFIX", s, 1);
+			break;
+		case 'r': /* FALLTHROUGH */
+		case 'R':
+			pseudo_client_getcwd();
+			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
+			if (!s)
+				pseudo_diag("Can't resolve path '%s'\n", optarg);
+			setenv("PSEUDO_CHROOT", s, 1);
+			if (o == 'r')
+				opt_r = s;
 			break;
 		case 'S':
 			opt_S = 1;
@@ -150,7 +165,7 @@ main(int argc, char *argv[]) {
 
 	if (!pseudo_get_prefix(argv[0])) {
 		pseudo_diag("Can't figure out prefix.  Set PSEUDO_PREFIX or invoke with full path.\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (opt_S) {
@@ -159,15 +174,22 @@ main(int argc, char *argv[]) {
 
 	if (opt_d && opt_f) {
 		pseudo_diag("You cannot run a foregrounded daemon.\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (opt_f || opt_d) {
 		if (argc > optind) {
 			pseudo_diag("pseudo: running program implies spawning background daemon.\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 	} else {
+		if (opt_r) {
+			if (chdir(opt_r) == -1) {
+				pseudo_diag("failed to chdir to '%s': %s\n",
+					opt_r, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+		}
 		if (argc > optind) {
 			pseudo_debug(2, "running command: %s\n",
 				argv[optind]);
@@ -190,7 +212,7 @@ main(int argc, char *argv[]) {
 			pseudo_diag("pseudo: can't run %s: %s\n",
 				argv[0], strerror(errno));
 		}
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	/* if we got here, we are not running a command, and we are not in
 	 * a pseudo environment.
@@ -201,13 +223,13 @@ main(int argc, char *argv[]) {
 	lockname = pseudo_prefix_path(PSEUDO_LOCKFILE);
 	if (!lockname) {
 		pseudo_diag("Couldn't allocate a file path.\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	lockfd = open(lockname, O_RDWR | O_CREAT, 0644);
 	if (lockfd < 0) {
 		pseudo_diag("Can't open or create lockfile %s: %s\n",
 			lockname, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	free(lockname);
 

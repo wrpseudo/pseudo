@@ -59,6 +59,7 @@ id_row op_rows[] = {
 	OP_ROW(OP_CHDIR, "chdir"),
 	OP_ROW(OP_CHMOD, "chmod"),
 	OP_ROW(OP_CHOWN, "chown"),
+	OP_ROW(OP_CHROOT, "chroot"),
 	OP_ROW(OP_CLOSE, "close"),
 	OP_ROW(OP_CREAT, "creat"),
 	OP_ROW(OP_DUP, "dup"),

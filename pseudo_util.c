@@ -42,8 +42,8 @@ int pseudo_util_debug_fd = 2;
 static int debugged_newline = 1;
 static char pid_text[32];
 static size_t pid_len;
-static int pseudo_append_element(char **newpath, size_t *allocated, char **current, const char *element, size_t elen, int leave_last);
-static int pseudo_append_elements(char **newpath, size_t *allocated, char **current, const char *elements, size_t elen, int leave_last);
+static int pseudo_append_element(char **pnewpath, char **proot, size_t *pallocated, char **pcurrent, const char *element, size_t elen, int leave_this);
+static int pseudo_append_elements(char **newpath, char **root, size_t *allocated, char **current, const char *elements, size_t elen, int leave_last);
 extern char **environ;
 static ssize_t pseudo_max_pathlen = -1;
 static ssize_t pseudo_sys_max_pathlen = -1;
@@ -136,18 +136,22 @@ pseudo_new_pid() {
  * the symlink, appending each element in turn the same way.
  */
 static int
-pseudo_append_element(char **pnewpath, size_t *pallocated, char **pcurrent, const char *element, size_t elen, int leave_this) {
+pseudo_append_element(char **pnewpath, char **proot, size_t *pallocated, char **pcurrent, const char *element, size_t elen, int leave_this) {
 	static int link_recursion = 0;
 	size_t curlen, allocated;
-	char *newpath, *current;
+	char *newpath, *current, *root;
 	struct stat64 buf;
-	if (!pnewpath || !*pnewpath || !pallocated || !pcurrent || !*pcurrent || !element) {
+	if (!pnewpath || !*pnewpath ||
+	    !pcurrent || !*pcurrent ||
+	    !proot || !*proot ||
+	    !pallocated || !element) {
 		pseudo_diag("pseudo_append_element: invalid args.\n");
 		return -1;
 	}
 	newpath = *pnewpath;
 	allocated = *pallocated;
 	current = *pcurrent;
+	root = *proot;
 	/* sanity-check:  ignore // or /./ */
 	if (elen == 0 || (elen == 1 && *element == '.')) {
 		return 1;
@@ -155,12 +159,12 @@ pseudo_append_element(char **pnewpath, size_t *pallocated, char **pcurrent, cons
 	/* backtrack for .. */
 	if (elen == 2 && element[0] == '.' && element[1] == '.') {
 		/* if newpath's whole contents are '/', do nothing */
-		if (current <= newpath + 1)
+		if (current <= root + 1)
 			return 1;
 		/* backtrack to the character before the / */
 		current -= 2;
 		/* now find the previous slash */
-		while (current > newpath && *current != '/') {
+		while (current > root && *current != '/') {
 			--current;
 		}
 		/* and point to the nul just past it */
@@ -181,11 +185,13 @@ pseudo_append_element(char **pnewpath, size_t *pallocated, char **pcurrent, cons
 		}
 		memcpy(bigger, newpath, curlen);
 		current = bigger + curlen;
+		root = bigger + (root - newpath);
 		free(newpath);
 		newpath = bigger;
 		allocated = big;
 		*pnewpath = newpath;
 		*pcurrent = current;
+		*proot = root;
 		*pallocated = allocated;
 	}
 	memcpy(current, element, elen);
@@ -225,7 +231,7 @@ pseudo_append_element(char **pnewpath, size_t *pallocated, char **pcurrent, cons
 			/* append all the elements in series */
 			*pcurrent = current;
 			++link_recursion;
-			retval = pseudo_append_elements(pnewpath, pallocated, pcurrent, linkbuf, linklen, 0);
+			retval = pseudo_append_elements(pnewpath, proot, pallocated, pcurrent, linkbuf, linklen, 0);
 			--link_recursion;
 			return retval;
 		}
@@ -238,10 +244,13 @@ pseudo_append_element(char **pnewpath, size_t *pallocated, char **pcurrent, cons
 }
 
 static int
-pseudo_append_elements(char **newpath, size_t *allocated, char **current, const char *element, size_t elen, int leave_last) {
+pseudo_append_elements(char **newpath, char **root, size_t *allocated, char **current, const char *element, size_t elen, int leave_last) {
 	int retval = 1;
 	const char * start = element;
-	if (!newpath || !current || !element || !*newpath || !*current) {
+	if (!newpath || !*newpath ||
+	    !root || !*root ||
+	    !current || !*current ||
+	    !element) {
 		pseudo_diag("pseudo_append_elements: invalid arguments.");
 		return -1;
 	}
@@ -259,13 +268,13 @@ pseudo_append_elements(char **newpath, size_t *allocated, char **current, const 
 			break;
 		case 1: /* path => '?/' */
 			if (*element != '.') {
-				if (pseudo_append_element(newpath, allocated, current, element, this_elen, leave_this) == -1) {
+				if (pseudo_append_element(newpath, root, allocated, current, element, this_elen, leave_this) == -1) {
 					retval = -1;
 				}
 			}
 			break;
 		default:
-			if (pseudo_append_element(newpath, allocated, current, element, this_elen, leave_this) == -1) {
+			if (pseudo_append_element(newpath, root, allocated, current, element, this_elen, leave_this) == -1) {
 				retval = -1;
 			}
 			break;
@@ -284,35 +293,40 @@ pseudo_append_elements(char **newpath, size_t *allocated, char **current, const 
  * we ignore base.
  */
 char *
-pseudo_fix_path(char *base, const char *path, size_t baselen, size_t *lenp, int leave_last) {
+pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t baselen, size_t *lenp, int leave_last) {
 	size_t newpathlen, pathlen;
 	char *newpath;
 	char *current;
+	char *effective_root;
 	
 	if (!path) {
 		pseudo_diag("can't fix empty path.\n");
 		return 0;
 	}
 	pathlen = strlen(path);
+	newpathlen = pathlen;
+	if (baselen && path[0] != '/') {
+		newpathlen += baselen + 2;
+	}
 	/* allow a bit of slush.  overallocating a bit won't
 	 * hurt.  rounding to 256's in the hopes that it makes life
 	 * easier for the library.
 	 */
-	if (path[0] == '/') {
-		newpathlen = round_up(pathlen + 1, 256);
-		newpath = malloc(newpathlen);
-		if (!newpath) {
-			pseudo_diag("allocation failed seeking memory for path (%s).\n", path);
-			return 0;
-		}
-		current = newpath;
-		++path;
-	} else {
-		newpathlen = round_up(baselen + pathlen + 2, 256);
-		newpath = malloc(newpathlen);
-		memcpy(newpath, base, baselen);
-		current = newpath + baselen;
+	newpathlen = round_up(newpathlen, 256);
+	newpath = malloc(newpathlen);
+	if (!newpath) {
+		pseudo_diag("allocation failed seeking memory for path (%s).\n", path);
+		return 0;
 	}
+	current = newpath;
+	if (baselen) {
+		memcpy(current, base, baselen);
+		current += baselen;
+	}
+	/* "root" is a pointer to the beginning of the *modifiable*
+	 * part of the string; you can't back up over it.
+	 */
+	effective_root = newpath + rootlen;
 	*current++ = '/';
 	*current = '\0';
 	/* at any given point:
@@ -323,12 +337,12 @@ pseudo_fix_path(char *base, const char *path, size_t baselen, size_t *lenp, int 
 	 * oldpath is the starting point of path
 	 * (path - oldpath) is how far into path we are
 	 */
-	if (pseudo_append_elements(&newpath, &newpathlen, &current, path, pathlen, leave_last) != -1) {
+	if (pseudo_append_elements(&newpath, &effective_root, &newpathlen, &current, path, pathlen, leave_last) != -1) {
 		--current;
-		if (*current == '/') {
+		if (*current == '/' && current > effective_root) {
 			*current = '\0';
 		}
-		pseudo_debug(3, "%s + %s => <%s>\n",
+		pseudo_debug(5, "%s + %s => <%s>\n",
 			base ? base : "<nil>",
 			path ? path : "<nil>",
 			newpath ? newpath : "<nil>");
@@ -478,7 +492,7 @@ pseudo_get_prefix(char *pathname) {
 			s += snprintf(s, pseudo_path_max() - (s - mypath), "/%s",
 				pathname);
 		}
-		tmp_path = pseudo_fix_path(NULL, mypath, 0, 0, AT_SYMLINK_NOFOLLOW);
+		tmp_path = pseudo_fix_path(NULL, mypath, 0, 0, 0, AT_SYMLINK_NOFOLLOW);
 		/* point s to the end of the fixed path */
 		if (strlen(tmp_path) >= pseudo_path_max()) {
 			pseudo_diag("Can't expand path '%s' -- expansion exceeds %d.\n",

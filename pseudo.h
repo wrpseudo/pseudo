@@ -18,6 +18,7 @@
  *
  */
 #include <stdlib.h>
+#include <fcntl.h>
 
 typedef enum {
 	OP_UNKNOWN = -1,
@@ -25,6 +26,7 @@ typedef enum {
 	OP_CHDIR,
 	OP_CHMOD,
 	OP_CHOWN,
+	OP_CHROOT,
 	OP_CLOSE,
 	OP_CREAT,
 	OP_DUP,
@@ -113,7 +115,7 @@ extern int pseudo_diag(char *, ...) __attribute__ ((format (printf, 1, 2)));
 void pseudo_new_pid(void);
 /* pseudo_fix_path resolves symlinks up to this depth */
 #define PSEUDO_MAX_LINK_RECURSION 16
-extern char *pseudo_fix_path(char *, const char *, size_t, size_t *, int);
+extern char *pseudo_fix_path(const char *, const char *, size_t, size_t, size_t *, int);
 extern void pseudo_dropenv(void);
 extern void pseudo_setupenv(char *);
 extern char *pseudo_prefix_path(char *);
@@ -128,3 +130,27 @@ extern char *pseudo_version;
 #define PSEUDO_LOGFILE PSEUDO_DATA "pseudo.log"
 #define PSEUDO_PIDFILE PSEUDO_DATA "pseudo.pid"
 #define PSEUDO_SOCKET PSEUDO_DATA "pseudo.socket"
+
+/* some systems might not have *at().  We like to define operations in
+ * terms of each other, and for instance, open(...) is the same as
+ * openat(AT_FDCWD, ...).  If no AT_FDCWD is provided, any value that can't
+ * be a valid file descriptor will do.  Using -2 because -1 could be
+ * mistaken for a failed syscall return.  Similarly, any value which isn't
+ * zero will do to fake AT_SYMLINK_NOFOLLOW.  Finally, if this happened,
+ * we set our own flag we can use to indicate that dummy implementations
+ * of the _at functions are needed.
+ */
+#ifndef AT_FDCWD
+#define AT_FDCWD -2
+#define AT_SYMLINK_NOFOLLOW 1
+#define PSEUDO_NO_REAL_AT_FUNCTIONS
+#endif
+
+/* Likewise, someone might not have O_LARGEFILE (the flag equivalent to
+ * using open64()).  Since open64() is the same as O_LARGEFILE in flags,
+ * we implement it that way... If the system has no O_LARGEFILE, we'll
+ * just call open() with nothing special.
+ */ 
+#ifndef O_LARGEFILE
+#define O_LARGEFILE 0
+#endif

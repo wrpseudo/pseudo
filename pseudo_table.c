@@ -28,6 +28,7 @@ static char *operation_names[] = {
 	"chdir",
 	"chmod",
 	"chown",
+	"chroot",
 	"close",
 	"creat",
 	"dup",

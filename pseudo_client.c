@@ -44,6 +44,9 @@ static int server_pid = 0;
 int pseudo_dir_fd = -1;
 char *pseudo_cwd = 0;
 size_t pseudo_cwd_len;
+char *pseudo_chroot = 0;
+size_t pseudo_chroot_len = 0;
+char *pseudo_cwd_rel = 0;
 
 static char **fd_paths = 0;
 static int nfds = 0;
@@ -77,6 +80,32 @@ pseudo_client_touchgid(void) {
 	setenv("PSEUDO_GIDS", gidbuf, 1);
 }
 
+int
+pseudo_client_chroot(const char *path) {
+	/* free old value */
+	free(pseudo_chroot);
+
+	pseudo_debug(2, "client chroot: %s\n", path);
+	if (!strcmp(path, "/")) {
+		pseudo_chroot_len = 0;
+		pseudo_chroot = 0;
+		unsetenv("PSEUDO_CHROOT");
+		return 0;
+	}
+	/* allocate new value */
+	pseudo_chroot_len = strlen(path);
+	pseudo_chroot = malloc(pseudo_chroot_len + 1);
+	if (!pseudo_chroot) {
+		pseudo_diag("Couldn't allocate chroot directory buffer.\n");
+		pseudo_chroot_len = 0;
+		errno = ENOMEM;
+		return -1;
+	}
+	memcpy(pseudo_chroot, path, pseudo_chroot_len + 1);
+	setenv("PSEUDO_CHROOT", pseudo_chroot, 1);
+	return 0;
+}
+
 char *
 pseudo_root_path(const char *func, int line, int dirfd, const char *path, int leave_last) {
 	char *rc;
@@ -102,13 +131,26 @@ pseudo_client_getcwd(void) {
 		pseudo_diag("Can't allocate CWD buffer!\n");
 		return -1;
 	}
-	pseudo_debug(2, "getcwd: trying to find cwd.\n");
+	pseudo_debug(3, "getcwd: trying to find cwd.\n");
 	if (getcwd(cwd, pseudo_path_max())) {
 		/* cwd now holds a canonical path to current directory */
-		pseudo_cwd_len = strlen(cwd);
-		pseudo_debug(3, "getcwd okay: [%s] %d bytes\n", cwd, (int) pseudo_cwd_len);
 		free(pseudo_cwd);
 		pseudo_cwd = cwd;
+		pseudo_cwd_len = strlen(pseudo_cwd);
+		pseudo_debug(3, "getcwd okay: [%s] %d bytes\n", pseudo_cwd, (int) pseudo_cwd_len);
+		if (pseudo_chroot_len &&
+			pseudo_cwd_len >= pseudo_chroot_len &&
+			!memcmp(pseudo_cwd, pseudo_chroot, pseudo_chroot_len) &&
+			(pseudo_cwd[pseudo_chroot_len] == '\0' ||
+			pseudo_cwd[pseudo_chroot_len] == '/')) {
+			pseudo_cwd_rel = pseudo_cwd + pseudo_chroot_len;
+		} else {
+			pseudo_cwd_rel = pseudo_cwd;
+		}
+		pseudo_debug(4, "abscwd: <%s>\n", pseudo_cwd);
+		if (pseudo_cwd_rel != pseudo_cwd) {
+			pseudo_debug(4, "relcwd: <%s>\n", pseudo_cwd_rel);
+		}
 		return 0;
 	} else {
 		pseudo_diag("Can't get CWD: %s\n", strerror(errno));
@@ -171,7 +213,6 @@ pseudo_client_reset() {
 		close(connect_fd);
 		connect_fd = -1;
 	}
-	pseudo_client_getcwd();
 	if (!pseudo_inited) {
 		char *env;
 		
@@ -187,8 +228,19 @@ pseudo_client_reset() {
 				&pseudo_rgid, &pseudo_egid,
 				&pseudo_sgid, &pseudo_fuid);
 
+		env = getenv("PSEUDO_CHROOT");
+		if (env) {
+			pseudo_chroot = strdup(env);
+			if (pseudo_chroot) {
+				pseudo_chroot_len = strlen(pseudo_chroot);
+			} else {
+				pseudo_diag("can't store chroot path (%s)\n", env);
+			}
+		}
+
 		pseudo_inited = 1;
 	}
+	pseudo_client_getcwd();
 	pseudo_magic();
 }
 
@@ -592,6 +644,7 @@ static char *
 base_path(int dirfd, const char *path, int leave_last) {
 	char *basepath = 0;
 	size_t baselen = 0;
+	size_t minlen = 0;
 	char *newpath;
 
 	if (path[0] != '/') {
@@ -610,9 +663,23 @@ base_path(int dirfd, const char *path, int leave_last) {
 			pseudo_diag("unknown base path for fd %d, path %s\n", dirfd, path);
 			return 0;
 		}
+		/* if there's a chroot path, and it's the start of basepath,
+		 * flag it for pseudo_fix_path
+		 */
+		if (pseudo_chroot_len && baselen >= pseudo_chroot_len &&
+			!memcmp(basepath, pseudo_chroot, pseudo_chroot_len) &&
+			(basepath[pseudo_chroot_len] == '\0' || basepath[pseudo_chroot_len] == '/')) {
+
+			minlen = pseudo_chroot_len;
+		}
+	} else if (pseudo_chroot_len) {
+		/* "absolute" is really relative to chroot path */
+		basepath = pseudo_chroot;
+		baselen = pseudo_chroot_len;
+		minlen = pseudo_chroot_len;
 	}
 
-	newpath = pseudo_fix_path(basepath, path, baselen, NULL, leave_last);
+	newpath = pseudo_fix_path(basepath, path, minlen, baselen, NULL, leave_last);
 	pseudo_debug(4, "base_path: %s</>%s\n",
 		basepath ? basepath : "<nil>",
 		path ? path : "<nil>");
@@ -715,6 +782,13 @@ pseudo_client_op(op_id_t op, int fd, int dirfd, const char *path, const struct s
 	switch (msg.op) {
 	case OP_CHDIR:
 		pseudo_client_getcwd();
+		do_request = 0;
+		break;
+	case OP_CHROOT:
+		if (pseudo_client_chroot(path) == 0) {
+			/* return a non-zero value to show non-failure */
+			result = &msg;
+		}
 		do_request = 0;
 		break;
 	case OP_OPEN:

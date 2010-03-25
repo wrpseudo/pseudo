@@ -1,4 +1,10 @@
 2010-03-24:
+	* (seebs) add chroot syscall
+	* (seebs) add chroot handling to path canonicalization
+	* (seebs) add many calls just to get path fixups
+	* (seebs) handle virtualizing rootness of absolute symlinks
+
+2010-03-24:
 	* (seebs) regenerate wrappers when makewrappers is changed.
 	* (seebs) begin prep for chroot
 	* (seebs) standardize path expansion

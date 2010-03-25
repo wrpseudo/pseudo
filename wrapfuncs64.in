@@ -7,3 +7,9 @@ int __lxstat64(int ver, const char *path, struct stat64 *buf); /* flags=AT_SYMLI
 int __fxstat64(int ver, int fd, struct stat64 *buf);
 int __fxstatat64(int ver, int dirfd, const char *path, struct stat64 *buf, int flags);
 FILE *fopen64(const char *path, const char *mode);
+int nftw64(const char *path, int (*fn)(const char *, const struct stat64 *, int, struct FTW *), int nopenfd, int flag);
+FILE *freopen64(const char *path, const char *mode, FILE *stream);
+int ftw64(const char *path, int (*fn)(const char *, const struct stat64 *, int), int nopenfd);
+int glob64(const char *pattern, int flags, int (*errfunc)(const char *, int), glob64_t *pglob);
+int scandir64(const char *path, struct dirent64 ***namelist, int (*filter)(const struct dirent64 *), int (*compar)(const void *, const void *));
+int truncate64(const char *path, off64_t length);

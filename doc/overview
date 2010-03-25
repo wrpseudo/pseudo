@@ -37,7 +37,7 @@ pseudo client code, and the check for whether or not to use it is controlled
 by the mutex (actually by the mutex owner variable, which is protected by
 the mutex.)  Without that, read operations in another thread during the
 "antimagic" part of an operation would bypass pseudo, yielding erratically
-wrong results!
+wrong results!  Wrappers are where pathnames get canonicalized.
 2.  The wrapper function itself.  This function may translate a single
 operation into two or more logical operations.  This function has no awareness
 of the database, but can send queries to the general client code.

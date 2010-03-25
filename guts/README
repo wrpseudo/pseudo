@@ -28,26 +28,32 @@ some difference -- the structure they manipulate is not the same.
 The following table shows which functions are merely wrappers around
 other functions:
 
-	chmod:          fchmodat
-	chown:          fchownat
-	creat64:        openat
-	creat:          openat
-	__fxstatat:	__fxstatat64
-	__fxstat:	__fxstat64
-	__lxstat64:     __fxstatat64
-	__lxstat:       __fxstatat
-	mkdir:          mkdirat
-	open64:         openat
-	__openat_2:     openat
-	__openat64_2:   openat
-	openat64:       openat
-	open:           openat
-	rename:         renameat
-	symlink:	symlinkat
-	unlink:         unlinkat
-	__xmknod:       __xmknodat
-	__xstat64:      __fxstatat64
-	__xstat:        __fxstatat
+	canonicalize_file_name:	realpath
+	chmod:			fchmodat
+	chown:			fchownat
+	creat64:		openat
+	creat:			openat
+	__fxstatat:		__fxstatat64
+	__fxstat:		__fxstat64
+	get_current_dir_name:	getcwd
+	getwd:			getcwd
+	__lxstat64:		__fxstatat64
+	__lxstat:		__fxstatat
+	mkdir:			mkdirat
+	mkfifoat:		__xmknodat
+	mkfifo:			mkfifoat
+	open64:			openat
+	__openat_2:		openat
+	__openat64_2:		openat
+	openat64:		openat
+	open:			openat
+	remove:			unlink or rmdir
+	rename:			renameat
+	symlink:		symlinkat
+	unlink:			unlinkat
+	__xmknod:		__xmknodat
+	__xstat64:		__fxstatat64
+	__xstat:		__fxstatat
 
 The following functions are full implementations:
 
@@ -59,10 +65,10 @@ The following functions are full implementations:
 	fchownat
 	__fxstat64
 	__fxstatat64
+	getcwd
 	lchown
 	mkdirat
 	openat
-	renameat
 	rmdir
 	symlinkat
 	unlinkat
@@ -71,7 +77,7 @@ The following functions are full implementations:
 The following functions provide only partial implementations, to trap special
 cases, to track internal data structures (for instance, close() is tracked so
 that the path to a file descriptor can be dropped when the file descriptor
-is closed),  or to handle functions which may not use the underlying syscall
+is closed), or to handle functions which may not use the underlying syscall
 wrappers:
 
 	close
@@ -81,6 +87,7 @@ wrappers:
 	fopen
 	fopen64
 	freopen
+	freopen64
 	mkstemp
 	fcntl
 	fork
@@ -107,3 +114,45 @@ but are used to simulate the permissions system:
 	getresuid
 	setfsuid
 	setresuid
+
+The following functions are present only to allow filename mangling
+for chroot(2) implementation.  Most of them have no logic beyond
+calling the underlying routine.
+
+	access
+	acct
+	chroot
+	eaccess
+	euidaccess
+	fts_open
+	ftw64
+	ftw
+	glob64
+	glob
+	lutimes
+	mkdtemp
+	mktemp
+	nftw64
+	nftw
+	opendir
+	pathconf
+	readlinkat
+	readlink
+	realpath
+	scandir64
+	scandir
+	truncate64
+	truncate
+	utime
+	utimes
+
+The following functions are unimplemented.  renameat could be done now (it
+would have been hard previously due to file name mangling issues), but
+since it's never come up, we haven't done it.  The tempnam() functions are
+fairly hard to get right, and perhaps more imporantly, extremely
+dangerous.  Since there's no evidence that they're in use anymore, I've
+dummied them out:
+
+	renameat
+	tempnam
+	tmpnam

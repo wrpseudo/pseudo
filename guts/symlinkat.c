@@ -6,6 +6,12 @@
  	struct stat64 buf;
 	char *roldname = 0;
 
+	if (oldname[0] == '/' && pseudo_chroot_len) {
+		size_t len = pseudo_chroot_len + strlen(oldname) + 1;
+		roldname = malloc(len);
+		snprintf(roldname, len, "%s%s", pseudo_chroot, oldname);
+	}
+
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
 		errno = ENOSYS;
