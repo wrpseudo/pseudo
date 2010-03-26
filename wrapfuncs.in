@@ -88,3 +88,4 @@ char *tmpnam(char *s);
 int truncate(const char *path, off_t length);
 int utime(const char *path, const struct utimbuf *buf);
 int utimes(const char *path, const struct timeval *times);
+int execve(const char *filename, char *const *argv, char *const *envp);

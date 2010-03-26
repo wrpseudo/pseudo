@@ -83,6 +83,7 @@ wrappers:
 	close
 	dup
 	dup2
+	execve (note that all other exec* functions redirect here)
 	fclose
 	fopen
 	fopen64

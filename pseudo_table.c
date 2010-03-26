@@ -43,6 +43,7 @@ static char *operation_names[] = {
 	"stat",
 	"unlink",
 	"symlink",
+	"exec",
 	NULL
 };
 

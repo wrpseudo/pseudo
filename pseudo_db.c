@@ -63,6 +63,7 @@ id_row op_rows[] = {
 	OP_ROW(OP_CLOSE, "close"),
 	OP_ROW(OP_CREAT, "creat"),
 	OP_ROW(OP_DUP, "dup"),
+	OP_ROW(OP_EXEC, "exec"),
 	OP_ROW(OP_FCHMOD, "fchmod"),
 	OP_ROW(OP_FCHOWN, "fchown"),
 	OP_ROW(OP_FSTAT, "fstat"),

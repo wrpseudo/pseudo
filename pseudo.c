@@ -481,6 +481,7 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 		 * as of this writing, but might be logged by accident: */
 		pseudo_diag("error: op %s sent to server.\n", pseudo_op_name(msg->op));
 		break;
+	case OP_EXEC:
 	case OP_OPEN:
 		/* nothing to do -- just sent in case we're logging */
 		break;

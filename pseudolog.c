@@ -382,7 +382,7 @@ plog_trait(int opt, char *string) {
 	case PSQF_ACCESS:
 		new_trait->data.ivalue = pseudo_access_fopen(string);
 		if (new_trait->data.ivalue == (unsigned long long) -1) {
-			pseudo_diag("access flags should be specified like fopen(3) mode strings.\n");
+			pseudo_diag("access flags should be specified like fopen(3) mode strings (or x for exec).\n");
 			free(new_trait);
 			return 0;
 		}
@@ -646,6 +646,7 @@ format_one(log_entry *e, char *format) {
 
 	switch (*s) {
 	case 'a': /* PSQF_ACCESS */
+		*scratch = '\0';
 		if (e->access == -1) {
 			strcpy(scratch, "invalid");
 		} else if (e->access != 0) {
@@ -661,6 +662,8 @@ format_one(log_entry *e, char *format) {
 				}
 				if (e->access & PSA_READ)
 					strcat(scratch, "+");
+			} else if (e->access & PSA_EXEC) {
+				strcpy(scratch, "x");
 			}
 			/* this should be impossible... should. */
 			if (e->access & PSA_APPEND && !(e->access & PSA_WRITE)) {

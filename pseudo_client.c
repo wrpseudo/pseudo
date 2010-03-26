@@ -835,10 +835,11 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 		 * (operations which can create should be CREAT or MKNOD
 		 * or MKDIR)
 		 */
-	case OP_LINK:
+	case OP_EXEC:
 	case OP_CHOWN:
 	case OP_FCHOWN:
 	case OP_FSTAT:
+	case OP_LINK:
 	case OP_RENAME:
 	case OP_STAT:
 	case OP_UNLINK:

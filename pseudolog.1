@@ -185,7 +185,10 @@ such as "r+" to indicate read/write access.  Note that specifying
 .B \&a
 as an access mode will include non-append writes, as the "a" mode
 implies write and append both.  This feature is slightly experimental
-and may not correctly identify the access type of every access.
+and may not correctly identify the access type of every access.  The
+string
+.B x
+may be specified to indicate execute access.
 .TP 8
 .B c
 Client ID (the PID of a client).

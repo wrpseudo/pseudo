@@ -604,6 +604,10 @@ pseudo_access_fopen(const char *mode) {
 		if (mode[1] == '+' || (mode[1] == 'b' && mode[2] == '+'))
 			access |= PSA_READ;
 		break;
+	/* special case */
+	case 'x':
+		access |= PSA_EXEC;
+		break;
 	default:
 		access = -1;
 		break;

@@ -40,7 +40,11 @@ typedef enum {
 	OP_RENAME,
 	OP_STAT,
 	OP_UNLINK,
+	/* added after the original release, so they have to go out of order
+	 * to avoid breaking the operation numbers in old logs.
+	 */
 	OP_SYMLINK,
+	OP_EXEC,
 	OP_MAX
 } op_id_t;
 extern char *pseudo_op_name(op_id_t id);
