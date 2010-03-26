@@ -495,7 +495,7 @@ main(int argc, char **argv) {
 	int query_only = 0;
 	int o;
 	int bad_args = 0;
-	char *format = "%s %-5o %7r: [mode %04m, %2a] %p %T";
+	char *format = "%s %-7o %7r: [mode %04m, %2a] %p %T";
 
 	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:r:s:S:t:T:u:")) != -1) {
 		switch (o) {
