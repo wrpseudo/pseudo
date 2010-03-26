@@ -37,7 +37,7 @@ static sig_atomic_t pipe_error = 0;
 static void (*old_handler)(int) = SIG_DFL;
 
 static void
-sigpipe_trap(int unused) {
+sigpipe_trap(int unused __attribute__((unused))) {
 	pipe_error = 1;
 }
 
@@ -86,7 +86,7 @@ pseudo_msg_send(int fd, pseudo_msg_t *msg, size_t len, const char *path) {
 	if (path) {
 		pseudo_debug(4, "msg type %d (%s), external path %s, mode 0%o\n",
 			msg->type, pseudo_op_name(msg->op), path, (int) msg->mode);
-		if (len == -1)
+		if (len == (size_t) -1)
 			len = strlen(path) + 1;
 		msg->pathlen = len;
 		ignore_sigpipe();
@@ -98,7 +98,7 @@ pseudo_msg_send(int fd, pseudo_msg_t *msg, size_t len, const char *path) {
 		pseudo_debug(5, "wrote %d bytes\n", r);
 		if (pipe_error || (r == -1 && errno == EBADF))
 			return -1;
-		return (r != PSEUDO_HEADER_SIZE + len);
+		return ((size_t) r != PSEUDO_HEADER_SIZE + len);
 	} else {
 		pseudo_debug(4, "msg type %d (%s), result %d (%s), path %.*s, mode 0%o\n",
 			msg->type, pseudo_op_name(msg->op),
@@ -111,7 +111,7 @@ pseudo_msg_send(int fd, pseudo_msg_t *msg, size_t len, const char *path) {
 		pseudo_debug(5, "wrote %d bytes\n", r);
 		if (pipe_error || (r == -1 && errno == EBADF))
 			return -1;
-		return (r != PSEUDO_HEADER_SIZE + msg->pathlen);
+		return ((size_t) r != PSEUDO_HEADER_SIZE + msg->pathlen);
 	}
 }
 
@@ -153,7 +153,7 @@ pseudo_msg_receive(int fd) {
 	*incoming = header;
 	if (incoming->pathlen) {
 		r = read(fd, incoming->path, incoming->pathlen);
-		if (r < incoming->pathlen) {
+		if (r < (int) incoming->pathlen) {
 			pseudo_debug(2, "short read on path, expecting %d, got %d\n",
 				(int) incoming->pathlen, r);
 			return 0;

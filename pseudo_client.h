@@ -31,14 +31,14 @@ extern void pseudo_stat64_from32(struct stat64 *, struct stat *);
 #define MOVE_FD	0
 #define COPY_FD	1
 #define PSEUDO_MIN_FD	20
-extern int pseudo_euid;
-extern int pseudo_fuid;
-extern int pseudo_suid;
-extern int pseudo_ruid;
-extern int pseudo_egid;
-extern int pseudo_sgid;
-extern int pseudo_rgid;
-extern int pseudo_fgid;
+extern uid_t pseudo_euid;
+extern uid_t pseudo_fuid;
+extern uid_t pseudo_suid;
+extern uid_t pseudo_ruid;
+extern gid_t pseudo_egid;
+extern gid_t pseudo_sgid;
+extern gid_t pseudo_rgid;
+extern gid_t pseudo_fgid;
 extern int pseudo_dir_fd;
 
 /* support related to chroot/getcwd/etc. */

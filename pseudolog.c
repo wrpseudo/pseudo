@@ -38,7 +38,7 @@ static int opt_D = 0;
 static int opt_l = 0;
 
 static void display(log_entry *, char *format);
-static unsigned long format_scan(char *format);
+static int format_scan(char *format);
 
 void
 usage(int status) {
@@ -268,13 +268,13 @@ parse_mode_string(char *string) {
 	if (len == 10) {
 		mode |= parse_file_type(string);
 		++string;
-		if (mode == -1) {
+		if (mode == (mode_t) -1) {
 			pseudo_diag("mode strings with a file type must use a valid type [-bcdflps]\n");
 			return -1;
 		}
 	}
 	bits = parse_partial_mode(string);
-	if (bits == -1)
+	if (bits == (mode_t) -1)
 		return -1;
 	if (bits & 010) {
 		mode |= S_ISUID;
@@ -283,7 +283,7 @@ parse_mode_string(char *string) {
 	mode |= bits << 6;
 	string += 3;
 	bits = parse_partial_mode(string);
-	if (bits == -1)
+	if (bits == (mode_t) -1)
 		return -1;
 	if (bits & 010) {
 		mode |= S_ISGID;
@@ -292,7 +292,7 @@ parse_mode_string(char *string) {
 	mode |= bits << 3;
 	string += 3;
 	bits = parse_partial_mode(string);
-	if (bits == -1)
+	if (bits == (mode_t) -1)
 		return -1;
 	if (bits & 010) {
 		mode |= S_ISVTX;
@@ -390,7 +390,7 @@ plog_trait(int opt, char *string) {
 			return 0;
 		}
 		new_trait->data.ivalue = parse_file_type(string);
-		if (new_trait->data.ivalue == -1) {
+		if (new_trait->data.ivalue == (mode_t) -1) {
 			free(new_trait);
 			return 0;
 		}
@@ -417,7 +417,7 @@ plog_trait(int opt, char *string) {
 		break;
 	case PSQF_STAMP:
 		new_trait->data.ivalue = parse_timestamp(string);
-		if (new_trait->data.ivalue == (time_t) -1) {
+		if ((time_t) new_trait->data.ivalue == (time_t) -1) {
 			free(new_trait);
 			return 0;
 		}
@@ -444,7 +444,7 @@ plog_trait(int opt, char *string) {
 		}
 		/* maybe it's a mode string? */
 		new_trait->data.ivalue = parse_mode_string(string);
-		if (new_trait->data.ivalue == -1) {
+		if (new_trait->data.ivalue == (mode_t) -1) {
 			free(new_trait);
 			return 0;
 		}
@@ -578,7 +578,7 @@ main(int argc, char **argv) {
 	if (opt_l) {
 		pdb_log_traits(traits);
 	} else {
-		unsigned long fields;
+		int fields;
 		fields = format_scan(format);
 		if (fields == -1) {
 			pseudo_diag("couldn't parse format string (%s).\n", format);
@@ -720,11 +720,11 @@ format_one(log_entry *e, char *format) {
 	return format + len;
 }
 
-static unsigned long
+static int
 format_scan(char *format) {
 	char *s;
 	size_t len;
-	unsigned long fields = 0;
+	int fields = 0;
 	pseudo_query_field_t field;
 
 	for (s = format; (s = strchr(s, '%')) != NULL; ++s) {

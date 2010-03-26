@@ -33,7 +33,7 @@ main(int argc, char **argv) {
 	pseudo_msg_t *msg;
 	int rc;
 
-	if (!argv[1]) {
+	if (argc < 2) {
 		fprintf(stderr, "Usage: pseudodb <filename>\n");
 		exit(1);
 	}

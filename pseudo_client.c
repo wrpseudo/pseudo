@@ -51,18 +51,18 @@ char *pseudo_cwd_rel = 0;
 static char **fd_paths = 0;
 static int nfds = 0;
 static int messages = 0;
-static struct timeval message_time = { 0 };
+static struct timeval message_time = { .tv_sec = 0 };
 static int pseudo_inited = 0;
 
 /* note: these are int, not uid_t/gid_t, so I can use 'em with scanf */
-int pseudo_ruid;
-int pseudo_euid;
-int pseudo_suid;
-int pseudo_fuid;
-int pseudo_rgid;
-int pseudo_egid;
-int pseudo_sgid;
-int pseudo_fgid;
+uid_t pseudo_ruid;
+uid_t pseudo_euid;
+uid_t pseudo_suid;
+uid_t pseudo_fuid;
+gid_t pseudo_rgid;
+gid_t pseudo_egid;
+gid_t pseudo_sgid;
+gid_t pseudo_fgid;
 
 void
 pseudo_client_touchuid(void) {

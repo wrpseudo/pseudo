@@ -4,7 +4,7 @@
  *	FTS * rc = NULL;
  */
  	char **rpath_argv;
-	size_t args = 0;
+	int args = 0;
 	int errored = 0;
 	int i;
 

@@ -30,22 +30,24 @@
 	}
 	save_errno = errno;
 
-	msg = pseudo_client_op(OP_STAT, -1, -1, path, &buf);
-	/* copy in any existing values... */
-	if (msg) {
-		if (msg->result == RESULT_SUCCEED) {
-			pseudo_stat_msg(&buf, msg);
-		} else {
-			pseudo_debug(2, "chownat to %d:%d on %d/%s, ino %llu, new file.\n",
-				owner, group, dirfd, path,
-				(unsigned long long) buf.st_ino);
+	if (owner == (uid_t) -1 || group == (gid_t) -1) {
+		msg = pseudo_client_op(OP_STAT, -1, -1, path, &buf);
+		/* copy in any existing values... */
+		if (msg) {
+			if (msg->result == RESULT_SUCCEED) {
+				pseudo_stat_msg(&buf, msg);
+			} else {
+				pseudo_debug(2, "chownat to %d:%d on %d/%s, ino %llu, new file.\n",
+					owner, group, dirfd, path,
+					(unsigned long long) buf.st_ino);
+			}
 		}
 	}
 	/* now override with arguments */
-	if (owner != -1) {
+	if (owner != (uid_t) -1) {
 		buf.st_uid = owner;
 	}
-	if (group != -1) {
+	if (group != (gid_t) -1) {
 		buf.st_gid = group;
 	}
 	msg = pseudo_client_op(OP_CHOWN, -1, dirfd, path, &buf);

@@ -71,7 +71,7 @@ quit_now(int signal) {
 }
 
 static int messages = 0;
-static struct timeval message_time = { 0 };
+static struct timeval message_time = { .tv_sec = 0 };
 
 static void pseudo_server_loop(void);
 

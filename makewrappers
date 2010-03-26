@@ -163,6 +163,7 @@ do
 		set -- $args
 		IFS=$save_IFS
 		args=''
+		dummy_args=''
 		optional_arg=false
 		prepend=''
 		depth=0
@@ -207,6 +208,7 @@ do
 			...*)
 				optional_arg=true
 				args="$args${args:+, }..."
+				dummy_args="$dummy_args${dummy_args:+, }..."
 				arg=`expr "$arg" : '\.\.\.{\(.*\)}'`
 				argname=`expr "$arg" : '.*[^a-zA-Z0-9_]\([a-zA-Z0-9_]*\)$'`
 				argnames="$argnames${argnames:+, }$argname"
@@ -221,6 +223,7 @@ do
 			*\(*)	# function pointer
 				argname=`expr "$arg" : '[^(]*(\*\([a-zA-Z0-9_]*\).*'`
 				args="$args${args:+, }$arg"
+				dummy_args="$dummy_args${dummy_args:+, }$arg __attribute__((unused))"
 				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
 				argnames="$argnames${argnames:+, }$argname"
 				prev_argname=$argname
@@ -228,6 +231,7 @@ do
 			*)
 				argname=`expr "$arg" : '.*[^a-zA-Z0-9_](*\([a-zA-Z0-9_]*\))*(*)*$'`
 				args="$args${args:+, }$arg"
+				dummy_args="$dummy_args${dummy_args:+, }$arg __attribute__((unused))"
 				# special handling for canonicalization
 				# set this before changing path -> rpath, for guts files
 				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
@@ -278,7 +282,7 @@ Unknown type '$type'." ; exit 1 ;;
 		# first the dummy, and the function pointer:
 		cat >&5 <<EOF
 static $type
-dummy_$name($args) {
+dummy_$name($dummy_args) {
 	pseudo_enosys("$name");
 	errno = ENOSYS;
 	return $default_value;

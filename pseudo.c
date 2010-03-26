@@ -267,7 +267,7 @@ main(int argc, char *argv[]) {
 int
 pseudo_op(pseudo_msg_t *msg, const char *tag) {
 	pseudo_msg_t msg_header;
-	pseudo_msg_t by_path = { 0 }, by_ino = { 0 };
+	pseudo_msg_t by_path = { .op = 0 }, by_ino = { .op = 0 };
 	pseudo_msg_t db_header;
 	char *path_by_ino = 0;
 	char *oldpath = 0;

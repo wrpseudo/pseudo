@@ -801,7 +801,7 @@ frag(buffer *b, char *fmt, ...) {
 	va_start(ap, fmt);
 	rc = vsnprintf(b->tail, b->buflen - curlen, fmt, ap);
 	va_end(ap);
-	if (rc >= (b->buflen - curlen)) {
+	if ((rc > 0) && ((size_t) rc >= (b->buflen - curlen))) {
 		size_t newlen = b->buflen;
 		while (newlen <= (rc + curlen))
 			newlen *= 2;
@@ -819,7 +819,7 @@ frag(buffer *b, char *fmt, ...) {
 		va_start(ap, fmt);
 		rc = vsnprintf(b->tail, b->buflen - curlen, fmt, ap);
 		va_end(ap);
-		if (rc >= (b->buflen - curlen)) {
+		if ((rc > 0) && ((size_t) rc >= (b->buflen - curlen))) {
 			pseudo_diag("tried to reallocate larger buffer, failed.  giving up.\n");
 			return -1;
 		}

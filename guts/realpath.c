@@ -4,7 +4,7 @@
  *	char * rc = NULL;
  */
 	char *rname = PSEUDO_ROOT_PATH(AT_FDCWD, name, 0);
-	size_t len;
+	ssize_t len;
 	if (!rname) {
 		errno = ENAMETOOLONG;
 		return NULL;

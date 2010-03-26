@@ -457,7 +457,7 @@ pseudo_prefix_path(char *file) {
 
 			rc = snprintf(path, len, "%s", prefix);
 			/* this certainly SHOULD be impossible */
-			if (rc >= len)
+			if ((size_t) rc >= len)
 				rc = len - 1;
 			endptr = path + rc;
 			/* strip extra slashes.
@@ -494,7 +494,7 @@ pseudo_get_prefix(char *pathname) {
 		}
 		tmp_path = pseudo_fix_path(NULL, mypath, 0, 0, 0, AT_SYMLINK_NOFOLLOW);
 		/* point s to the end of the fixed path */
-		if (strlen(tmp_path) >= pseudo_path_max()) {
+		if ((int) strlen(tmp_path) >= pseudo_path_max()) {
 			pseudo_diag("Can't expand path '%s' -- expansion exceeds %d.\n",
 				mypath, (int) pseudo_path_max());
 			free(tmp_path);

@@ -14,7 +14,7 @@
 		errno = save_errno;
 		return -1;
 	}
-	if (owner == -1 || group == -1) {
+	if (owner == (uid_t) -1 || group == (gid_t) -1) {
 		msg = pseudo_client_op(OP_STAT, fd, -1, NULL, &buf);
 		/* copy in any existing values... */
 		if (msg) {
@@ -30,10 +30,10 @@
 		}
 	}
 	/* now override with arguments */
-	if (owner != -1) {
+	if (owner != (uid_t) -1) {
 		buf.st_uid = owner;
 	}
-	if (group != -1) {
+	if (group != (gid_t) -1) {
 		buf.st_gid = group;
 	}
 	pseudo_debug(2, "fchown, fd %d: %d:%d -> %d:%d\n",
