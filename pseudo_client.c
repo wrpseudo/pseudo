@@ -687,7 +687,7 @@ base_path(int dirfd, const char *path, int leave_last) {
 }
 
 pseudo_msg_t *
-pseudo_client_op(op_id_t op, int fd, int dirfd, const char *path, const struct stat64 *buf, ...) {
+pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, const struct stat64 *buf, ...) {
 	pseudo_msg_t *result = 0;
 	pseudo_msg_t msg = { .type = PSEUDO_MSG_OP };
 	size_t pathlen = -1;
@@ -774,6 +774,7 @@ pseudo_client_op(op_id_t op, int fd, int dirfd, const char *path, const struct s
 	msg.type = PSEUDO_MSG_OP;
 	msg.op = op;
 	msg.fd = fd;
+	msg.access = access;
 	msg.result = RESULT_NONE;
 	msg.client = getpid();
 

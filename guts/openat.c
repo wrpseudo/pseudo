@@ -48,13 +48,13 @@
 		if (stat_rc != -1) {
 			buf.st_mode = PSEUDO_DB_MODE(buf.st_mode, mode);
 			if (!existed) {
-				pseudo_client_op(OP_CREAT, -1, dirfd, path, &buf);
+				pseudo_client_op(OP_CREAT, 0, -1, dirfd, path, &buf);
 			}
-			pseudo_client_op(OP_OPEN, rc, dirfd, path, &buf);
+			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, dirfd, path, &buf);
 		} else {
 			pseudo_debug(1, "openat (fd %d, path %d/%s, flags %d) succeeded, but stat failed (%s).\n",
 				rc, dirfd, path, flags, strerror(errno));
-			pseudo_client_op(OP_OPEN, rc, dirfd, path, 0);
+			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, dirfd, path, 0);
 		}
 		errno = save_errno;
 	}

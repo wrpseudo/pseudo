@@ -53,10 +53,10 @@
 	 */
 
 	/* newpath must be removed. */
-	pseudo_client_op(OP_UNLINK, -1, -1, newpath, &newbuf);
+	pseudo_client_op(OP_UNLINK, 0, -1, -1, newpath, &newbuf);
 
 	/* fill in "correct" details from server */
-	msg = pseudo_client_op(OP_STAT, -1, -1, oldpath, &oldbuf);
+	msg = pseudo_client_op(OP_STAT, 0, -1, -1, oldpath, &oldbuf);
 	if (msg && msg->result == RESULT_SUCCEED) {
 		pseudo_stat_msg(&oldbuf, msg);
 		pseudo_debug(1, "renaming %s, got old mode of 0%o\n", oldpath, (int) msg->mode);
@@ -67,9 +67,9 @@
 		 */
 		pseudo_debug(1, "renaming new '%s' [%llu]\n",
 			oldpath, (unsigned long long) oldbuf.st_ino);
-		pseudo_client_op(OP_LINK, -1, -1, oldpath, &oldbuf);
+		pseudo_client_op(OP_LINK, 0, -1, -1, oldpath, &oldbuf);
 	}
-	pseudo_client_op(OP_RENAME, -1, -1, newpath, &oldbuf, oldpath);
+	pseudo_client_op(OP_RENAME, 0, -1, -1, newpath, &oldbuf, oldpath);
 
 	errno = save_errno;
 /*	return rc;

@@ -178,6 +178,15 @@ few fields are parsed or displayed in other ways, as detailed in their
 entries.
 
 .TP 8
+.B a
+Access mode.  This is an access mode specified in the form used by
+.IR fopen(3) ,
+such as "r+" to indicate read/write access.  Note that specifying
+.B \&a
+as an access mode will include non-append writes, as the "a" mode
+implies write and append both.  This feature is slightly experimental
+and may not correctly identify the access type of every access.
+.TP 8
 .B c
 Client ID (the PID of a client).
 .TP 8

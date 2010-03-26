@@ -27,7 +27,7 @@
 		save_errno = errno;
 
 		if (real___xstat64(_STAT_VER, rc, &buf) != -1) {
-			pseudo_client_op(OP_CREAT, -1, -1, tmp_template, &buf);
+			pseudo_client_op(OP_CREAT, 0, -1, -1, tmp_template, &buf);
 		} else {
 			pseudo_debug(1, "mkstemp (path %s) succeeded, but fstat failed (%s).\n",
 				rc, strerror(errno));

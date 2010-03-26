@@ -35,7 +35,7 @@
 	rc = real_unlinkat(dirfd, path, rflags);
 #endif
 	if (rc != -1) {
-		pseudo_client_op(OP_UNLINK, -1, dirfd, path, &buf);
+		pseudo_client_op(OP_UNLINK, 0, -1, dirfd, path, &buf);
 	}
 
 /*	return rc;

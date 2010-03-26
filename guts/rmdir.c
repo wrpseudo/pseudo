@@ -13,7 +13,7 @@
 	rc = real_rmdir(path);
 	save_errno = errno;
 	if (rc != -1) {
-		pseudo_client_op(OP_UNLINK, -1, -1, path, &buf);
+		pseudo_client_op(OP_UNLINK, 0, -1, -1, path, &buf);
 	}
 
 	errno = save_errno;

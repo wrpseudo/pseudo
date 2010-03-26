@@ -91,6 +91,7 @@ extern pseudo_query_type_t pseudo_query_type_id(char *name);
 typedef enum pseudo_query_field {
 	PSQF_UNKNOWN = -1,
 	PSQF_NONE, /* so that these are always non-zero */
+	PSQF_ACCESS,
 	PSQF_CLIENT,	PSQF_DEV,	PSQF_FD, 	PSQF_FTYPE,
 	PSQF_GID,	PSQF_ID,	PSQF_INODE,	PSQF_MODE,	
 	PSQF_OP,	PSQF_ORDER,	PSQF_PATH,	PSQF_PERM,

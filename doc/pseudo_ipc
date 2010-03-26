@@ -4,7 +4,7 @@ typedef struct {
 	pseudo_msg_type_t type;
 	op_id_t	op;
 	res_id_t result;
-	int xerrno;
+	int access;
 	int client;
 	dev_t dev;
 	unsigned long long ino;
@@ -59,9 +59,10 @@ uid/gid/mode/rdev on response, and never sends a path back.  Dev and inode
 are currently changed by stat-by-path operations, but this may turn out to
 be wrong.
 
-xerrno is used to contain a changed errno if, at some point, the server wants
-to override the default errno.  Normally, the client just uses its existing
-errno.
+access holds information about the open mode of a file (read, write, append,
+etc.), but is not fully implemented.
+
+A field "xerrno" used to exist; it was never actually implemented.
 
 nlink is used to forward the number of links.  The server DOES NOT modify
 this.  Rather, nlink is used to provide better diagnostics when checking

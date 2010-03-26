@@ -17,7 +17,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
-extern pseudo_msg_t *pseudo_client_op(op_id_t op, int fd, int dirfd, const char *path, const struct stat64 *buf, ...);
+extern pseudo_msg_t *pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, const struct stat64 *buf, ...);
 extern void pseudo_antimagic(void);
 extern void pseudo_magic(void);
 extern void pseudo_client_reset(void);

@@ -92,6 +92,7 @@ static char *query_type_sql[] = {
 
 static char *query_field_names[] = {
 	"zero",
+	"access",
 	"client",
 	"dev",
 	"fd",

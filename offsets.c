@@ -33,20 +33,20 @@
 
 int
 main(void) {
-	printf("type: %d\n", offsetof(pseudo_msg_t, type));
-	printf("op: %d\n", offsetof(pseudo_msg_t, op));
-	printf("result: %d\n", offsetof(pseudo_msg_t, result));
-	printf("xerrno: %d\n", offsetof(pseudo_msg_t, xerrno));
-	printf("client: %d\n", offsetof(pseudo_msg_t, client));
-	printf("dev: %d\n", offsetof(pseudo_msg_t, dev));
-	printf("ino: %d\n", offsetof(pseudo_msg_t, ino));
-	printf("uid: %d\n", offsetof(pseudo_msg_t, uid));
-	printf("gid: %d\n", offsetof(pseudo_msg_t, gid));
-	printf("mode: %d\n", offsetof(pseudo_msg_t, mode));
-	printf("rdev: %d\n", offsetof(pseudo_msg_t, rdev));
-	printf("pathlen: %d\n", offsetof(pseudo_msg_t, pathlen));
-	printf("path: %d\n", offsetof(pseudo_msg_t, path));
-	printf("size: %d\n", sizeof(pseudo_msg_t));
+	printf("type: %d\n", (int) offsetof(pseudo_msg_t, type));
+	printf("op: %d\n", (int) offsetof(pseudo_msg_t, op));
+	printf("result: %d\n", (int) offsetof(pseudo_msg_t, result));
+	printf("rwx: %d\n", (int) offsetof(pseudo_msg_t, rwx));
+	printf("client: %d\n", (int) offsetof(pseudo_msg_t, client));
+	printf("dev: %d\n", (int) offsetof(pseudo_msg_t, dev));
+	printf("ino: %d\n", (int) offsetof(pseudo_msg_t, ino));
+	printf("uid: %d\n", (int) offsetof(pseudo_msg_t, uid));
+	printf("gid: %d\n", (int) offsetof(pseudo_msg_t, gid));
+	printf("mode: %d\n", (int) offsetof(pseudo_msg_t, mode));
+	printf("rdev: %d\n", (int) offsetof(pseudo_msg_t, rdev));
+	printf("pathlen: %d\n", (int) offsetof(pseudo_msg_t, pathlen));
+	printf("path: %d\n", (int) offsetof(pseudo_msg_t, path));
+	printf("size: %d\n", (int) sizeof(pseudo_msg_t));
 	return 0;
 }
 

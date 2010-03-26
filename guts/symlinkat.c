@@ -40,7 +40,7 @@
 		return rc;
 	}
 	/* just record the entry */
-	pseudo_client_op(OP_SYMLINK, -1, dirfd, newpath, &buf);
+	pseudo_client_op(OP_SYMLINK, 0, -1, dirfd, newpath, &buf);
 
 	free(roldname);
 

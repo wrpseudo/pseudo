@@ -220,6 +220,8 @@ static struct sql_migration {
 	 */
 	{ "ALTER TABLE logs ADD uid INTEGER;" },
 	{ "ALTER TABLE logs ADD gid INTEGER;" },
+	/* track access types (read/write, etc) */
+	{ "ALTER TABLE logs ADD access INTEGER;" },
 	{ NULL },
 };
 
@@ -558,6 +560,9 @@ pdb_log_traits(pseudo_query_t *traits) {
 	}
 	for (trait = traits; trait; trait = trait->next) {
 		switch (trait->field) {
+		case PSQF_ACCESS:
+			e->access = trait->data.ivalue;
+			break;
 		case PSQF_CLIENT:
 			e->client = trait->data.ivalue;
 			break;
@@ -628,10 +633,11 @@ pdb_log_traits(pseudo_query_t *traits) {
 int
 pdb_log_entry(log_entry *e) {
 	char *sql = "INSERT INTO logs "
-		    "(stamp, op, client, dev, gid, ino, mode, path, result, severity, text, tag, uid)"
+		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, severity, text, tag, uid)"
 		    " VALUES "
-		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	static sqlite3_stmt *insert;
+	int field;
 	int rc;
 
 	if (!log_db && get_db(&log_db)) {
@@ -647,50 +653,53 @@ pdb_log_entry(log_entry *e) {
 		}
 	}
 
+	field = 1;
 	if (e) {
 		if (e->stamp) {
-			sqlite3_bind_int(insert, 1, e->stamp);
+			sqlite3_bind_int(insert, field++, e->stamp);
 		} else {
-			sqlite3_bind_int(insert, 1, (unsigned long) time(NULL));
+			sqlite3_bind_int(insert, field++, (unsigned long) time(NULL));
 		}
-		sqlite3_bind_int(insert, 2, e->op);
-		sqlite3_bind_int(insert, 3, e->client);
-		sqlite3_bind_int(insert, 4, e->dev);
-		sqlite3_bind_int(insert, 5, e->gid);
-		sqlite3_bind_int(insert, 6, e->ino);
-		sqlite3_bind_int(insert, 7, e->mode);
+		sqlite3_bind_int(insert, field++, e->op);
+		sqlite3_bind_int(insert, field++, e->access);
+		sqlite3_bind_int(insert, field++, e->client);
+		sqlite3_bind_int(insert, field++, e->dev);
+		sqlite3_bind_int(insert, field++, e->gid);
+		sqlite3_bind_int(insert, field++, e->ino);
+		sqlite3_bind_int(insert, field++, e->mode);
 		if (e->path) {
-			sqlite3_bind_text(insert, 8, e->path, -1, SQLITE_STATIC);
+			sqlite3_bind_text(insert, field++, e->path, -1, SQLITE_STATIC);
 		} else {
-			sqlite3_bind_null(insert, 8);
+			sqlite3_bind_null(insert, field++);
 		}
-		sqlite3_bind_int(insert, 9, e->result);
-		sqlite3_bind_int(insert, 10, e->severity);
+		sqlite3_bind_int(insert, field++, e->result);
+		sqlite3_bind_int(insert, field++, e->severity);
 		if (e->text) {
-			sqlite3_bind_text(insert, 11, e->text, -1, SQLITE_STATIC);
+			sqlite3_bind_text(insert, field++, e->text, -1, SQLITE_STATIC);
 		} else {
-			sqlite3_bind_null(insert, 11);
+			sqlite3_bind_null(insert, field++);
 		}
 		if (e->tag) {
-			sqlite3_bind_text(insert, 12, e->tag, -1, SQLITE_STATIC);
+			sqlite3_bind_text(insert, field++, e->tag, -1, SQLITE_STATIC);
 		} else {
-			sqlite3_bind_null(insert, 12);
+			sqlite3_bind_null(insert, field++);
 		}
-		sqlite3_bind_int(insert, 13, e->uid);
+		sqlite3_bind_int(insert, field++, e->uid);
 	} else {
-		sqlite3_bind_int(insert, 1, (unsigned long) time(NULL));
-		sqlite3_bind_int(insert, 2, 0);
-		sqlite3_bind_int(insert, 3, 0);
-		sqlite3_bind_int(insert, 4, 0);
-		sqlite3_bind_int(insert, 5, 0);
-		sqlite3_bind_int(insert, 6, 0);
-		sqlite3_bind_int(insert, 7, 0);
-		sqlite3_bind_null(insert, 8);
-		sqlite3_bind_int(insert, 9, 0);
-		sqlite3_bind_int(insert, 10, 0);
-		sqlite3_bind_null(insert, 11);
-		sqlite3_bind_null(insert, 12);
-		sqlite3_bind_int(insert, 13, 0);
+		sqlite3_bind_int(insert, field++, (unsigned long) time(NULL));
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_null(insert, field++);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_null(insert, field++);
+		sqlite3_bind_null(insert, field++);
+		sqlite3_bind_int(insert, field++, 0);
 	}
 
 	rc = sqlite3_step(insert);
@@ -705,11 +714,12 @@ pdb_log_entry(log_entry *e) {
 int
 pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *tag, const char *text, ...) {
 	char *sql = "INSERT INTO logs "
-		    "(stamp, op, client, dev, gid, ino, mode, path, result, severity, text, tag, uid)"
+		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, uid, severity, text, tag)"
 		    " VALUES "
-		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	static sqlite3_stmt *insert;
 	char buffer[8192];
+	int field;
 	int rc;
 	va_list ap;
 
@@ -733,42 +743,45 @@ pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *tag, const char *t
 		}
 	}
 
+	field = 1;
+	sqlite3_bind_int(insert, field++, (unsigned long) time(NULL));
 	if (msg) {
-		sqlite3_bind_int(insert, 2, msg->op);
-		sqlite3_bind_int(insert, 3, msg->client);
-		sqlite3_bind_int(insert, 4, msg->dev);
-		sqlite3_bind_int(insert, 5, msg->gid);
-		sqlite3_bind_int(insert, 6, msg->ino);
-		sqlite3_bind_int(insert, 7, msg->mode);
+		sqlite3_bind_int(insert, field++, msg->op);
+		sqlite3_bind_int(insert, field++, msg->access);
+		sqlite3_bind_int(insert, field++, msg->client);
+		sqlite3_bind_int(insert, field++, msg->dev);
+		sqlite3_bind_int(insert, field++, msg->gid);
+		sqlite3_bind_int(insert, field++, msg->ino);
+		sqlite3_bind_int(insert, field++, msg->mode);
 		if (msg->pathlen) {
-			sqlite3_bind_text(insert, 8, msg->path, -1, SQLITE_STATIC);
+			sqlite3_bind_text(insert, field++, msg->path, -1, SQLITE_STATIC);
 		} else {
-			sqlite3_bind_null(insert, 8);
+			sqlite3_bind_null(insert, field++);
 		}
-		sqlite3_bind_int(insert, 9, msg->result);
-		sqlite3_bind_int(insert, 13, msg->uid);
+		sqlite3_bind_int(insert, field++, msg->result);
+		sqlite3_bind_int(insert, field++, msg->uid);
 	} else {
-		sqlite3_bind_int(insert, 2, 0);
-		sqlite3_bind_int(insert, 3, 0);
-		sqlite3_bind_int(insert, 4, 0);
-		sqlite3_bind_int(insert, 5, 0);
-		sqlite3_bind_int(insert, 6, 0);
-		sqlite3_bind_int(insert, 7, 0);
-		sqlite3_bind_null(insert, 8);
-		sqlite3_bind_int(insert, 9, 0);
-		sqlite3_bind_int(insert, 13, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_null(insert, field++);
+		sqlite3_bind_int(insert, field++, 0);
+		sqlite3_bind_int(insert, field++, 0);
 	}
-	sqlite3_bind_int(insert, 1, (unsigned long) time(NULL));
-	sqlite3_bind_int(insert, 10, severity);
+	sqlite3_bind_int(insert, field++, severity);
 	if (text) {
-		sqlite3_bind_text(insert, 11, text, -1, SQLITE_STATIC);
+		sqlite3_bind_text(insert, field++, text, -1, SQLITE_STATIC);
 	} else {
-		sqlite3_bind_null(insert, 11);
+		sqlite3_bind_null(insert, field++);
 	}
 	if (tag) {
-		sqlite3_bind_text(insert, 12, tag, -1, SQLITE_STATIC);
+		sqlite3_bind_text(insert, field++, tag, -1, SQLITE_STATIC);
 	} else {
-		sqlite3_bind_null(insert, 12);
+		sqlite3_bind_null(insert, field++);
 	}
 
 	rc = sqlite3_step(insert);
@@ -1005,10 +1018,11 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			sqlite3_bind_text(select, field++,
 				trait->data.svalue, -1, SQLITE_STATIC);
 			break;
-		case PSQF_FTYPE: /* FALLTHROUGH */
+		case PSQF_ACCESS: /* FALLTHROUGH */
 		case PSQF_CLIENT: /* FALLTHROUGH */
 		case PSQF_DEV: /* FALLTHROUGH */
 		case PSQF_FD: /* FALLTHROUGH */
+		case PSQF_FTYPE: /* FALLTHROUGH */
 		case PSQF_INODE: /* FALLTHROUGH */
 		case PSQF_GID: /* FALLTHROUGH */
 		case PSQF_PERM: /* FALLTHROUGH */
@@ -1070,6 +1084,9 @@ pdb_history_entry(log_history h) {
 		if (!(h->fields & (1 << f)))
 			continue;
 		switch (f) {
+		case PSQF_ACCESS:
+			l->access = sqlite3_column_int64(h->stmt, column++);
+			break;
 		case PSQF_CLIENT:
 			l->client = sqlite3_column_int64(h->stmt, column++);
 			break;

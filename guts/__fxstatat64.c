@@ -56,7 +56,7 @@
 	 * note that symlink canonicalizing is now automatic, so we
 	 * don't need to check for a symlink on this end
 	 */
-	msg = pseudo_client_op(OP_STAT, -1, dirfd, path, buf);
+	msg = pseudo_client_op(OP_STAT, 0, -1, dirfd, path, buf);
 	if (msg) {
 		pseudo_stat_msg(buf, msg);
 		if (save_mode) {

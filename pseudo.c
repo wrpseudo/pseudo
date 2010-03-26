@@ -278,7 +278,6 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 		return 1;
 	
 	msg->result = RESULT_SUCCEED;
-	msg->xerrno = 0;
 
 	/* debugging message.  Primary key first. */
 	switch (msg->op) {

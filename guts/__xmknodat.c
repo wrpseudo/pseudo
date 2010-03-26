@@ -44,12 +44,12 @@
 	buf.st_mode = (PSEUDO_DB_MODE(buf.st_mode, mode) & 07777) |
 			(mode & ~07777);
 	buf.st_rdev = *dev;
-	msg = pseudo_client_op(OP_MKNOD, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_MKNOD, 0, -1, dirfd, path, &buf);
 	if (!msg) {
 		errno = ENOSYS;
 		rc = -1;
 	} else if (msg->result != RESULT_SUCCEED) {
-		errno = msg->xerrno;
+		errno = EPERM;
 		rc = -1;
 	} else {
 		rc = 0;

@@ -33,7 +33,7 @@ typedef struct {
 	pseudo_msg_type_t type;
 	op_id_t	op;
 	res_id_t result;
-	int xerrno;
+	int access;
 	int client;
 	int fd;
 	dev_t dev;
@@ -46,6 +46,22 @@ typedef struct {
 	int nlink;
 	char path[];
 } pseudo_msg_t;
+
+enum {
+	PSA_EXEC = 1,
+	PSA_WRITE = (PSA_EXEC << 1),
+	PSA_READ = (PSA_WRITE << 1),
+	PSA_APPEND = (PSA_READ << 1),
+} pseudo_access_t;
+
+#define PSEUDO_ACCESS_MAP(mode, fcntl_access, pseudo_access) ((((mode) & O_ACCMODE) == (fcntl_access)) ? (pseudo_access) : (0))
+#define PSEUDO_ACCESS_FLAG(mode, fcntl_access, pseudo_access) (((mode) & (fcntl_access)) ? (pseudo_access) : (0))
+#define PSEUDO_ACCESS(mode) ( \
+	PSEUDO_ACCESS_MAP(mode, O_RDONLY, PSA_READ) | \
+	PSEUDO_ACCESS_MAP(mode, O_WRONLY, PSA_WRITE) | \
+	PSEUDO_ACCESS_MAP(mode, O_RDWR, PSA_READ | PSA_WRITE) | \
+	PSEUDO_ACCESS_FLAG(mode, O_APPEND, PSA_APPEND))
+extern int pseudo_access_fopen(const char *);
 
 #define PSEUDO_HEADER_SIZE (offsetof(pseudo_msg_t, path))
 

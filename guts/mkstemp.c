@@ -27,12 +27,12 @@
 		save_errno = errno;
 
 		if (real___fxstat64(_STAT_VER, rc, &buf) != -1) {
-			pseudo_client_op(OP_CREAT, -1, -1, tmp_template, &buf);
-			pseudo_client_op(OP_OPEN, rc, -1, tmp_template, &buf);
+			pseudo_client_op(OP_CREAT, 0, -1, -1, tmp_template, &buf);
+			pseudo_client_op(OP_OPEN, PSA_READ | PSA_WRITE, rc, -1, tmp_template, &buf);
 		} else {
 			pseudo_debug(1, "mkstemp (fd %d) succeeded, but fstat failed (%s).\n",
 				rc, strerror(errno));
-			pseudo_client_op(OP_OPEN, rc, -1, tmp_template, 0);
+			pseudo_client_op(OP_OPEN, PSA_READ | PSA_WRITE, rc, -1, tmp_template, 0);
 		}
 		errno = save_errno;
 	}

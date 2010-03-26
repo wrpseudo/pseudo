@@ -22,7 +22,7 @@
 		stat_rc = real___fxstatat64(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 		if (stat_rc != -1) {
-			pseudo_client_op(OP_MKDIR, -1, dirfd, path, &buf);
+			pseudo_client_op(OP_MKDIR, 0, -1, dirfd, path, &buf);
 		} else {
 			pseudo_debug(1, "mkdir of %s succeeded, but stat failed: %s\n",
 				path, strerror(errno));

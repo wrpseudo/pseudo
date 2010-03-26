@@ -64,6 +64,7 @@ LOGS
 	severity (severity id)
 	text (anything else you wanted to say)
 	tag (identifier for operations)
+	access (integer)
 
 The log database contains a primary table (logs).  As of this writing it
 is not indexed, because indexing is expensive during writes (common, for
@@ -79,3 +80,11 @@ The log database "tag" field, added since the initial release of pseudo,
 is available for tagging operations.  When a client connects to the
 pseudo server, it passes the value of the environment variable PSEUDO_TAG;
 this tag is then recorded for all log entries pertaining to that client.
+
+The log database "access" field, added since the initial release of pseudo,
+stores values which are bitwise masks of the values 1 (execute), 2 (write),
+4 (read), and 8 (append), used to report the modes with which a file was
+opened.  These values are not completely reliable.  A value of 0 is typical
+for non-open operations, and a value outside the 0-15 range (usually -1)
+indicates that something went wrong trying to identify the mode of a given
+open.

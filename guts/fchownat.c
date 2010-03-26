@@ -31,7 +31,7 @@
 	save_errno = errno;
 
 	if (owner == (uid_t) -1 || group == (gid_t) -1) {
-		msg = pseudo_client_op(OP_STAT, -1, -1, path, &buf);
+		msg = pseudo_client_op(OP_STAT, 0, -1, -1, path, &buf);
 		/* copy in any existing values... */
 		if (msg) {
 			if (msg->result == RESULT_SUCCEED) {
@@ -50,12 +50,12 @@
 	if (group != (gid_t) -1) {
 		buf.st_gid = group;
 	}
-	msg = pseudo_client_op(OP_CHOWN, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_CHOWN, 0, -1, dirfd, path, &buf);
 	if (!msg) {
 		errno = ENOSYS;
 		rc = -1;
 	} else if (msg->result != RESULT_SUCCEED) {
-		errno = msg->xerrno;
+		errno = EPERM;
 		rc = -1;
 	} else {
 		rc = 0;

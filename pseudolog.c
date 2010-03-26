@@ -43,6 +43,7 @@ static int format_scan(char *format);
 void
 usage(int status) {
 	static char *options[] = {
+		"a  access (rwax)",
 		"c  client pid",
 		"d  device number",
 		"f  file descriptor",
@@ -88,6 +89,7 @@ usage(int status) {
 }
 
 pseudo_query_field_t opt_to_field[UCHAR_MAX + 1] = {
+	['a'] = PSQF_ACCESS,
 	['c'] = PSQF_CLIENT,
 	['d'] = PSQF_DEV,
 	['f'] = PSQF_FD,
@@ -377,6 +379,14 @@ plog_trait(int opt, char *string) {
 		return 0;
 	}
 	switch (new_trait->field) {
+	case PSQF_ACCESS:
+		new_trait->data.ivalue = pseudo_access_fopen(string);
+		if (new_trait->data.ivalue == (unsigned long long) -1) {
+			pseudo_diag("access flags should be specified like fopen(3) mode strings.\n");
+			free(new_trait);
+			return 0;
+		}
+		break;
 	case PSQF_FTYPE:
 		/* special magic: allow file types ala find */
 		/* This is implemented by additional magic over in the database code */
@@ -485,9 +495,9 @@ main(int argc, char **argv) {
 	int query_only = 0;
 	int o;
 	int bad_args = 0;
-	char *format = "%s %-5o %7r: [mode %04m] %p %T";
+	char *format = "%s %-5o %7r: [mode %04m, %2a] %p %T";
 
-	while ((o = getopt(argc, argv, "vlc:d:DE:f:F:g:G:hi:I:m:M:o:O:p:r:s:S:t:T:u:")) != -1) {
+	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:r:s:S:t:T:u:")) != -1) {
 		switch (o) {
 		case 'P':
 			setenv("PSEUDO_PREFIX", optarg, 1);
@@ -513,6 +523,7 @@ main(int argc, char **argv) {
 		case 'I': /* PSQF_ID */
 			query_only = 1;
 			/* FALLTHROUGH */
+		case 'a': /* PSQF_ACCESS */
 		case 'c': /* PSQF_CLIENT */
 		case 'd': /* PSQF_DEV */
 		case 'f': /* PSQF_FD */
@@ -606,7 +617,7 @@ main(int argc, char **argv) {
 static char *
 format_one(log_entry *e, char *format) {
 	char fmtbuf[256];
-	size_t len = strcspn(format, "cdfgGimMoprsStTu"), real_len;
+	size_t len = strcspn(format, "acdfgGimMoprsStTu"), real_len;
 	char scratch[4096];
 	time_t stamp_sec;
 	struct tm stamp_tm;
@@ -634,6 +645,33 @@ format_one(log_entry *e, char *format) {
 	}
 
 	switch (*s) {
+	case 'a': /* PSQF_ACCESS */
+		if (e->access == -1) {
+			strcpy(scratch, "invalid");
+		} else if (e->access != 0) {
+			if (e->access & PSA_READ) {
+				strcpy(scratch, "r");
+				if (e->access & PSA_WRITE)
+					strcat(scratch, "+");
+			} else if (e->access & PSA_WRITE) {
+				if (e->access & PSA_APPEND) {
+					strcpy(scratch, "a");
+				} else {
+					strcpy(scratch, "w");
+				}
+				if (e->access & PSA_READ)
+					strcat(scratch, "+");
+			}
+			/* this should be impossible... should. */
+			if (e->access & PSA_APPEND && !(e->access & PSA_WRITE)) {
+				strcat(scratch, "?a");
+			}
+		} else {
+			strcpy(scratch, "-");
+		}
+		strcpy(s, "s");
+		printf(fmtbuf, scratch);
+		break;
 	case 'c': /* PSQF_CLIENT */
 		strcpy(s, "d");
 		printf(fmtbuf, (int) e->client);
@@ -690,7 +728,7 @@ format_one(log_entry *e, char *format) {
 		printf(fmtbuf, pseudo_sev_name(e->severity));
 		break;
 	case 't': /* PSQF_FTYPE */
-		strcpy(s, "s");
+	strcpy(s, "s");
 		if (S_ISREG(e->mode)) {
 			strcpy(scratch, "file");
 		} if (S_ISLNK(e->mode)) {
@@ -728,14 +766,20 @@ format_scan(char *format) {
 	pseudo_query_field_t field;
 
 	for (s = format; (s = strchr(s, '%')) != NULL; ++s) {
-		len = strcspn(s, "cdfgGimMoprsStTu");
+		len = strcspn(s, "acdfgGimMoprsStTu");
 		s += len;
+		if (!*s) {
+			pseudo_diag("Unknown format: '%.3s'\n",
+				(s - len));
+			return -1;
+		}
 		field = opt_to_field[(unsigned char) *s];
 		switch (field) {
 		case PSQF_PERM:
 		case PSQF_FTYPE:
 			fields |= (1 << PSQF_MODE);
 			break;
+		case PSQF_ACCESS:
 		case PSQF_CLIENT:
 		case PSQF_DEV:
 		case PSQF_FD:

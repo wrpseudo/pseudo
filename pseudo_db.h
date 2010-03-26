@@ -20,6 +20,7 @@
 typedef struct {
 	time_t stamp;
 	op_id_t op;
+	int access;
 	unsigned long client;
 	unsigned long fd;
 	unsigned long long dev;

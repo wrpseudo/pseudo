@@ -580,3 +580,33 @@ pseudo_sys_path_max(void) {
 	}
 	return pseudo_sys_max_pathlen;
 }
+
+/* complicated because in theory you can have modes like * 'ab+'
+ * which is the same as 'a+' in POSIX.  The first letter really does have
+ * to be one of r, w, a, though.
+ */
+int
+pseudo_access_fopen(const char *mode) {
+	int access = 0;
+	switch (*mode) {
+	case 'a':
+		access |= (PSA_APPEND | PSA_WRITE);
+		if (mode[1] == '+' || (mode[1] == 'b' && mode[2] == '+'))
+			access |= PSA_READ;
+		break;
+	case 'r':
+		access |= PSA_READ;
+		if (mode[1] == '+' || (mode[1] == 'b' && mode[2] == '+'))
+			access |= PSA_WRITE;
+		break;
+	case 'w':
+		access |= PSA_WRITE;
+		if (mode[1] == '+' || (mode[1] == 'b' && mode[2] == '+'))
+			access |= PSA_READ;
+		break;
+	default:
+		access = -1;
+		break;
+	}
+	return access;
+}
