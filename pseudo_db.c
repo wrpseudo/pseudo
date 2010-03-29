@@ -905,8 +905,8 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			}
 		}
 		switch (trait->field) {
-		case PSQF_TEXT: /* FALLTHROUGH */
-		case PSQF_TAG: /* FALLTHROUGH */
+		case PSQF_TEXT:		/* FALLTHROUGH */
+		case PSQF_TAG:		/* FALLTHROUGH */
 		case PSQF_PATH:
 			switch (trait->type) {
 			case PSQT_LIKE:
@@ -914,7 +914,7 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 					pseudo_query_field_name(trait->field),
 					pseudo_query_type_sql(trait->type));
 				break;
-			case PSQT_NOTLIKE:
+			case PSQT_NOTLIKE:	/* FALLTHROUGH */
 			case PSQT_SQLPAT:
 				frag(sql, "%s %s ?",
 					pseudo_query_field_name(trait->field),
@@ -929,8 +929,8 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			break;
 		case PSQF_PERM:
 			switch (trait->type) {
-			case PSQT_LIKE: /* FALLTHROUGH */
-			case PSQT_NOTLIKE: /* FALLTHROUGH */
+			case PSQT_LIKE:		/* FALLTHROUGH */
+			case PSQT_NOTLIKE:	/* FALLTHROUGH */
 			case PSQT_SQLPAT:
 				pseudo_diag("Error:  Can't use a LIKE match on non-text fields.\n");
 				return 0;
@@ -946,8 +946,8 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			break;
 		case PSQF_FTYPE:
 			switch (trait->type) {
-			case PSQT_LIKE: /* FALLTHROUGH */
-			case PSQT_NOTLIKE: /* FALLTHROUGH */
+			case PSQT_LIKE:		/* FALLTHROUGH */
+			case PSQT_NOTLIKE:	/* FALLTHROUGH */
 			case PSQT_SQLPAT:
 				pseudo_diag("Error:  Can't use a LIKE match on non-text fields.\n");
 				return 0;
@@ -967,7 +967,7 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			case PSQT_LESS:
 				order_dir = "DESC";
 				break;
-			case PSQT_EXACT: /* FALLTHROUGH */
+			case PSQT_EXACT:	/* FALLTHROUGH */
 				/* this was already the default */
 				break;
 			case PSQT_GREATER:
@@ -981,8 +981,8 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			break;
 		default:
 			switch (trait->type) {
-			case PSQT_LIKE: /* FALLTHROUGH */
-			case PSQT_NOTLIKE: /* FALLTHROUGH */
+			case PSQT_LIKE:		/* FALLTHROUGH */
+			case PSQT_NOTLIKE:	/* FALLTHROUGH */
 			case PSQT_SQLPAT:
 				pseudo_diag("Error:  Can't use a LIKE match on non-text fields.\n");
 				return 0;
@@ -1013,26 +1013,26 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 		case PSQF_ORDER:
 			/* this just creates a hunk of SQL above */
 			break;
-		case PSQF_PATH: /* FALLTHROUGH */
-		case PSQF_TAG: /* FALLTHROUGH */
+		case PSQF_PATH:		/* FALLTHROUGH */
+		case PSQF_TAG:		/* FALLTHROUGH */
 		case PSQF_TEXT:
 			sqlite3_bind_text(select, field++,
 				trait->data.svalue, -1, SQLITE_STATIC);
 			break;
-		case PSQF_ACCESS: /* FALLTHROUGH */
-		case PSQF_CLIENT: /* FALLTHROUGH */
-		case PSQF_DEV: /* FALLTHROUGH */
-		case PSQF_FD: /* FALLTHROUGH */
-		case PSQF_FTYPE: /* FALLTHROUGH */
-		case PSQF_INODE: /* FALLTHROUGH */
-		case PSQF_GID: /* FALLTHROUGH */
-		case PSQF_PERM: /* FALLTHROUGH */
-		case PSQF_MODE: /* FALLTHROUGH */
-		case PSQF_OP: /* FALLTHROUGH */
-		case PSQF_RESULT: /* FALLTHROUGH */
-		case PSQF_SEVERITY: /* FALLTHROUGH */
-		case PSQF_STAMP: /* FALLTHROUGH */
-		case PSQF_UID: /* FALLTHROUGH */
+		case PSQF_ACCESS:	/* FALLTHROUGH */
+		case PSQF_CLIENT:	/* FALLTHROUGH */
+		case PSQF_DEV:		/* FALLTHROUGH */
+		case PSQF_FD:		/* FALLTHROUGH */
+		case PSQF_FTYPE:	/* FALLTHROUGH */
+		case PSQF_INODE:	/* FALLTHROUGH */
+		case PSQF_GID:		/* FALLTHROUGH */
+		case PSQF_PERM:		/* FALLTHROUGH */
+		case PSQF_MODE:		/* FALLTHROUGH */
+		case PSQF_OP:		/* FALLTHROUGH */
+		case PSQF_RESULT:	/* FALLTHROUGH */
+		case PSQF_SEVERITY:	/* FALLTHROUGH */
+		case PSQF_STAMP:	/* FALLTHROUGH */
+		case PSQF_UID:		/* FALLTHROUGH */
 			sqlite3_bind_int(select, field++, trait->data.ivalue);
 			break;
 		default:
@@ -1136,8 +1136,8 @@ pdb_history_entry(log_history h) {
 		case PSQF_UID:
 			l->uid = sqlite3_column_int64(h->stmt, column++);
 			break;
-		case PSQF_ORDER: /* FALLTHROUGH */
-		case PSQF_FTYPE: /* FALLTHROUGH */
+		case PSQF_ORDER:	/* FALLTHROUGH */
+		case PSQF_FTYPE:	/* FALLTHROUGH */
 		case PSQF_PERM:
 			pseudo_diag("field %s should not be in the fields list.\n",
 				pseudo_query_field_name(f));

@@ -119,15 +119,15 @@ main(int argc, char *argv[]) {
 			pseudo_client_getcwd();
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
-				pseudo_diag("Can't resolve path '%s'\n", optarg);
+				pseudo_diag("Can't resolve prefix path '%s'\n", optarg);
 			setenv("PSEUDO_PREFIX", s, 1);
 			break;
-		case 'r': /* FALLTHROUGH */
+		case 'r':	/* FALLTHROUGH */
 		case 'R':
 			pseudo_client_getcwd();
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
-				pseudo_diag("Can't resolve path '%s'\n", optarg);
+				pseudo_diag("Can't resolve root path '%s'\n", optarg);
 			setenv("PSEUDO_CHROOT", s, 1);
 			if (o == 'r')
 				opt_r = s;
@@ -157,6 +157,7 @@ main(int argc, char *argv[]) {
 			exit(0);
 			break;
 		case '?':
+		default:
 			pseudo_diag("unknown/invalid argument (option '%c').\n", optopt);
 			usage(EXIT_FAILURE);
 			break;
@@ -281,8 +282,8 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 
 	/* debugging message.  Primary key first. */
 	switch (msg->op) {
-	case OP_FCHOWN:
-	case OP_FCHMOD:
+	case OP_FCHOWN:		/* FALLTHROUGH */
+	case OP_FCHMOD:		/* FALLTHROUGH */
 	case OP_FSTAT:
 		prefer_ino = 1;
 		pseudo_debug(2, "%s %llu [%s]: ", pseudo_op_name(msg->op),
@@ -475,13 +476,13 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 	}
 
 	switch (msg->op) {
-	case OP_CHDIR:
+	case OP_CHDIR:		/* FALLTHROUGH */
 	case OP_CLOSE:
 		/* these messages are handled entirely on the client side,
 		 * as of this writing, but might be logged by accident: */
 		pseudo_diag("error: op %s sent to server.\n", pseudo_op_name(msg->op));
 		break;
-	case OP_EXEC:
+	case OP_EXEC:		/* FALLTHROUGH */
 	case OP_OPEN:
 		/* nothing to do -- just sent in case we're logging */
 		break;
@@ -505,7 +506,7 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 				msg->pathlen ? msg->path : "no path");
 		}
 		break;
-	case OP_CHMOD:
+	case OP_CHMOD:		/* FALLTHROUGH */
 	case OP_FCHMOD:
 		pseudo_debug(2, "mode 0%o ", (int) msg->mode);
 		/* if the inode is known, update it */
@@ -531,7 +532,7 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 			pdb_link_file(msg);
 		}
 		break;
-	case OP_CHOWN:
+	case OP_CHOWN:		/* FALLTHROUGH */
 	case OP_FCHOWN:
 		pseudo_debug(2, "owner %d:%d ", (int) msg_header.uid, (int) msg_header.gid);
 		/* if the inode is known, update it */
@@ -557,7 +558,7 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 			pdb_link_file(msg);
 		}
 		break;
-	case OP_STAT:
+	case OP_STAT:		/* FALLTHROUGH */
 	case OP_FSTAT:
 		/* db_header will be whichever one looked best, in the rare
 		 * case where there might be a clash.
@@ -571,7 +572,7 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 			pseudo_op_name(msg->op), (unsigned long long) msg->ino,
 			(int) msg_header.mode, (int) msg->mode);
 		break;
-	case OP_LINK:
+	case OP_LINK:		/* FALLTHROUGH */
 	case OP_SYMLINK:
 		/* a successful link (client only notifies us for those)
 		 * implies that the new path did not previously exist, and
@@ -638,7 +639,7 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 			pdb_unlink_file_dev(msg);
 		}
 		break;
-	case OP_MKDIR:
+	case OP_MKDIR:		/* FALLTHROUGH */
 	case OP_MKNOD:
 		pseudo_debug(2, "mode 0%o", (int) msg->mode);
 		/* for us to get called, the client has to have succeeded in
@@ -687,8 +688,8 @@ pseudo_server_response(pseudo_msg_t *msg, const char *tag) {
 	case PSEUDO_MSG_OP:
 		return pseudo_op(msg, tag);
 		break;
-	case PSEUDO_MSG_ACK:
-	case PSEUDO_MSG_NAK:
+	case PSEUDO_MSG_ACK:		/* FALLTHROUGH */
+	case PSEUDO_MSG_NAK:		/* FALLTHROUGH */
 	default:
 		pdb_log_msg(SEVERITY_WARN, msg, tag, "invalid message");
 		return 1;

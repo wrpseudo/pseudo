@@ -189,7 +189,7 @@ parse_file_type(char *string) {
 	case 'd':
 		return S_IFDIR;
 		break;
-	case '-': /* FALLTHROUGH */
+	case '-':	/* FALLTHROUGH */
 	case 'f':
 		return S_IFREG;
 		break;
@@ -239,11 +239,11 @@ parse_partial_mode(char *string) {
 	case 'x':
 		mode |= 01;
 		break;
-	case 't': /* FALLTHROUGH */
+	case 't':	/* FALLTHROUGH */
 	case 's':
 		mode |= 011;
 		break;
-	case 'T': /* FALLTHROUGH */
+	case 'T':	/* FALLTHROUGH */
 	case 'S':
 		mode |= 010;
 		break;
@@ -463,8 +463,8 @@ plog_trait(int opt, char *string) {
 			new_trait->data.ivalue &= ~S_IFMT;
 		}
 		break;
-	case PSQF_PATH: /* FALLTHROUGH */
-	case PSQF_TEXT: /* FALLTHROUGH */
+	case PSQF_PATH:		/* FALLTHROUGH */
+	case PSQF_TEXT:		/* FALLTHROUGH */
 	case PSQF_TAG:
 		/* Plain strings */
 		new_trait->data.svalue = strdup(string);
@@ -520,27 +520,27 @@ main(int argc, char **argv) {
 			format = strdup(optarg);
 			query_only = 1;
 			break;
-		case 'I': /* PSQF_ID */
+		case 'I':		/* PSQF_ID */
 			query_only = 1;
-			/* FALLTHROUGH */
-		case 'a': /* PSQF_ACCESS */
-		case 'c': /* PSQF_CLIENT */
-		case 'd': /* PSQF_DEV */
-		case 'f': /* PSQF_FD */
-		case 'g': /* PSQF_GID */
-		case 'G': /* PSQF_TAG */
-		case 'i': /* PSQF_INODE */
-		case 'm': /* PSQF_PERM */
-		case 'M': /* PSQF_MODE */
-		case 'o': /* PSQF_OP */
-		case 'O': /* PSQF_ORDER */
-		case 'p': /* PSQF_PATH */
-		case 'r': /* PSQF_RESULT */
-		case 's': /* PSQF_STAMP */
-		case 'S': /* PSQF_SEVERITY */
-		case 't': /* PSQF_FTYPE */
-		case 'T': /* PSQF_TEXT */
-		case 'u': /* PSQF_UID */
+					/* FALLTHROUGH */
+		case 'a':		/* PSQF_ACCESS */
+		case 'c':		/* PSQF_CLIENT */
+		case 'd':		/* PSQF_DEV */
+		case 'f':		/* PSQF_FD */
+		case 'g':		/* PSQF_GID */
+		case 'G':		/* PSQF_TAG */
+		case 'i':		/* PSQF_INODE */
+		case 'm':		/* PSQF_PERM */
+		case 'M':		/* PSQF_MODE */
+		case 'o':		/* PSQF_OP */
+		case 'O':		/* PSQF_ORDER */
+		case 'p':		/* PSQF_PATH */
+		case 'r':		/* PSQF_RESULT */
+		case 's':		/* PSQF_STAMP */
+		case 'S':		/* PSQF_SEVERITY */
+		case 't':		/* PSQF_FTYPE */
+		case 'T':		/* PSQF_TEXT */
+		case 'u':		/* PSQF_UID */
 			new_trait = plog_trait(o, optarg);
 			if (!new_trait) {
 				bad_args = 1;
@@ -549,7 +549,7 @@ main(int argc, char **argv) {
 		case 'h':
 			usage(EXIT_SUCCESS);
 			break;
-		case '?': /* FALLTHROUGH */
+		case '?':		/* FALLTHROUGH */
 		default:
 			fprintf(stderr, "unknown option '%c'\n", optopt);
 			usage(EXIT_FAILURE);
@@ -645,7 +645,7 @@ format_one(log_entry *e, char *format) {
 	}
 
 	switch (*s) {
-	case 'a': /* PSQF_ACCESS */
+	case 'a':		/* PSQF_ACCESS */
 		*scratch = '\0';
 		if (e->access == -1) {
 			strcpy(scratch, "invalid");
@@ -675,62 +675,62 @@ format_one(log_entry *e, char *format) {
 		strcpy(s, "s");
 		printf(fmtbuf, scratch);
 		break;
-	case 'c': /* PSQF_CLIENT */
+	case 'c':		/* PSQF_CLIENT */
 		strcpy(s, "d");
 		printf(fmtbuf, (int) e->client);
 		break;
-	case 'd': /* PSQF_DEV */
+	case 'd':		/* PSQF_DEV */
 		strcpy(s, "d");
 		printf(fmtbuf, (int) e->dev);
 		break;
-	case 'f': /* PSQF_FD */
+	case 'f':		/* PSQF_FD */
 		strcpy(s, "d");
 		printf(fmtbuf, (int) e->fd);
 		break;
-	case 'g': /* PSQF_GID */
+	case 'g':		/* PSQF_GID */
 		strcpy(s, "d");
 		printf(fmtbuf, (int) e->gid);
 		break;
-	case 'G': /* PSQF_TAG */
+	case 'G':		/* PSQF_TAG */
 		strcpy(s, "s");
 		printf(fmtbuf, e->tag ? e->tag : "");
 		break;
-	case 'i': /* PSQF_INODE */
+	case 'i':		/* PSQF_INODE */
 		strcpy(s, "llu");
 		printf(fmtbuf, (unsigned long long) e->ino);
 		break;
-	case 'm': /* PSQF_PERM */
+	case 'm':		/* PSQF_PERM */
 		strcpy(s, "o");
 		printf(fmtbuf, (unsigned int) e->mode & ALLPERMS);
 		break;
-	case 'M': /* PSQF_MODE */
+	case 'M':		/* PSQF_MODE */
 		strcpy(s, "o");
 		printf(fmtbuf, (unsigned int) e->mode);
 		break;
-	case 'o': /* PSQF_OP */
+	case 'o':		/* PSQF_OP */
 		strcpy(s, "s");
 		printf(fmtbuf, pseudo_op_name(e->op));
 		break;
-	case 'p': /* PSQF_PATH */
+	case 'p':		/* PSQF_PATH */
 		strcpy(s, "s");
 		printf(fmtbuf, e->path ? e->path : "");
 		break;
-	case 'r': /* PSQF_RESULT */
+	case 'r':		/* PSQF_RESULT */
 		strcpy(s, "s");
 		printf(fmtbuf, pseudo_res_name(e->result));
 		break;
-	case 's': /* PSQF_STAMP */
+	case 's':		/* PSQF_STAMP */
 		strcpy(s, "s");
 		stamp_sec = e->stamp;
 		localtime_r(&stamp_sec, &stamp_tm);
 		strftime(scratch, sizeof(scratch), timeformat, &stamp_tm);
 		printf(fmtbuf, scratch);
 		break;
-	case 'S': /* PSQF_SEVERITY */
+	case 'S':		/* PSQF_SEVERITY */
 		strcpy(s, "s");
 		printf(fmtbuf, pseudo_sev_name(e->severity));
 		break;
-	case 't': /* PSQF_FTYPE */
+	case 't':		/* PSQF_FTYPE */
 	strcpy(s, "s");
 		if (S_ISREG(e->mode)) {
 			strcpy(scratch, "file");
@@ -749,11 +749,11 @@ format_one(log_entry *e, char *format) {
 		}
 		printf(fmtbuf, scratch);
 		break;
-	case 'T': /* PSQF_TEXT */
+	case 'T':		/* PSQF_TEXT */
 		strcpy(s, "s");
 		printf(fmtbuf, e->text ? e->text : "");
 		break;
-	case 'u': /* PSQF_UID */
+	case 'u':		/* PSQF_UID */
 		strcpy(s, "d");
 		printf(fmtbuf, (int) e->uid);
 		break;
@@ -778,24 +778,24 @@ format_scan(char *format) {
 		}
 		field = opt_to_field[(unsigned char) *s];
 		switch (field) {
-		case PSQF_PERM:
+		case PSQF_PERM:		/* FALLTHROUGH */
 		case PSQF_FTYPE:
 			fields |= (1 << PSQF_MODE);
 			break;
-		case PSQF_ACCESS:
-		case PSQF_CLIENT:
-		case PSQF_DEV:
-		case PSQF_FD:
-		case PSQF_GID:
-		case PSQF_TAG:
-		case PSQF_INODE:
-		case PSQF_MODE:
-		case PSQF_OP:
-		case PSQF_PATH:
-		case PSQF_RESULT:
-		case PSQF_STAMP:
-		case PSQF_SEVERITY:
-		case PSQF_TEXT:
+		case PSQF_ACCESS:	/* FALLTHROUGH */
+		case PSQF_CLIENT:	/* FALLTHROUGH */
+		case PSQF_DEV:		/* FALLTHROUGH */
+		case PSQF_FD:		/* FALLTHROUGH */
+		case PSQF_GID:		/* FALLTHROUGH */
+		case PSQF_TAG:		/* FALLTHROUGH */
+		case PSQF_INODE:	/* FALLTHROUGH */
+		case PSQF_MODE:		/* FALLTHROUGH */
+		case PSQF_OP:		/* FALLTHROUGH */
+		case PSQF_PATH:		/* FALLTHROUGH */
+		case PSQF_RESULT:	/* FALLTHROUGH */
+		case PSQF_STAMP:	/* FALLTHROUGH */
+		case PSQF_SEVERITY:	/* FALLTHROUGH */
+		case PSQF_TEXT:		/* FALLTHROUGH */
 		case PSQF_UID:
 			fields |= (1 << field);
 			break;
