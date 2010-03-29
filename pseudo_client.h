@@ -40,6 +40,12 @@ extern gid_t pseudo_sgid;
 extern gid_t pseudo_rgid;
 extern gid_t pseudo_fgid;
 extern int pseudo_dir_fd;
+extern FILE *pseudo_pwd_open();
+extern FILE *pseudo_grp_open();
+extern void pseudo_pwd_close();
+extern void pseudo_grp_close();
+extern FILE *pseudo_pwd;
+extern FILE *pseudo_grp;
 
 /* support related to chroot/getcwd/etc. */
 extern int pseudo_client_getcwd(void);
@@ -50,6 +56,7 @@ extern char *pseudo_cwd;
 extern size_t pseudo_cwd_len;
 extern char *pseudo_cwd_rel;
 extern char *pseudo_chroot;
+extern char *pseudo_passwd;
 extern size_t pseudo_chroot_len;
 
 /* Root can read, write, and execute files which have no read, write,

@@ -93,11 +93,14 @@ main(int argc, char *argv[]) {
 	}
 	unsetenv("PSEUDO_RELOADED");
 
+	/* we need cwd to canonicalize paths */
+	pseudo_client_getcwd();
+
 	/* warning:  GNU getopt permutes arguments, which is just plain
 	 * wrong.  The + suppresses this annoying behavior, but may not
 	 * be compatible with sane option libraries.
 	 */
-	while ((o = getopt(argc, argv, "+dfhlP:r:R:St:vV")) != -1) {
+	while ((o = getopt(argc, argv, "+dfhlp:P:r:R:St:vV")) != -1) {
 		switch (o) {
 		case 'd':
 			/* run as daemon */
@@ -115,8 +118,13 @@ main(int argc, char *argv[]) {
 					"%s-l", optptr > opts ? " " : "");
 			opt_l = 1;
 			break;
+		case 'p':
+			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
+			if (!s)
+				pseudo_diag("Can't resolve passwd path '%s'\n", optarg);
+			setenv("PSEUDO_PASSWD", s, 1);
+			break;
 		case 'P':
-			pseudo_client_getcwd();
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
 				pseudo_diag("Can't resolve prefix path '%s'\n", optarg);
@@ -124,7 +132,6 @@ main(int argc, char *argv[]) {
 			break;
 		case 'r':	/* FALLTHROUGH */
 		case 'R':
-			pseudo_client_getcwd();
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
 				pseudo_diag("Can't resolve root path '%s'\n", optarg);

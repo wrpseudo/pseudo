@@ -14,7 +14,7 @@
 	if (rc) {
 		int fd = fileno(rc);
 
-		pseudo_debug(2, "fopen64 '%s': fd %d\n", path, fd);
+		pseudo_debug(2, "fopen64 '%s': fd %d <FILE %p>\n", path, fd, (void *) rc);
 		if (real___fxstat64(_STAT_VER, fd, &buf) != -1) {
 			if (!existed) {
 				pseudo_client_op(OP_CREAT, 0, -1, -1, path, &buf);

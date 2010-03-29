@@ -51,17 +51,21 @@ cat >&5 <<EOF
 #include <string.h>
 #include <errno.h>
 #include <pthread.h>
-#include <dirent.h>
-#include <fts.h>
-#include <ftw.h>
-#include <glob.h>
-#include <utime.h>
 
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <dlfcn.h>
+
+/* used for various specific function arguments */
+#include <dirent.h>
+#include <fts.h>
+#include <ftw.h>
+#include <glob.h>
+#include <grp.h>
+#include <pwd.h>
+#include <utime.h>
 
 #include "pseudo.h"
 #include "pseudo_wrappers.h"
@@ -268,16 +272,42 @@ do
 		done
 
 		# determine default return value.
+		is_void=false
 		case $type in
 		int|ssize_t|long)
 			default_value=-1;;
 		uid_t|gid_t)
 			default_value=0;;
-		'FILE *' | 'char *' | 'DIR *' | 'FTS *')
+		*'*')
 			default_value=NULL;;
+		void)	
+			is_void=true
+			default_value=''
+			;;
 		*)	echo >&2 "
 Unknown type '$type'." ; exit 1 ;;
 		esac
+		if $is_void; then
+			write_return() {
+				printf "return"
+			}
+			write_assign() {
+				printf "(void)"
+			}
+			write_decl() {
+				: # do nothing
+			}
+		else
+			write_return() {
+				printf "return %s" "$1"
+			}
+			write_assign() {
+				printf "%s =" "$1"
+			}
+			write_decl() {
+				printf "%s %s = %s;" "$1" "$2" "$3"
+			}
+		fi
 		# create the wrappers
 		# first the dummy, and the function pointer:
 		cat >&5 <<EOF
@@ -285,7 +315,7 @@ static $type
 dummy_$name($dummy_args) {
 	pseudo_enosys("$name");
 	errno = ENOSYS;
-	return $default_value;
+	$(write_return $default_value);
 }
 
 static $type (*real_$name)($args) = dummy_$name;
@@ -314,32 +344,32 @@ EOF
 	pseudo_debug(4, "called: $name\n");
 	if (pseudo_getlock()) {
 		errno = EBUSY;
-		return $default_value;
+		$(write_return $default_value);
 	}
 	$decl_paths
 	if (pseudo_populate_wrappers()) {
-		$type rc = $default_value;
+		$(write_decl "$type" "rc" "$default_value")
 		int save_errno;
 		if (antimagic > 0) {
 			if (real_$name) {
-				rc = (*real_$name)($argnames);
+				$(write_assign rc) (*real_$name)($argnames);
 			} else {
-				rc = dummy_$name($argnames);
+				$(write_assign rc) dummy_$name($argnames);
 			}
 		} else {
 $alloc_paths
-			rc = wrap_$name($argnames);
+			$(write_assign rc) wrap_$name($argnames);
 $free_paths
 		}
 		save_errno = errno;
 		pseudo_droplock();
 		errno = save_errno;
 		pseudo_debug(4, "completed: $name\n");
-		return rc;
+		$(write_return rc);
 	} else {
 		pseudo_droplock();
 		pseudo_debug(4, "completed: $name\n");
-		return dummy_$name($argnames);
+		$(write_return "dummy_$name($argnames)");
 	}
 }
 
@@ -357,7 +387,7 @@ EOF
 			cat >&5 << EOF
 static $type
 wrap_$name($args) {
-	$type rc = $default_value;
+	$(write_decl "$type" "rc" "$default_value")
 	$optional_decl;
 
 	va_list ap;
@@ -367,18 +397,18 @@ wrap_$name($args) {
 
 #include "$guts"
 
-	return rc;
+	$(write_return rc);
 }
 EOF
 		else
 			cat >&5 << EOF
 static $type
 wrap_$name($args) {
-	$type rc = $default_value;
+	$(write_decl "$type" "rc" "$default_value")
 
 #include "$guts"
 
-	return rc;
+	$(write_return rc);
 }
 EOF
 		fi
@@ -390,12 +420,12 @@ EOF
 /* 
  * static $type
  * wrap_$name($args$optional_decl) {
- *	$type rc = $default_value;
+ *	$(write_decl "$type" "rc" "$default_value")
  */
 
-	rc = real_$name($wrapargnames);
+	$(write_assign rc) real_$name($wrapargnames);
 
-/*	return rc;
+/*	$(write_return rc);
  * }
  */
 EOF
@@ -404,12 +434,12 @@ EOF
 /* 
  * static $type
  * wrap_$name($args) {
- *	$type rc = $default_value;
+ *	$(write_decl "$type" "rc" "$default_value")
  */
 
-	rc = real_$name($wrapargnames);
+	$(write_assign rc) real_$name($wrapargnames);
 
-/*	return rc;
+/*	$(write_return rc);
  * }
  */
 EOF

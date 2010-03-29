@@ -614,3 +614,47 @@ pseudo_access_fopen(const char *mode) {
 	}
 	return access;
 }
+
+/* find a passwd/group file to use
+ * uses in order:
+ * - PSEUDO_CHROOT/etc/<file> (only if CHROOT is set)
+ * - PSEUDO_PASSWD/etc/<file>
+ * - /etc/<file>
+ */
+
+int
+pseudo_etc_file(char *file, char **search_dirs, int dircount) {
+	char filename[pseudo_path_max()];
+	int rc;
+
+	if (!file) {
+		pseudo_diag("pseudo_etc_file: needs argument, usually passwd/group\n");
+		return 0;
+	}
+	if (search_dirs) {
+		char *s;
+		int i;
+		for (i = 0; i < dircount; ++i) {
+			s = search_dirs[i];
+			if (!s)
+				continue;
+			snprintf(filename, pseudo_path_max(), "%s/etc/%s",
+				s, file);
+			rc = open(filename, O_RDONLY);
+			if (rc >= 0) {
+				pseudo_debug(2, "using <%s> for <%s>\n",
+					filename, file);
+				return rc;
+			} else {
+				pseudo_debug(3, "didn't find <%s>\n",
+					filename);
+			}
+		}
+	} else {
+		pseudo_debug(2, "pseudo_etc_file: no search dirs.\n");
+	}
+	snprintf(filename, pseudo_path_max(), "/etc/%s", file);
+	pseudo_debug(2, "falling back on <%s> for <%s>\n",
+		filename, file);
+	return open(filename, O_RDONLY);
+}

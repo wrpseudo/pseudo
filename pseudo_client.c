@@ -42,13 +42,18 @@ static char *base_path(int dirfd, const char *path, int leave_last);
 static int connect_fd = -1;
 static int server_pid = 0;
 int pseudo_dir_fd = -1;
-char *pseudo_cwd = 0;
+int pseudo_pwd_fd = -1;
+FILE *pseudo_pwd = NULL;
+int pseudo_grp_fd = -1;
+FILE *pseudo_grp = NULL;
+char *pseudo_cwd = NULL;
 size_t pseudo_cwd_len;
-char *pseudo_chroot = 0;
+char *pseudo_chroot = NULL;
+char *pseudo_passwd = NULL;
 size_t pseudo_chroot_len = 0;
-char *pseudo_cwd_rel = 0;
+char *pseudo_cwd_rel = NULL;
 
-static char **fd_paths = 0;
+static char **fd_paths = NULL;
 static int nfds = 0;
 static int messages = 0;
 static struct timeval message_time = { .tv_sec = 0 };
@@ -63,6 +68,67 @@ gid_t pseudo_rgid;
 gid_t pseudo_egid;
 gid_t pseudo_sgid;
 gid_t pseudo_fgid;
+
+static void
+pseudo_file_close(int *fd, FILE **fp) {
+	if (!fp || !fd) {
+		pseudo_diag("pseudo_file_close: needs valid pointers.\n");
+		return;
+	}
+	pseudo_antimagic();
+	if (*fp) {
+		fclose(*fp);
+		*fd = -1;
+		*fp = 0;
+	}
+	/* this should be impossible */
+	if (*fd >= 0) {
+		close(*fd);
+		*fd = -1;
+	}
+	pseudo_magic();
+}
+
+static FILE *
+pseudo_file_open(char *name, int *fd, FILE **fp) {
+	if (!fp || !fd || !name) {
+		pseudo_diag("pseudo_file_open: needs valid pointers.\n");
+		return NULL;
+	}
+	pseudo_file_close(fd, fp);
+	pseudo_antimagic();
+	*fd = PSEUDO_ETC_FILE(name);
+	if (*fd >= 0) {
+		*fd = pseudo_fd(*fd, MOVE_FD);
+		*fp = fdopen(*fd, "r");
+		if (!*fp) {
+			close(*fd);
+			*fd = -1;
+		}
+	}
+	pseudo_magic();
+	return *fp;
+}
+
+FILE *
+pseudo_pwd_open() {
+	return pseudo_file_open("passwd", &pseudo_pwd_fd, &pseudo_pwd);
+}
+
+void
+pseudo_pwd_close() {
+	pseudo_file_close(&pseudo_pwd_fd, &pseudo_pwd);
+}
+
+FILE *
+pseudo_grp_open() {
+	return pseudo_file_open("group", &pseudo_grp_fd, &pseudo_grp);
+}
+
+void
+pseudo_grp_close() {
+	pseudo_file_close(&pseudo_grp_fd, &pseudo_grp);
+}
 
 void
 pseudo_client_touchuid(void) {
@@ -236,6 +302,11 @@ pseudo_client_reset() {
 			} else {
 				pseudo_diag("can't store chroot path (%s)\n", env);
 			}
+		}
+
+		env = getenv("PSEUDO_PASSWD");
+		if (env) {
+			pseudo_passwd = strdup(env);
 		}
 
 		pseudo_inited = 1;
@@ -808,6 +879,10 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 				pseudo_util_debug_fd = pseudo_fd(fd, COPY_FD);
 			} else if (fd == pseudo_dir_fd) {
 				pseudo_dir_fd = pseudo_fd(fd, COPY_FD);
+			} else if (fd == pseudo_pwd_fd) {
+				pseudo_pwd_fd = pseudo_fd(fd, COPY_FD);
+			} else if (fd == pseudo_grp_fd) {
+				pseudo_grp_fd = pseudo_fd(fd, COPY_FD);
 			}
 		}
 		pseudo_client_close(fd);

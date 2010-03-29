@@ -303,6 +303,23 @@ to manually run things in the
 .I pseudo
 environment.
 .TP 8
+.B PSEUDO_PASSWD
+This variable holds the path to a directory containing password and
+group files to use for emulation of various password and group routines.
+It should be the path to a directory containing the
+.I etc
+directory containing files named
+.IR passwd and group .
+When
+.I pseudo
+is emulating a
+.I chroot
+environment, the chroot directory is used by preference.  The
+parallelism between these cases is why this variable points at
+the parent directory of
+.I etc
+rather than the directory containing the files.
+.TP 8
 .B PSEUDO_PREFIX
 If set, the variable
 .B PSEUDO_PREFIX

@@ -157,3 +157,34 @@ dummied them out:
 	renameat
 	tempnam
 	tmpnam
+
+The following functions are partially emulated in order to provide for
+emulation of various getpw*() and getgr*() functions.  No handling is
+provided for putpw*() or putgr*().  Nearly everything is ultimately
+implemented in terms of fgetpwent_r() and fgetgrent_r(), which are
+GNU extensions corresponding to fgetpwent() and fgetgrent(), allowing
+pseudo to read password information from an arbitrary stream; the
+setpwent() and setgrent() functions are modified to pick /etc/* from
+the pseudo_chroot path, if one is set, or from PSEUDO_PASSWD, if that
+is set, or else the system /etc/* files.
+
+	endgrent
+	endpwent
+	getgrent
+	getgrent_r
+	getgrgid
+	getgrgid_r
+	getgrnam
+	getgrnam_r
+	getgrouplist
+	getgroups
+	getpw
+	getpwent
+	getpwent_r
+	getpwnam
+	getpwnam_r
+	getpwuid
+	getpwuid_r
+	setgrent
+	setgroups
+	setpwent
