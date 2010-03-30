@@ -188,3 +188,9 @@ is set, or else the system /etc/* files.
 	setgrent
 	setgroups
 	setpwent
+
+The implementation of getgroups() is inauthentic in that it always checks
+the group file when called, rather than checking the group file once
+"at login" (whatever that means in our context) and returning that saved
+status.  We don't think this matters.  setgroups() just fails; this will
+be corrected if we come up with a compelling reason to do so.

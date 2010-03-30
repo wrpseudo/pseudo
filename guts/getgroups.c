@@ -3,11 +3,15 @@
  * wrap_getgroups(int size, gid_t *list) {
  *	int rc = -1;
  */
+	struct passwd *p = wrap_getpwuid(wrap_getuid());
+	int oldsize = size;
 
-	/* you're only in group zero */
-	rc = 1;
-	if (size > 0) {
-		list[0] = 0;
+	if (p) {
+		rc = wrap_getgrouplist(p->pw_name, wrap_getgid(), list, &size);
+		if (oldsize == 0 || size <= oldsize)
+			rc = size;
+	} else {
+		errno = ENOENT;
 	}
 
 /*	return rc;
