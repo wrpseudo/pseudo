@@ -881,8 +881,16 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 				pseudo_dir_fd = pseudo_fd(fd, COPY_FD);
 			} else if (fd == pseudo_pwd_fd) {
 				pseudo_pwd_fd = pseudo_fd(fd, COPY_FD);
+				/* since we have a FILE * on it, we close that... */
+				fclose(pseudo_pwd);
+				/* and open a new one on the copy */
+				pseudo_pwd = fdopen(pseudo_pwd_fd, "r");
 			} else if (fd == pseudo_grp_fd) {
 				pseudo_grp_fd = pseudo_fd(fd, COPY_FD);
+				/* since we have a FILE * on it, we close that... */
+				fclose(pseudo_grp);
+				/* and open a new one on the copy */
+				pseudo_grp = fdopen(pseudo_grp, "r");
 			}
 		}
 		pseudo_client_close(fd);

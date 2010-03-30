@@ -588,29 +588,35 @@ pseudo_sys_path_max(void) {
 int
 pseudo_access_fopen(const char *mode) {
 	int access = 0;
-	switch (*mode) {
-	case 'a':
-		access |= (PSA_APPEND | PSA_WRITE);
-		if (mode[1] == '+' || (mode[1] == 'b' && mode[2] == '+'))
+	for (; *mode; ++mode) {
+		switch (*mode) {
+		case 'a':
+			access |= (PSA_APPEND | PSA_WRITE);
+			break;
+		case 'r':
 			access |= PSA_READ;
-		break;
-	case 'r':
-		access |= PSA_READ;
-		if (mode[1] == '+' || (mode[1] == 'b' && mode[2] == '+'))
+			break;
+		case 'w':
 			access |= PSA_WRITE;
-		break;
-	case 'w':
-		access |= PSA_WRITE;
-		if (mode[1] == '+' || (mode[1] == 'b' && mode[2] == '+'))
-			access |= PSA_READ;
-		break;
-	/* special case */
-	case 'x':
-		access |= PSA_EXEC;
-		break;
-	default:
-		access = -1;
-		break;
+			break;
+		case 'x':
+			/* special case -- note that this conflicts with a
+			 * rarely-used glibc extension
+			 */
+			access |= PSA_EXEC;
+			break;
+		case 'b':			/* binary mode */
+			break;
+		case 'c': case 'e': case 'm':	/* glibc extensions */
+			break;
+		case '+':
+			/* one of these will already be set, presumably */
+			access |= (PSA_READ | PSA_WRITE);
+			break;
+		default:
+			access = -1;
+			break;
+		}
 	}
 	return access;
 }
