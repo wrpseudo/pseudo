@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_getpw(uid_t uid, char *buf) {
  *	int rc = -1;

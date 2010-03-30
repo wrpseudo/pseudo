@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_fchmodat(int dirfd, const char *path, mode_t mode, int flags) {
  *	int rc = -1;

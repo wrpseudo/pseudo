@@ -418,6 +418,9 @@ EOF
 			if $optional_arg; then
 				cat > "$guts" <<EOF
 /* 
+ * Copyright (c) `date +%Y` Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static $type
  * wrap_$name($args$optional_decl) {
  *	$(write_decl "$type" "rc" "$default_value")
@@ -432,6 +435,9 @@ EOF
 			else
 				cat > "$guts" <<EOF
 /* 
+ * Copyright (c) `date +%Y` Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static $type
  * wrap_$name($args) {
  *	$(write_decl "$type" "rc" "$default_value")

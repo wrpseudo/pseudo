@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static struct group *
  * wrap_getgrgid(gid_t gid) {
  *	struct group * rc = NULL;

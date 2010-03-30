@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_remove(const char *path) {
  *	int rc = -1;

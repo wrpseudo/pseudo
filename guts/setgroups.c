@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_setgroups(size_t size, const gid_t *list) {
  *	int rc = -1;

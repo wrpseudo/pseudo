@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_getgrgid_r(gid_t gid, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp) {
  *	int rc = -1;

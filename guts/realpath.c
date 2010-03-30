@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static char *
  * wrap_realpath(const char *name, char *resolved_name) {
  *	char * rc = NULL;

@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
  *	int rc = -1;

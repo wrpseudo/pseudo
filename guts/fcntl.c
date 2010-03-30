@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_fcntl(int fd, int cmd, ...struct flock *lock) {
  *	int rc = -1;

@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups) {
  *	int rc = -1;

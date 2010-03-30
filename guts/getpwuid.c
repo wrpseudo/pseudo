@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static struct passwd *
  * wrap_getpwuid(uid_t uid) {
  *	struct passwd * rc = NULL;

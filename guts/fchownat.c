@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flags) {
  *	int rc = -1;

@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_execve(const char *filename, char *const *argv, char *const *envp) {
  *	int rc = -1;

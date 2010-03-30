@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap_setresuid(uid_t ruid, uid_t euid, uid_t suid) {
  *	int rc = -1;

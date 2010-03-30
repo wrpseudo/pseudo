@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static FILE *
  * wrap_freopen(const char *path, const char *mode, FILE *stream) {
  *	FILE * rc = NULL;

@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static struct group *
  * wrap_getgrnam(const char *name) {
  *	struct group * rc = NULL;

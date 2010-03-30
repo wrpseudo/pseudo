@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static char *
  * wrap_mkdtemp(char *template) {
  *	char * rc = NULL;

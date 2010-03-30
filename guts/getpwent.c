@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static struct passwd *
  * wrap_getpwent(void) {
  *	struct passwd * rc = NULL;

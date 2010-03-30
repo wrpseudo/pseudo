@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static int
  * wrap___fxstatat(int ver, int dirfd, const char *path, struct stat *buf, int flags) {
  *	int rc = -1;

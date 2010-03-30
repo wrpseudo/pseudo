@@ -1,4 +1,7 @@
 /* 
+ * Copyright (c) 2008-2010 Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
  * static FILE *
  * wrap_fopen(const char *path, const char *mode) {
  *	FILE * rc = 0;
