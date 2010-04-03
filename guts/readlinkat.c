@@ -9,18 +9,7 @@
 	rc = real_readlinkat(dirfd, path, buf, bufsiz);
 
 	if (rc > 0) {
-		/* strip out a leading chrooted part */
-		if (pseudo_chroot_len &&
-			!memcmp(buf, pseudo_chroot, pseudo_chroot_len)) {
-			if (buf[pseudo_chroot_len] == '/') {
-				memmove(buf, buf + pseudo_chroot_len, rc - pseudo_chroot_len);
-				rc -= pseudo_chroot_len;
-			} else if (buf[pseudo_chroot_len] == '\0') {
-				buf[0] = '/';
-				rc = 1;
-			}
-			/* otherwise, it's not really a match... */
-		}
+		rc = pseudo_dechroot(buf, rc);
 	}
 
 /*	return rc;

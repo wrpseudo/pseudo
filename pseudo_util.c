@@ -664,3 +664,4 @@ pseudo_etc_file(char *file, char **search_dirs, int dircount) {
 		filename, file);
 	return open(filename, O_RDONLY);
 }
+

@@ -37,6 +37,7 @@ static pthread_t pseudo_mutex_holder;
 static int pseudo_mutex_recursion = 0;
 static int pseudo_getlock(void);
 static void pseudo_droplock(void);
+static size_t pseudo_dechroot(char *, size_t);
 
 extern char *program_invocation_short_name;
 
@@ -84,6 +85,33 @@ pseudo_enosys(const char *func) {
 	pseudo_diag("pseudo: ENOSYS for '%s'.\n", func ? func : "<nil>");
 	if (getenv("PSEUDO_ENOSYS_ABORT"))
 		abort();
+}
+
+/* de-chroot a string.
+ * note that readlink() yields an unterminated buffer, so
+ * must pass in the correct length.  Buffers are null-terminated
+ * unconditionally if they are modified -- the modification would
+ * shorten the string, so there will be space for the NUL, so
+ * this is safe even for stuff like readlink().
+ */
+static size_t
+pseudo_dechroot(char *s, size_t len) {
+	if (len == (size_t) -1)
+		len = strlen(s);
+	if (pseudo_chroot_len && len >= pseudo_chroot_len &&
+		!memcmp(s, pseudo_chroot, pseudo_chroot_len)) {
+		if (s[pseudo_chroot_len] == '/') {
+			memmove(s, s + pseudo_chroot_len, len - pseudo_chroot_len);
+			len -= pseudo_chroot_len;
+			s[len] = '\0';
+		} else if (s[pseudo_chroot_len] == '\0') {
+			s[0] = '/';
+			len = 1;
+			s[len] = '\0';
+		}
+		/* otherwise, it's not really a match... */
+	}
+	return len;
 }
 
 static int
