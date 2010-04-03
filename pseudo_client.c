@@ -890,7 +890,7 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 				/* since we have a FILE * on it, we close that... */
 				fclose(pseudo_grp);
 				/* and open a new one on the copy */
-				pseudo_grp = fdopen(pseudo_grp, "r");
+				pseudo_grp = fdopen(pseudo_grp_fd, "r");
 			}
 		}
 		pseudo_client_close(fd);
