@@ -629,7 +629,7 @@ pseudo_access_fopen(const char *mode) {
  */
 
 int
-pseudo_etc_file(char *file, char **search_dirs, int dircount) {
+pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs, int dircount) {
 	char filename[pseudo_path_max()];
 	int rc;
 
@@ -646,8 +646,10 @@ pseudo_etc_file(char *file, char **search_dirs, int dircount) {
 				continue;
 			snprintf(filename, pseudo_path_max(), "%s/etc/%s",
 				s, file);
-			rc = open(filename, O_RDONLY);
+			rc = open(filename, flags);
 			if (rc >= 0) {
+				if (realname)
+					strcpy(realname, filename);
 				pseudo_debug(2, "using <%s> for <%s>\n",
 					filename, file);
 				return rc;
@@ -662,6 +664,9 @@ pseudo_etc_file(char *file, char **search_dirs, int dircount) {
 	snprintf(filename, pseudo_path_max(), "/etc/%s", file);
 	pseudo_debug(2, "falling back on <%s> for <%s>\n",
 		filename, file);
-	return open(filename, O_RDONLY);
+	rc = open(filename, flags);
+	if (rc >= 0 && realname)
+		strcpy(realname, filename);
+	return rc;
 }
 

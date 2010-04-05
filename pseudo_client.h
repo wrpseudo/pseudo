@@ -40,10 +40,12 @@ extern gid_t pseudo_sgid;
 extern gid_t pseudo_rgid;
 extern gid_t pseudo_fgid;
 extern int pseudo_dir_fd;
-extern FILE *pseudo_pwd_open();
-extern FILE *pseudo_grp_open();
-extern void pseudo_pwd_close();
-extern void pseudo_grp_close();
+extern FILE *pseudo_pwd_open(void);
+extern FILE *pseudo_grp_open(void);
+extern void pseudo_pwd_close(void);
+extern void pseudo_grp_close(void);
+extern int pseudo_pwd_lck_open(void);
+extern void pseudo_pwd_lck_close(void);
 extern FILE *pseudo_pwd;
 extern FILE *pseudo_grp;
 

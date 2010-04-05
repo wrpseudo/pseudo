@@ -43,6 +43,8 @@ static int connect_fd = -1;
 static int server_pid = 0;
 int pseudo_dir_fd = -1;
 int pseudo_pwd_fd = -1;
+int pseudo_pwd_lck_fd = -1;
+char *pseudo_pwd_lck_name = NULL;
 FILE *pseudo_pwd = NULL;
 int pseudo_grp_fd = -1;
 FILE *pseudo_grp = NULL;
@@ -97,7 +99,7 @@ pseudo_file_open(char *name, int *fd, FILE **fp) {
 	}
 	pseudo_file_close(fd, fp);
 	pseudo_antimagic();
-	*fd = PSEUDO_ETC_FILE(name);
+	*fd = PSEUDO_ETC_FILE(name, NULL, O_RDONLY);
 	if (*fd >= 0) {
 		*fd = pseudo_fd(*fd, MOVE_FD);
 		*fp = fdopen(*fd, "r");
@@ -110,23 +112,53 @@ pseudo_file_open(char *name, int *fd, FILE **fp) {
 	return *fp;
 }
 
+/* there is no spec I know of requiring us to defend this fd
+ * against being closed by the user.
+ */
+int
+pseudo_pwd_lck_open(void) {
+	if (!pseudo_pwd_lck_name) {
+		pseudo_pwd_lck_name = malloc(pseudo_path_max());
+		if (!pseudo_pwd_lck_name) {
+			pseudo_diag("couldn't allocate space for passwd lockfile path.\n");
+			return -1;
+		}
+	}
+	pseudo_pwd_lck_fd = PSEUDO_ETC_FILE(".pwd.lock",
+					pseudo_pwd_lck_name, O_RDWR | O_CREAT);
+	return pseudo_pwd_lck_fd;
+}
+
+void
+pseudo_pwd_lck_close(void) {
+	if (pseudo_pwd_lck_fd != -1) {
+		close(pseudo_pwd_lck_fd);
+		if (pseudo_pwd_lck_name) {
+			unlink(pseudo_pwd_lck_name);
+			free(pseudo_pwd_lck_name);
+			pseudo_pwd_lck_name = 0;
+		}
+		pseudo_pwd_lck_fd = -1;
+	}
+}
+
 FILE *
-pseudo_pwd_open() {
+pseudo_pwd_open(void) {
 	return pseudo_file_open("passwd", &pseudo_pwd_fd, &pseudo_pwd);
 }
 
 void
-pseudo_pwd_close() {
+pseudo_pwd_close(void) {
 	pseudo_file_close(&pseudo_pwd_fd, &pseudo_pwd);
 }
 
 FILE *
-pseudo_grp_open() {
+pseudo_grp_open(void) {
 	return pseudo_file_open("group", &pseudo_grp_fd, &pseudo_grp);
 }
 
 void
-pseudo_grp_close() {
+pseudo_grp_close(void) {
 	pseudo_file_close(&pseudo_grp_fd, &pseudo_grp);
 }
 

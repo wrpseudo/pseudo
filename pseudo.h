@@ -128,8 +128,8 @@ extern char *pseudo_get_prefix(char *);
 extern ssize_t pseudo_sys_path_max(void);
 extern ssize_t pseudo_path_max(void);
 #define PSEUDO_PWD_MAX 4096
-extern int pseudo_etc_file(char *filename, char **search, int dircount);
-#define PSEUDO_ETC_FILE(name) pseudo_etc_file((name), (char *[]) { pseudo_chroot, pseudo_passwd }, 2)
+extern int pseudo_etc_file(const char *filename, char *realname, int flags, char **search, int dircount);
+#define PSEUDO_ETC_FILE(name, realname, flags) pseudo_etc_file((name), (realname), (flags), (char *[]) { pseudo_chroot, pseudo_passwd }, 2)
 
 extern char *pseudo_version;
 
