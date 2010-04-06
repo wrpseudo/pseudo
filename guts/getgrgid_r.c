@@ -13,6 +13,7 @@
 		if (gbuf->gr_gid == gid) {
 			pseudo_debug(1, "found group gid %d, name %s\n",
 				gbuf->gr_gid, gbuf->gr_name);
+			endgrent();
 			return rc;
 		}
 	}

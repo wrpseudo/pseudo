@@ -1,3 +1,12 @@
+2010-04-19:
+	* (seebs) fix crash if xstat() or similar routine called with null path
+	* (seebs) fix list of client processes still running
+
+2010-04-16:
+	* (seebs) add tracking of program names
+	* (seebs) track message types
+	* (seebs) small bug fixes and improvements galore
+
 2010-04-06:
 	* (seebs) implement various passwd-related utilities, various
 	  bugfixes.

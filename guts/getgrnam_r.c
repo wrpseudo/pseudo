@@ -10,8 +10,10 @@
 	setgrent();
 	while ((rc = wrap_getgrent_r(gbuf, buf, buflen, gbufp)) == 0) {
 		/* 0 means no error occurred, and *gbufp == gbuf */
-		if (gbuf->gr_name && !strcmp(gbuf->gr_name, name))
+		if (gbuf->gr_name && !strcmp(gbuf->gr_name, name)) {
+			endgrent();
 			return rc;
+		}
 	}
 	endgrent();
 	/* we never found a match; rc is 0 if there was no error, or

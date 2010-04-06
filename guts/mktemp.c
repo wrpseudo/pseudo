@@ -28,6 +28,7 @@
 	 * a file -- note the race condition implied here.
 	 */
 	memcpy(template + len - 6, tmp_template + strlen(tmp_template) - 6, 6);
+	rc = template;
 	free(tmp_template);
 
 /*	return rc;

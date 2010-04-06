@@ -646,7 +646,11 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 				continue;
 			snprintf(filename, pseudo_path_max(), "%s/etc/%s",
 				s, file);
-			rc = open(filename, flags);
+			if (flags & O_CREAT) {
+				rc = open(filename, flags, 0600);
+			} else {
+				rc = open(filename, flags);
+			}
 			if (rc >= 0) {
 				if (realname)
 					strcpy(realname, filename);
@@ -664,7 +668,11 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 	snprintf(filename, pseudo_path_max(), "/etc/%s", file);
 	pseudo_debug(2, "falling back on <%s> for <%s>\n",
 		filename, file);
-	rc = open(filename, flags);
+	if (flags & O_CREAT) {
+		rc = open(filename, flags, 0600);
+	} else {
+		rc = open(filename, flags);
+	}
 	if (rc >= 0 && realname)
 		strcpy(realname, filename);
 	return rc;

@@ -32,13 +32,14 @@
 		if (real___xstat64(_STAT_VER, rc, &buf) != -1) {
 			pseudo_client_op(OP_CREAT, 0, -1, -1, tmp_template, &buf);
 		} else {
-			pseudo_debug(1, "mkstemp (path %s) succeeded, but fstat failed (%s).\n",
+			pseudo_debug(1, "mkdtemp (path %s) succeeded, but fstat failed (%s).\n",
 				rc, strerror(errno));
 		}
 		errno = save_errno;
 	}
 	/* mkdtemp only changes the XXXXXX at the end. */
 	memcpy(template + len - 6, tmp_template + strlen(tmp_template) - 6, 6);
+	rc = template;
 	free(tmp_template);
 /*	return rc;
  * }

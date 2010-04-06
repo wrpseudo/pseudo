@@ -326,7 +326,7 @@ serve_client(int i) {
 				die_peacefully = 1;
 			}
 		}
-		if ((rc = pseudo_msg_send(client_fds[i], in, 0, NULL)) != 0)
+		if ((rc = pseudo_msg_send(clients[i].fd, in, -1, response_path)) != 0)
 			pseudo_debug(1, "failed to send response to client %d [%d]: %d (%s)\n",
 				i, (int) client_pids[i], rc, strerror(errno));
 		rc = in->op;

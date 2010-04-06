@@ -124,6 +124,7 @@ pseudo_pwd_lck_open(void) {
 			return -1;
 		}
 	}
+	pseudo_pwd_lck_close();
 	pseudo_pwd_lck_fd = PSEUDO_ETC_FILE(".pwd.lock",
 					pseudo_pwd_lck_name, O_RDWR | O_CREAT);
 	return pseudo_pwd_lck_fd;
@@ -749,6 +750,9 @@ base_path(int dirfd, const char *path, int leave_last) {
 	size_t baselen = 0;
 	size_t minlen = 0;
 	char *newpath;
+
+	if (!path)
+		return NULL;
 
 	if (path[0] != '/') {
 		if (dirfd != -1 && dirfd != AT_FDCWD) {

@@ -185,9 +185,11 @@ is set, or else the system /etc/* files.
 	getpwnam_r
 	getpwuid
 	getpwuid_r
+	lckpwdf
 	setgrent
 	setgroups
 	setpwent
+	ulckpwdf
 
 The implementation of getgroups() is inauthentic in that it always checks
 the group file when called, rather than checking the group file once

@@ -10,8 +10,10 @@
 	setpwent();
 	while ((rc = wrap_getpwent_r(pwbuf, buf, buflen, pwbufp)) == 0) {
 		/* 0 means no error occurred, and *pwbufp == pwbuf */
-		if (pwbuf->pw_uid == uid)
+		if (pwbuf->pw_uid == uid) {
+			endpwent();
 			return rc;
+		}
 	}
 	endpwent();
 	/* we never found a match; rc is 0 if there was no error, or
