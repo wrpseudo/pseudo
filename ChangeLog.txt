@@ -1,3 +1,7 @@
+2010-04-06:
+	* (seebs) implement various passwd-related utilities, various
+	  bugfixes.
+
 2010-03-25:
 	* (seebs) fix return values.
 

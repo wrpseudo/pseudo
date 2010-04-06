@@ -37,9 +37,7 @@ some documentation on internals is provided in the doc/ directory.
 
 FUTURE DIRECTIONS:
 
-* We intend to add functionality to support user name/uid lookups from 
-  an alternative password file.
-* The chroot() functionality may need improvement.
+* The chroot() functionality is incomplete.
 * We have no immediate plans to make pseudo work on other targets, but
   are not opposed to accepting patches to do so.  (It isn't even CLOSE
   on OS X, largely because of the Linux-specific _STAT_VER stuff.)

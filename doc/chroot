@@ -1,0 +1,31 @@
+Pseudo incorporates functionality similar to that of fakechroot.
+
+The implementation is basically as follows:  When incoming arguments
+are known to be paths, they are automatically converted to absolute,
+fully canonicalized, paths.  When the chroot(2) call is used, pseudo
+intercepts it and stashes the path to the new root directory internally
+in the client.  This path is then silently prepended to absolute
+paths.  The internal tracking of file paths uses absolute paths
+including the path to the chroot directory.  So, all underlying calls
+are invoked with absolute, canonical, paths.
+
+A few calls are then modified.  For instance, when readlink() returns
+a link, it strips a leading prefix looking like the chroot directory;
+when symlink() creates a link, if the link path is absolute, the chroot
+directory is prepended to it.
+
+This behavior, which may seem surprising, is an attempt to produce
+path resolution equivalent to what would normally happen when
+canonicalizing a path using real chroot; if you create a link to /tmp
+while in a chroot environment, following that link should yield
+<chroot>/tmp.  Arguably, now that we are intercepting nearly every
+incoming path, we should just prepend the chroot path when following
+absolute symlinks -- this may get revisited.
+
+Similarly, when glob() is called, the path to be globbed has the
+chroot directory prepended, and then the results have any leading
+chroot directory stripped from them.
+
+This implementation is far from complete or perfect; the intent is
+that it provide enough functionality to allow RPM and similar tools
+to run file system installs using chroot().
