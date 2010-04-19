@@ -807,7 +807,7 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 	size_t pathlen = -1;
 	int do_request = 0;
 	char *oldpath = 0;
-	char *newpath = 0;
+	char *alloced_path = 0;
 
 	/* disable wrappers */
 	pseudo_antimagic();
@@ -836,8 +836,13 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 		/* path fixup has to happen in the specific functions,
 		 * because they may have to make calls which have to be
 		 * fixed up for chroot stuff already.
+		 * ... but wait!  / in chroot should not have that
+		 * trailing /.
+		 * (no attempt is made to handle a rename of "/" occurring
+		 * in a chroot...)
 		 */
 		pathlen = strlen(path) + 1;
+		int strip_slash = (pathlen > 2 && (path[pathlen - 2]) == '/');
 		if (oldpath) {
 			size_t full_len = strlen(oldpath) + 1 + pathlen;
 			char *both_paths = malloc(full_len);
@@ -846,13 +851,20 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 				pseudo_magic();
 				return 0;
 			}
-			snprintf(both_paths, full_len, "%s%c%s",
+			snprintf(both_paths, full_len, "%.*s%c%s",
+				pathlen - 1 - strip_slash,
 				path, 0, oldpath);
 			pseudo_debug(2, "rename: %s -> %s [%d]\n",
 				both_paths + pathlen, both_paths, (int) full_len);
-			path = both_paths;
-			newpath = both_paths;
+			alloced_path = both_paths;
+			path = alloced_path;
 			pathlen = full_len;
+		} else {
+			if (strip_slash) {
+				alloced_path = strdup(path);
+				alloced_path[pathlen - 2] = '\0';
+				path = alloced_path;
+			}
 		}
 	} else if (fd >= 0 && fd <= nfds) {
 		path = fd_path(fd);
@@ -1014,8 +1026,10 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 	}
 	pseudo_debug(2, "\n");
 
-	/* if not NULL, newpath is the buffer holding both paths */
-	free(newpath);
+	/* if not NULL, alloced_path is an allocated buffer for both
+	 * paths, or for modified paths...
+	 */
+	free(alloced_path);
 
 	if (do_request && (messages % 1000 == 0)) {
 		pseudo_debug(2, "%d messages handled in %.4f seconds\n",
