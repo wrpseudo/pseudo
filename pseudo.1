@@ -28,6 +28,10 @@
 .PP
 .B pseudo
 .RB [ \-P\ prefix ]
+.B \-C
+.PP
+.B pseudo
+.RB [ \-P\ prefix ]
 .B \-S
 .PP
 .B pseudo
@@ -67,8 +71,16 @@ can then start the server automatically.
 
 The
 .I pseudo
-command can be invoked in one of five possible modes:
+command can be invoked in one of several possible modes:
 
+.TP 8
+.B \-C
+The
+.B \-C
+option causes
+.I pseudo
+to scan its database, comparing against the filesystem, and reporting likely
+errors.
 .TP 8
 .B \-h
 The

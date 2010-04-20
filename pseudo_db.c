@@ -36,6 +36,11 @@ struct log_history {
 	sqlite3_stmt *stmt;
 };
 
+struct pdb_file_list {
+	int rc;
+	sqlite3_stmt *stmt;
+};
+
 static sqlite3 *file_db = 0;
 static sqlite3 *log_db = 0;
 
@@ -1603,12 +1608,12 @@ pdb_find_file_path(pseudo_msg_t *msg) {
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
-		msg->dev = (unsigned long) sqlite3_column_int64(select, 2);
-		msg->ino = (unsigned long) sqlite3_column_int64(select, 3);
-		msg->uid = (unsigned long) sqlite3_column_int64(select, 4);
-		msg->gid = (unsigned long) sqlite3_column_int64(select, 5);
-		msg->mode = (unsigned long) sqlite3_column_int64(select, 6);
-		msg->rdev = (unsigned long) sqlite3_column_int64(select, 7);
+		msg->dev = sqlite3_column_int64(select, 2);
+		msg->ino = sqlite3_column_int64(select, 3);
+		msg->uid = sqlite3_column_int64(select, 4);
+		msg->gid = sqlite3_column_int64(select, 5);
+		msg->mode = sqlite3_column_int64(select, 6);
+		msg->rdev = sqlite3_column_int64(select, 7);
 		rc = 0;
 		break;
 	case SQLITE_DONE:
@@ -1767,4 +1772,72 @@ pdb_find_file_ino(pseudo_msg_t *msg) {
 	sqlite3_reset(select);
 	sqlite3_clear_bindings(select);
 	return rc;
+}
+
+pdb_file_list
+pdb_files(void) {
+	pdb_file_list l;
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
+
+	l = malloc(sizeof(*l));
+	if (!l)
+		return NULL;
+
+	l->rc = sqlite3_prepare_v2(file_db, "SELECT path, dev, ino, uid, gid, mode, rdev FROM files", -1, &l->stmt, NULL);
+	if (l->rc) {
+		dberr(file_db, "Couldn't start SELECT from files.\n");
+		free(l);
+		return NULL;
+	}
+	return l;
+}
+
+pseudo_msg_t *
+pdb_file(pdb_file_list l) {
+	const unsigned char *s;
+	pseudo_msg_t *m;
+	int column = 0;
+
+	if (!l || !l->stmt)
+		return 0;
+	/* in case someone tries again after we're already done */
+	if (l->rc == SQLITE_DONE) {
+		return 0;
+	}
+	l->rc = sqlite3_step(l->stmt);
+	if (l->rc == SQLITE_DONE) {
+		return 0;
+	} else if (l->rc != SQLITE_ROW) {
+		dberr(log_db, "statement failed");
+		return 0;
+	}
+	s = sqlite3_column_text(l->stmt, column++);
+	m = pseudo_msg_new(0, (const char *) s);
+	if (!m) {
+		pseudo_diag("couldn't allocate file message.\n");
+		return NULL;
+	}
+	pseudo_debug(2, "pdb_file: '%s'\n", s ? (const char *) s : "<nil>");
+	m->dev = sqlite3_column_int64(l->stmt, column++);
+	m->ino = sqlite3_column_int64(l->stmt, column++);
+	m->uid = sqlite3_column_int64(l->stmt, column++);
+	m->gid = sqlite3_column_int64(l->stmt, column++);
+	m->mode = sqlite3_column_int64(l->stmt, column++);
+	m->rdev = sqlite3_column_int64(l->stmt, column++);
+	return m;
+}
+
+void
+pdb_files_done(pdb_file_list l) {
+	if (!l)
+		return;
+	if (l->stmt) {
+		sqlite3_reset(l->stmt);
+		sqlite3_finalize(l->stmt);
+	}
+	free(l);
 }

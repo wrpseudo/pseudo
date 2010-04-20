@@ -70,8 +70,8 @@ pseudo: pseudo.o $(SHOBJS) $(DBOBJS) pseudo_server.o pseudo_ipc.o
 		pseudo.o pseudo_server.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
-pseudolog: pseudolog.o $(SHOBJS) $(DBOBJS)
-	$(CC) $(CFLAGS) -o pseudolog pseudolog.o \
+pseudolog: pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
+	$(CC) $(CFLAGS) -o pseudolog pseudolog.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
 pseudodb: pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o

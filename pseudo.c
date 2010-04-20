@@ -38,6 +38,7 @@
 #include "pseudo_server.h"
 #include "pseudo_db.h"
 
+int opt_C = 0;
 int opt_d = 0;
 int opt_f = 0;
 int opt_l = 0;
@@ -46,12 +47,14 @@ char *opt_r = NULL;
 int opt_S = 0;
 
 static int pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag);
+static int pseudo_db_check(void);
 
 void
 usage(int status) {
 	FILE *f = status ? stderr : stdout;
 	fputs("Usage: pseudo [-dflv] [-P prefix] [-rR root] [-t timeout] [command]\n", f);
 	fputs("       pseudo -h\n", f);
+	fputs("       pseudo [-dflv] [-P prefix] -C\n", f);
 	fputs("       pseudo [-dflv] [-P prefix] -S\n", f);
 	fputs("       pseudo [-dflv] [-P prefix] -V\n", f);
 	exit(status);
@@ -100,8 +103,12 @@ main(int argc, char *argv[]) {
 	 * wrong.  The + suppresses this annoying behavior, but may not
 	 * be compatible with sane option libraries.
 	 */
-	while ((o = getopt(argc, argv, "+dfhlp:P:r:R:St:vV")) != -1) {
+	while ((o = getopt(argc, argv, "+Cdfhlp:P:r:R:St:vV")) != -1) {
 		switch (o) {
+		case 'C':
+			/* check database */
+			opt_C = 1;
+			break;
 		case 'd':
 			/* run as daemon */
 			opt_d = 1;
@@ -174,6 +181,10 @@ main(int argc, char *argv[]) {
 	if (!pseudo_get_prefix(argv[0])) {
 		pseudo_diag("Can't figure out prefix.  Set PSEUDO_PREFIX or invoke with full path.\n");
 		exit(EXIT_FAILURE);
+	}
+
+	if (opt_C) {
+		return pseudo_db_check();
 	}
 
 	if (opt_S) {
@@ -701,4 +712,66 @@ pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag) 
 		pdb_log_msg(SEVERITY_WARN, msg, program, tag, "invalid message");
 		return 1;
 	}
+}
+
+int
+pseudo_db_check(void) {
+	struct stat64 buf;
+	pseudo_msg_t *m;
+	pdb_file_list l;
+	int errors = 0;
+
+	l = pdb_files();
+	if (!l) {
+		pseudo_diag("Couldn't start file list, can't scan.\n");
+		return EXIT_FAILURE;
+	}
+	while ((m = pdb_file(l)) != NULL) {
+		pseudo_debug(2, "m: %p (%d: %s)\n",
+			(void *) m,
+			m ? m->pathlen : -1,
+			m ? m->path : "<n/a>");
+		if (m->pathlen > 0) {
+			pseudo_debug(1, "Checking <%s>\n", m->path);
+			if (lstat64(m->path, &buf)) {
+				errors = EXIT_FAILURE;
+				pseudo_diag("can't stat <%s>\n", m->path);
+				continue;
+			}
+			if (buf.st_ino != m->ino) {
+				pseudo_diag("ino mismatch <%s>: ino %llu, db %llu\n",
+					m->path,
+					(unsigned long long) buf.st_ino,
+					(unsigned long long) m->ino);
+				errors = EXIT_FAILURE;
+			}
+			if (buf.st_dev != m->dev) {
+				pseudo_diag("dev mismatch <%s>: dev %llu, db %llu\n",
+					m->path,
+					(unsigned long long) buf.st_dev,
+					(unsigned long long) m->dev);
+				errors = EXIT_FAILURE;
+			}
+			if (S_ISLNK(buf.st_mode) != S_ISLNK(m->mode)) {
+				pseudo_diag("symlink mismatch <%s>: file %d, db %d\n",
+					m->path,
+					S_ISLNK(buf.st_mode),
+					S_ISLNK(m->mode));
+				errors = EXIT_FAILURE;
+			}
+			if (S_ISDIR(buf.st_mode) != S_ISDIR(m->mode)) {
+				pseudo_diag("symlink mismatch <%s>: file %d, db %d\n",
+					m->path,
+					S_ISDIR(buf.st_mode),
+					S_ISDIR(m->mode));
+				errors = EXIT_FAILURE;
+			}
+			/* can't check for device type mismatches, uid/gid, or
+			 * permissions, because those are the very things we
+			 * can't really set.
+			 */
+		}
+	}
+	pdb_files_done(l);
+	return errors;
 }

@@ -68,6 +68,13 @@ extern int pdb_log_entry(log_entry *e);
 extern int pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...);
 extern int pdb_log_traits(pseudo_query_t *traits);
 
+struct pdb_file_list;
+typedef struct pdb_file_list *pdb_file_list;
+
+extern pdb_file_list pdb_files(void);
+extern pseudo_msg_t *pdb_file(pdb_file_list);
+extern void pdb_files_done(pdb_file_list);
+
 extern log_history pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int delete);
 extern log_entry *pdb_history_entry(log_history h);
 extern void pdb_history_free(log_history h);
