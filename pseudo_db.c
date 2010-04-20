@@ -1402,10 +1402,14 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete exact by path may have failed");
 	}
+	rc = sqlite3_changes(file_db);
+	pseudo_debug(2, "(exact %d, ", rc);
 	rc = sqlite3_step(delete_sub);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete sub by path may have failed");
 	}
+	rc = sqlite3_changes(file_db);
+	pseudo_debug(2, "sub %d) ", rc);
 	sqlite3_reset(delete_exact);
 	sqlite3_reset(delete_sub);
 	sqlite3_clear_bindings(delete_exact);

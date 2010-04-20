@@ -652,7 +652,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		 * This should cease to be needed once symlinks are tracked.
 		 */
 		if (msg_header.nlink == 1 && found_ino) {
-			pseudo_debug(2, "unlink, link count 1, unlinking anything with ino %llu.\n",
+			pseudo_debug(2, "link count 1, unlinking anything with ino %llu.\n",
 				(unsigned long long) msg->ino);
 			pdb_unlink_file_dev(msg);
 		}
@@ -729,7 +729,7 @@ pseudo_db_check(void) {
 	while ((m = pdb_file(l)) != NULL) {
 		pseudo_debug(2, "m: %p (%d: %s)\n",
 			(void *) m,
-			m ? m->pathlen : -1,
+			m ? (int) m->pathlen : -1,
 			m ? m->path : "<n/a>");
 		if (m->pathlen > 0) {
 			pseudo_debug(1, "Checking <%s>\n", m->path);
