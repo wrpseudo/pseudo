@@ -1,4 +1,4 @@
-int open(const char *path, int flags, ...{mode_t mode});
+int open(const char *path, int flags, ...{mode_t mode}); /* flags=0 */
 char *getcwd(char *buf, size_t size);
 char *getwd(char *buf);
 char *get_current_dir_name(void);
@@ -27,7 +27,7 @@ int __xmknodat(int ver, int dirfd, const char *path, mode_t mode, dev_t *dev); /
 int dup2(int oldfd, int newfd);
 int dup(int fd);
 int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
-int mkdirat(int dirfd, const char *path, mode_t mode);
+int mkdirat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
 int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
 int chdir(const char *path);
 int fchdir(int dirfd);
