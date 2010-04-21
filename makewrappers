@@ -273,6 +273,7 @@ EOF
 	pseudo_debug(4, "called: $name\n");
 	if (pseudo_getlock()) {
 		errno = EBUSY;
+		sigprocmask(SIG_SETMASK, &saved, NULL);
 		$(write_return $default_value);
 	}
 	$decl_paths

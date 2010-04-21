@@ -656,6 +656,16 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				(unsigned long long) msg->ino);
 			pdb_unlink_file_dev(msg);
 		}
+		/* if we had a match for this path, stash it in the
+		 * message -- client may want to relink it if the
+		 * real_unlink() fails.
+		 */
+		if (found_path) {
+			*msg = by_path;
+			msg->result = RESULT_SUCCEED;
+		} else {
+			msg->result = RESULT_NONE;
+		}
 		break;
 	case OP_MKDIR:		/* FALLTHROUGH */
 	case OP_MKNOD:

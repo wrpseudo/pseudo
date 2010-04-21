@@ -1,6 +1,7 @@
 2010-04-20:
 	* (seebs) add quick sanity-check option for pseudo
 	* (seebs) report on rows deleted
+	* (seebs) unlink after removing db entry to reduce race conditions
 
 2010-04-19:
 	* (seebs) fix crash if xstat() or similar routine called with null path

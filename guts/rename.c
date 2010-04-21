@@ -27,9 +27,24 @@
 
 	errno = save_errno;
 
+	/* newpath must be removed. */
+	/* as with unlink, we have to do the remove before the operation
+	 */
+	msg = pseudo_client_op(OP_UNLINK, 0, -1, -1, newpath, newrc ? NULL : &newbuf);
 	rc = real_rename(oldpath, newpath);
+	save_errno = errno;
 	if (rc == -1) {
-		/* we failed, and we don't care why */
+		newbuf.st_uid = msg->uid;
+		newbuf.st_gid = msg->uid;
+		newbuf.st_mode = msg->mode;
+		newbuf.st_dev = msg->dev;
+		newbuf.st_ino = msg->ino;
+		/* since we failed, that wasn't really unlinked -- put
+		 * it back.
+		 */
+		pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &newbuf);
+		/* and we're done. */
+		errno = save_errno;
 		return rc;
 	}
 	save_errno = errno;
@@ -54,9 +69,6 @@
 	 * we may have to rename or remove directory trees even though in
 	 * theory rename can never destroy a directory tree.
 	 */
-
-	/* newpath must be removed. */
-	pseudo_client_op(OP_UNLINK, 0, -1, -1, newpath, &newbuf);
 
 	/* fill in "correct" details from server */
 	msg = pseudo_client_op(OP_STAT, 0, -1, -1, oldpath, &oldbuf);
