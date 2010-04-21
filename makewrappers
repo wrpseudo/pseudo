@@ -270,7 +270,19 @@ EOF
 		fi
 		# and now the body of the wrapper:
 		cat >&5 <<EOF
+	sigset_t blocked, saved;
+
 	pseudo_debug(4, "called: $name\n");
+	/* these are signals for which the handlers often
+	 * invoke operations, such as close(), which are handled
+	 * by pseudo and could result in a deadlock.
+	 */
+	sigemptyset(&blocked);
+	sigaddset(&blocked, SIGCHLD);
+	sigaddset(&blocked, SIGALRM);
+	sigaddset(&blocked, SIGUSR1);
+	sigaddset(&blocked, SIGUSR2);
+	sigprocmask(SIG_BLOCK, &blocked, &saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
 		sigprocmask(SIG_SETMASK, &saved, NULL);
@@ -293,11 +305,13 @@ $free_paths
 		}
 		save_errno = errno;
 		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
 		errno = save_errno;
 		pseudo_debug(4, "completed: $name\n");
 		$(write_return rc);
 	} else {
 		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
 		pseudo_debug(4, "completed: $name\n");
 		$(write_return "dummy_$name($argnames)");
 	}
