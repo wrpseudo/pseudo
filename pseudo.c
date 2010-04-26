@@ -363,7 +363,8 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 
 	if (found_path) {
 		/* This is a bad sign.  We should never have a different entry
-		 * for the inode...
+		 * for the inode...  But an inode of 0 from an EXEC is normal,
+		 * we don't track those.
 		 */
 		if (by_path.ino != msg_header.ino && msg_header.ino != 0) {
 			switch (msg->op) {
@@ -443,6 +444,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			int mismatch = 0;
 			switch (msg->op) {
 			case OP_LINK:
+			case OP_EXEC:
 				break;
 			case OP_RENAME:
 				if (msg->nlink == 1 && strcmp(oldpath, path_by_ino)) {
