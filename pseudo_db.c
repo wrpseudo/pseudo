@@ -1485,6 +1485,53 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 	return rc != SQLITE_DONE;
 }
 
+/* change dev/inode for a given path -- used only by RENAME for now.
+ */
+int
+pdb_update_inode(pseudo_msg_t *msg) {
+	static sqlite3_stmt *update;
+	int rc;
+	char *sql = "UPDATE files "
+		    " SET dev = ?, ino = ? "
+		    " WHERE path = ?;";
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
+	if (!update) {
+		rc = sqlite3_prepare_v2(file_db, sql, strlen(sql), &update, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare UPDATE statement");
+			return 1;
+		}
+	}
+	if (!msg) {
+		return 1;
+	}
+	if (!msg->pathlen) {
+		pseudo_diag("Can't update the inode of a file without its path.\n");
+		return 1;
+	}
+	sqlite3_bind_int(update, 1, msg->dev);
+	sqlite3_bind_int(update, 2, msg->ino);
+	rc = sqlite3_bind_text(update, 3, msg->path, -1, SQLITE_STATIC);
+	if (rc) {
+		dberr(file_db, "error binding %s to select", msg->pathlen ? msg->path : "<nil>");
+	}
+
+	rc = sqlite3_step(update);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "update may have failed: rc %d", rc);
+	}
+	sqlite3_reset(update);
+	sqlite3_clear_bindings(update);
+	pseudo_debug(2, "updating path %s to dev %llu, ino %llu\n",
+		msg->path,
+		(unsigned long long) msg->dev, (unsigned long long) msg->ino);
+	return rc != SQLITE_DONE;
+}
+
 /* change uid/gid/mode/rdev in any existing entries matching a given
  * dev/inode pair.
  */

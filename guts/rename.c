@@ -31,18 +31,21 @@
 	/* as with unlink, we have to do the remove before the operation
 	 */
 	msg = pseudo_client_op(OP_UNLINK, 0, -1, -1, newpath, newrc ? NULL : &newbuf);
+	/* stash the server's old data */
 	rc = real_rename(oldpath, newpath);
 	save_errno = errno;
 	if (rc == -1) {
-		newbuf.st_uid = msg->uid;
-		newbuf.st_gid = msg->uid;
-		newbuf.st_mode = msg->mode;
-		newbuf.st_dev = msg->dev;
-		newbuf.st_ino = msg->ino;
-		/* since we failed, that wasn't really unlinked -- put
-		 * it back.
-		 */
-		pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &newbuf);
+		if (msg && msg->result == RESULT_SUCCEED) {
+			newbuf.st_uid = msg->uid;
+			newbuf.st_gid = msg->uid;
+			newbuf.st_mode = msg->mode;
+			newbuf.st_dev = msg->dev;
+			newbuf.st_ino = msg->ino;
+			/* since we failed, that wasn't really unlinked -- put
+			 * it back.
+			 */
+			pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &newbuf);
+		}
 		/* and we're done. */
 		errno = save_errno;
 		return rc;
@@ -70,17 +73,31 @@
 	 * theory rename can never destroy a directory tree.
 	 */
 
-	/* fill in "correct" details from server */
-	msg = pseudo_client_op(OP_STAT, 0, -1, -1, oldpath, &oldbuf);
+	/* re-stat the new file.  Why?  Because if something got moved
+	 * across device boundaries, its dev/ino changed!
+	 */
+	newrc = real___lxstat64(_STAT_VER, newpath, &newbuf);
 	if (msg && msg->result == RESULT_SUCCEED) {
 		pseudo_stat_msg(&oldbuf, msg);
+		if (newrc == 0) {
+			if (newbuf.st_dev != oldbuf.st_dev) {
+				oldbuf.st_dev = newbuf.st_dev;
+				oldbuf.st_ino = newbuf.st_ino;
+			}
+		}
 		pseudo_debug(1, "renaming %s, got old mode of 0%o\n", oldpath, (int) msg->mode);
 	} else {
 		/* create an entry under the old name, which will then be
 		 * renamed; this way, children would get renamed too, if there
 		 * were any.
 		 */
-		pseudo_debug(1, "renaming new '%s' [%llu]\n",
+		if (newrc == 0) {
+			if (newbuf.st_dev != oldbuf.st_dev) {
+				oldbuf.st_dev = newbuf.st_dev;
+				oldbuf.st_ino = newbuf.st_ino;
+			}
+		}
+		pseudo_debug(1, "creating new '%s' [%llu] to rename\n",
 			oldpath, (unsigned long long) oldbuf.st_ino);
 		pseudo_client_op(OP_LINK, 0, -1, -1, oldpath, &oldbuf);
 	}

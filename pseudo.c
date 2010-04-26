@@ -365,12 +365,24 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		/* This is a bad sign.  We should never have a different entry
 		 * for the inode...
 		 */
-		if (by_path.ino != msg_header.ino) {
-			pseudo_diag("inode mismatch: '%s' ino %llu in db, %llu in request.\n",
-				msg->path,
-				(unsigned long long) by_path.ino,
-				(unsigned long long) msg_header.ino);
-
+		if (by_path.ino != msg_header.ino && msg_header.ino != 0) {
+			switch (msg->op) {
+			case OP_EXEC:	/* FALLTHROUGH */
+			case OP_RENAME:
+				/* A rename that crossed a filesystem can change the inode
+				 * number legitimately.
+				 */
+				pseudo_debug(2, "inode changed for '%s': %llu in db, %llu in request.\n",
+					msg->path,
+					(unsigned long long) by_path.ino,
+					(unsigned long long) msg_header.ino);
+				break;
+			default:
+				pseudo_diag("inode mismatch: '%s' ino %llu in db, %llu in request.\n",
+					msg->path,
+					(unsigned long long) by_path.ino,
+					(unsigned long long) msg_header.ino);
+			}
 		}
 		/* If the database entry disagrees on S_ISDIR, it's just
 		 * plain wrong.  We remove the database entry, because it
@@ -512,7 +524,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			 */
 			pseudo_diag("creat for '%s' replaces existing %llu ['%s'].\n",
 				msg->pathlen ? msg->path : "no path",
-				(unsigned long long) msg_header.ino,
+				(unsigned long long) by_ino.ino,
 				path_by_ino ? path_by_ino : "no path");
 			pdb_unlink_file_dev(&by_ino);
 		}
@@ -632,9 +644,10 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		break;
 	case OP_RENAME:
 		/* a rename implies renaming an existing entry... and every
-		 * database entry rooted in it.
+		 * database entry rooted in it, if it's a directory.
 		 */
 		pdb_rename_file(oldpath, msg);
+		pdb_update_inode(msg);
 		break;
 	case OP_UNLINK:
 		/* this removes any entries with the given path from the
