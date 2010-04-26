@@ -547,8 +547,17 @@ get_db(sqlite3 **db) {
 		}
 		sqlite3_free_table(results);
 	}
-	/* cleanup database before getting started */
-	sqlite3_exec(*db, "VACUUM;", NULL, NULL, &errmsg);
+	/* cleanup database before getting started
+	 *
+	 * On a large build, the logs database gets GIGANTIC...  And
+	 * we rarely-if-ever delete things from it.  So instead of
+	 * doing the vacuum operation on it at startup, which can impose
+	 * a several-minute delay, we do it only on deletions.
+	 *
+	 */
+	if (db == &file_db) {
+		sqlite3_exec(*db, "VACUUM;", NULL, NULL, &errmsg);
+	}
 	return rc;
 }
 
@@ -1089,6 +1098,9 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 		int rc = sqlite3_step(select);
 		if (rc != SQLITE_DONE) {
 			dberr(log_db, "deletion failed");
+		} else {
+			pseudo_diag("Deleted records, vacuuming log database (may take a while).\n");
+			sqlite3_exec(log_db, "VACUUM;", NULL, NULL, NULL);
 		}
 		sqlite3_finalize(select);
 		return  0;

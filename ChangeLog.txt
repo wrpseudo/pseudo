@@ -1,3 +1,8 @@
+2010-04-26:
+	* (seebs) many bug fixes and updates
+	* (seebs) allow deleting entries in pseudolog
+	* (seebs) correct race conditions and related bugs
+
 2010-04-20:
 	* (seebs) add quick sanity-check option for pseudo
 	* (seebs) report on rows deleted

@@ -15,7 +15,11 @@
 		 * that there was no previous file with this name, so we
 		 * shove it into the database.
 		 */
-		real___xstat64(_STAT_VER, oldpath, &buf);
+		/* On linux, link(2) links to symlinks, not to the
+		 * files they link to.  This is contraPOSIX, but
+		 * it's apparently useful.
+		 */
+		real___lxstat64(_STAT_VER, oldpath, &buf);
 		/* a link should copy the existing database entry, if
 		 * there is one.  OP_LINK is also used to insert unseen
 		 * files, though, so it can't be implicit.
