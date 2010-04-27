@@ -18,6 +18,8 @@
  *
  */
 typedef enum {
+	PSEUDO_MSG_UNKNOWN = -1,
+	PSEUDO_MSG_NONE,
 	PSEUDO_MSG_PING,
 	PSEUDO_MSG_SHUTDOWN,
 	PSEUDO_MSG_OP,
@@ -25,6 +27,8 @@ typedef enum {
 	PSEUDO_MSG_NAK,
 	PSEUDO_MSG_MAX
 } pseudo_msg_type_t;
+extern char *pseudo_msg_type_name(pseudo_msg_type_t id);
+extern pseudo_msg_type_t pseudo_msg_type_id(char *name);
 
 /* The [] item at the end of the struct is a C99 feature, replacing the
  * old (and unportable) "struct hack".

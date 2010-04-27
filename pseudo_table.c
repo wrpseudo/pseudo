@@ -17,9 +17,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
-#include "pseudo.h"
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+
+#include "pseudo.h"
+#include "pseudo_ipc.h"
 
 /* just a bunch of handy lookups for pretty-printing stuff */
 
@@ -106,12 +109,24 @@ static char *query_field_names[] = {
 	"order",
 	"path",
 	"perm",
+	"program",
 	"result",
 	"severity",
 	"stamp",
 	"tag",
 	"text",
+	"type",
 	"uid",
+	NULL
+};
+
+static char *pseudo_msg_type_names[] = {
+	"none",
+	"ping",
+	"halt",
+	"op",
+	"ack",
+	"nak",
 	NULL
 };
 
@@ -163,6 +178,14 @@ pseudo_query_field_name(pseudo_query_field_t id) {
 	return "unknown";
 }
 
+char *
+pseudo_msg_type_name(pseudo_msg_type_t id) {
+	if (id >= PSEUDO_MSG_NONE && id < PSEUDO_MSG_MAX) {
+		return pseudo_msg_type_names[id];
+	}
+	return "????";
+}
+
 op_id_t
 pseudo_op_id(char *name) {
 	int id;
@@ -211,4 +234,14 @@ pseudo_query_field(char *name) {
 			return id;
 	}
 	return PSQF_UNKNOWN;
+}
+
+pseudo_msg_type_t
+pseudo_msg_type_id(char *name) {
+	int id;
+	for (id = PSEUDO_MSG_NONE; id < PSEUDO_MSG_MAX; ++id) {
+		if (!strcmp(name, pseudo_msg_type_names[id]))
+			return id;
+	}
+	return PSEUDO_MSG_NONE;;
 }

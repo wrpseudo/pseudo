@@ -42,9 +42,15 @@
 
 static int listen_fd = -1;
 
-int *client_fds;
-pid_t *client_pids;
-char **client_tags;
+typedef struct {
+	int fd;
+	pid_t pid;
+	char *tag;
+	char *program;
+} pseudo_client_t;
+
+pseudo_client_t *clients;
+
 /* active_clients: Number of clients we actually have right now.
  * highest_client: Highest index into clients table of an active client.
  * max_clients: Size of table.
@@ -178,18 +184,17 @@ pseudo_server_start(int daemonize) {
 /* mess with internal tables as needed */
 static void
 open_client(int fd) {
-	int *new_client_fds;
-	pid_t *new_client_pids;
-	char **new_client_tags;
+	pseudo_client_t *new_clients;
 	int i;
 
 	/* if possible, use first open client slot */
 	for (i = 0; i < max_clients; ++i) {
-		if (client_fds[i] == -1) {
+		if (clients[i].fd == -1) {
 			pseudo_debug(2, "reusing client %d for fd %d\n", i, fd);
-			client_fds[i] = fd;
-			client_pids[i] = 0;
-			client_tags[i] = 0;
+			clients[i].fd = fd;
+			clients[i].pid = 0;
+			clients[i].tag = NULL;
+			clients[i].program = NULL;
 			++active_clients;
 			if (i > highest_client)
 				highest_client = i;
@@ -198,37 +203,26 @@ open_client(int fd) {
 	}
 
 	/* otherwise, allocate a new one */
-	new_client_fds = malloc(sizeof(int) * (max_clients + 16));
-	new_client_pids = malloc(sizeof(pid_t) * (max_clients + 16));
-	new_client_tags = malloc(sizeof(char *) * (max_clients + 16));
-	if (new_client_fds && new_client_pids && new_client_tags) {
-		memcpy(new_client_fds, client_fds, max_clients * sizeof(int));
-		memcpy(new_client_pids, client_pids, max_clients * sizeof(pid_t));
-		memcpy(new_client_tags, client_tags, max_clients * sizeof(char *));
-		free(client_fds);
-		free(client_pids);
-		free(client_tags);
+	new_clients = malloc(sizeof(*new_clients) * (max_clients + 16));
+	if (new_clients) {
+		memcpy(new_clients, clients, max_clients * sizeof(*clients));
+		free(clients);
 		for (i = max_clients; i < max_clients + 16; ++i) {
-			new_client_fds[i] = -1;
-			new_client_pids[i] = 0;
-			new_client_tags[i] = 0;
+			new_clients[i].fd = -1;
+			new_clients[i].pid = 0;
+			new_clients[i].tag = NULL;
+			new_clients[i].program = NULL;
 		}
-		client_fds = new_client_fds;
-		client_pids = new_client_pids;
-		client_tags = new_client_tags;
-
-		client_fds[max_clients] = fd;
-		client_pids[max_clients] = 0;
-		client_tags[max_clients] = 0;
+		clients = new_clients;
+		clients[max_clients].fd = fd;
+		clients[max_clients].pid = 0;
+		clients[max_clients].tag = NULL;
+		clients[max_clients].program = NULL;
 		highest_client = max_clients + 1;
 
 		max_clients += 16;
 		++active_clients;
 	} else {
-		/* if something got allocated, free it */
-		free(new_client_fds);
-		free(new_client_pids);
-		free(new_client_tags);
 		pseudo_diag("error allocating new client, fd %d\n", fd);
 		close(fd);
 	}
@@ -239,16 +233,24 @@ open_client(int fd) {
  */
 static void
 close_client(int client) {
-	pseudo_debug(2, "lost client %d [%d], closing fd %d\n", client, client_pids[client], client_fds[client]);
+	pseudo_debug(2, "lost client %d [%d], closing fd %d\n", client,
+		clients[client].pid, clients[client].fd);
 	/* client went away... */
-	close(client_fds[client]);
-	client_fds[client] = -1;
-	free(client_tags[client]);
-	client_tags[client] = 0;
-	client_pids[client] = 0;
+	if (client > highest_client || client <= 0) {
+		pseudo_diag("tried to close client %d (highest is %d)\n",
+			client, highest_client);
+		return;
+	}
+	close(clients[client].fd);
+	clients[client].fd = -1;
+	free(clients[client].tag);
+	free(clients[client].program);
+	clients[client].pid = 0;
+	clients[client].tag = NULL;
+	clients[client].program = NULL;
 	--active_clients;
 	if (client == highest_client)
-		while (client_fds[highest_client] != -1 && highest_client > 0)
+		while (clients[highest_client].fd != -1 && highest_client > 0)
 			--highest_client;
 }
 
@@ -259,34 +261,50 @@ serve_client(int i) {
 	pseudo_msg_t *in;
 	int rc;
 
-	pseudo_debug(2, "message from client %d [%d:%s] fd %d\n",
-		i, (int) client_pids[i],
-		client_tags[i] ? client_tags[i] : "NO TAG",
-		client_fds[i]);
-	in = pseudo_msg_receive(client_fds[i]);
+	pseudo_debug(2, "message from client %d [%d:%s - %s] fd %d\n",
+		i, (int) clients[i].pid,
+		clients[i].program ? clients[i].program : "???",
+		clients[i].tag ? clients[i].tag : "NO TAG",
+		clients[i].fd);
+	in = pseudo_msg_receive(clients[i].fd);
 	if (in) {
 		char *response_path = 0;
 		pseudo_debug(4, "got a message (%d): %s\n", in->type, (in->pathlen ? in->path : "<no path>"));
 		/* handle incoming ping */
-		if (in->type == PSEUDO_MSG_PING && !client_pids[i]) {
-			pseudo_debug(2, "new client: %d -> %d\n",
+		if (in->type == PSEUDO_MSG_PING && !clients[i].pid) {
+			pseudo_debug(2, "new client: %d -> %d",
 				i, in->client);
-			client_pids[i] = in->client;
+			clients[i].pid = in->client;
 			if (in->pathlen) {
-				free(client_tags[i]);
-				client_tags[i] = strdup(in->path);
+				size_t proglen;
+				proglen = strlen(in->path);
+
+				pseudo_debug(2, " <%s>", in->path);
+				free(clients[i].program);
+				clients[i].program = malloc(proglen + 1);
+				if (clients[i].program) {
+					snprintf(clients[i].program, proglen + 1, "%s", in->path);
+				}
+				if (in->pathlen > proglen) {
+					pseudo_debug(2, " [%s]", in->path + proglen + 1);
+					clients[i].tag = malloc(in->pathlen - proglen);
+					if (clients[i].tag)
+						snprintf(clients[i].tag, in->pathlen - proglen,
+							"%s", in->path + proglen + 1);
+				}
 			}
+			pseudo_debug(2, "\n");
 		}
 		/* sanity-check client ID */
-		if (in->client != client_pids[i]) {
+		if (in->client != clients[i].pid) {
 			pseudo_debug(1, "uh-oh, expected pid %d for client %d, got %d\n",
-				(int) client_pids[i], i, in->client);
+				(int) clients[i].pid, i, in->client);
 		}
 		/* regular requests are processed in place by
 		 * pseudo_server_response.
 		 */
 		if (in->type != PSEUDO_MSG_SHUTDOWN) {
-			if (pseudo_server_response(in, client_tags[i])) {
+			if (pseudo_server_response(in, clients[i].program, clients[i].tag)) {
 				in->type = PSEUDO_MSG_NAK;
 			} else {
 				in->type = PSEUDO_MSG_ACK;
@@ -312,8 +330,8 @@ serve_client(int i) {
 				in->fd = active_clients - 2;
 				s = response_path;
 				for (j = 1; j <= highest_client; ++j) {
-					if (client_fds[j] != -1 && j != i) {
-						s += snprintf(s, 8, "%d ", (int) client_pids[j]);
+					if (clients[j].fd != -1 && j != i) {
+						s += snprintf(s, 8, "%d ", (int) clients[j].pid);
 					}
 				}
 				in->pathlen = (s - response_path) + 1;
@@ -328,7 +346,7 @@ serve_client(int i) {
 		}
 		if ((rc = pseudo_msg_send(clients[i].fd, in, -1, response_path)) != 0)
 			pseudo_debug(1, "failed to send response to client %d [%d]: %d (%s)\n",
-				i, (int) client_pids[i], rc, strerror(errno));
+				i, (int) clients[i].pid, rc, strerror(errno));
 		rc = in->op;
 		free(response_path);
 		return rc;
@@ -336,7 +354,7 @@ serve_client(int i) {
 		/* this should not be happening, but the exceptions aren't
 		 * being detected in select() for some reason.
 		 */
-		pseudo_debug(2, "client %d: no message\n", (int) client_pids[i]);
+		pseudo_debug(2, "client %d: no message\n", (int) clients[i].pid);
 		close_client(i);
 		return 0;
 	}
@@ -358,17 +376,16 @@ pseudo_server_loop(void) {
 	int fd;
 	int loop_timeout = pseudo_server_timeout;
 
-	client_fds = malloc(sizeof(int) * 16);
-	client_pids = malloc(sizeof(pid_t) * 16);
-	client_tags = malloc(sizeof(char *) * 16);
+	clients = malloc(16 * sizeof(*clients));
 
-	client_fds[0] = listen_fd;
-	client_pids[0] = getpid();
+	clients[0].fd = listen_fd;
+	clients[0].pid = getpid();
 
 	for (i = 1; i < 16; ++i) {
-		client_fds[i] = -1;
-		client_pids[i] = 0;
-		client_tags[i] = 0;
+		clients[i].fd = -1;
+		clients[i].pid = 0;
+		clients[i].tag = NULL;
+		clients[i].program = NULL;
 	}
 
 	active_clients = 1;
@@ -380,14 +397,14 @@ pseudo_server_loop(void) {
 		pseudo_diag("got into loop with no valid listen fd.\n");
 		exit(1);
 	}
-	pdb_log_msg(SEVERITY_INFO, NULL, NULL, "server started (pid %d)", getpid());
+	pdb_log_msg(SEVERITY_INFO, NULL, NULL, NULL, "server started (pid %d)", getpid());
 
 	FD_ZERO(&reads);
 	FD_ZERO(&writes);
 	FD_ZERO(&events);
-	FD_SET(client_fds[0], &reads);
-	FD_SET(client_fds[0], &events);
-	max_fd = client_fds[0];
+	FD_SET(clients[0].fd, &reads);
+	FD_SET(clients[0].fd, &events);
+	max_fd = clients[0].fd;
 	timeout = (struct timeval) { .tv_sec = LOOP_DELAY, .tv_usec = 0 };
 	
 	/* EINTR tends to come from profiling, so it is not a good reason to
@@ -414,12 +431,12 @@ pseudo_server_loop(void) {
 		} else if (rc > 0) {
 			loop_timeout = pseudo_server_timeout;
 			for (i = 1; i <= highest_client; ++i) {
-				if (client_fds[i] == -1)
+				if (clients[i].fd == -1)
 					continue;
-				if (FD_ISSET(client_fds[i], &events)) {
+				if (FD_ISSET(clients[i].fd, &events)) {
 					/* this should happen but doesn't... */
 					close_client(i);
-				} else if (FD_ISSET(client_fds[i], &reads)) {
+				} else if (FD_ISSET(clients[i].fd, &reads)) {
 					struct timeval tv1, tv2;
 					int op;
 					gettimeofday(&tv1, NULL);
@@ -440,8 +457,8 @@ pseudo_server_loop(void) {
 					break;
 			}
 			if (!(die_peacefully || die_forcefully) && 
-			    (FD_ISSET(client_fds[0], &events) ||
-			     FD_ISSET(client_fds[0], &reads))) {
+			    (FD_ISSET(clients[0].fd, &events) ||
+			     FD_ISSET(clients[0].fd, &reads))) {
 				len = sizeof(client);
 				if ((fd = accept(listen_fd, (struct sockaddr *) &client, &len)) != -1) {
 					pseudo_debug(2, "new client fd %d\n", fd);
@@ -456,31 +473,31 @@ pseudo_server_loop(void) {
 				getpid(), messages,
 				(double) message_time.tv_sec +
 				(double) message_time.tv_usec / 1000000.0);
-			pdb_log_msg(SEVERITY_INFO, NULL, NULL, "server %d exiting: handled %d messages in %.4f seconds",
+			pdb_log_msg(SEVERITY_INFO, NULL, NULL, NULL, "server %d exiting: handled %d messages in %.4f seconds",
 				getpid(), messages,
 				(double) message_time.tv_sec +
 				(double) message_time.tv_usec / 1000000.0);
-			close(client_fds[0]);
+			close(clients[0].fd);
 			exit(0);
 		}
 		FD_ZERO(&reads);
 		FD_ZERO(&writes);
 		FD_ZERO(&events);
-		FD_SET(client_fds[0], &reads);
-		FD_SET(client_fds[0], &events);
-		max_fd = client_fds[0];
+		FD_SET(clients[0].fd, &reads);
+		FD_SET(clients[0].fd, &events);
+		max_fd = clients[0].fd;
 		/* current_clients is a sanity check; note that for
 		 * purposes of select(), the server is one of the fds,
 		 * and thus, "a client".
 		 */
 		current_clients = 1;
 		for (i = 1; i <= highest_client; ++i) {
-			if (client_fds[i] != -1) {
+			if (clients[i].fd != -1) {
 				++current_clients;
-				FD_SET(client_fds[i], &reads);
-				FD_SET(client_fds[i], &events);
-				if (client_fds[i] > max_fd)
-					max_fd = client_fds[i];
+				FD_SET(clients[i].fd, &reads);
+				FD_SET(clients[i].fd, &events);
+				if (clients[i].fd > max_fd)
+					max_fd = clients[i].fd;
 			}
 		}
 		if (current_clients != active_clients) {

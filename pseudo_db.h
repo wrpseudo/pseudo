@@ -19,6 +19,7 @@
  */
 typedef struct {
 	time_t stamp;
+	pseudo_msg_type_t type;
 	op_id_t op;
 	int access;
 	unsigned long client;
@@ -33,6 +34,7 @@ typedef struct {
 	sev_id_t severity;
 	char *text;
 	char *tag;
+	char *program;
 } log_entry;
 
 extern int pdb_link_file(pseudo_msg_t *msg);
@@ -63,10 +65,10 @@ typedef struct pseudo_query {
 } pseudo_query_t;
 
 extern int pdb_log_entry(log_entry *e);
-extern int pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *tag, const char *text, ...);
+extern int pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...);
 extern int pdb_log_traits(pseudo_query_t *traits);
 
-extern log_history pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct);
+extern log_history pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int delete);
 extern log_entry *pdb_history_entry(log_history h);
 extern void pdb_history_free(log_history h);
 extern void log_entry_free(log_entry *);

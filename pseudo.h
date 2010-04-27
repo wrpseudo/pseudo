@@ -99,8 +99,8 @@ typedef enum pseudo_query_field {
 	PSQF_CLIENT,	PSQF_DEV,	PSQF_FD, 	PSQF_FTYPE,
 	PSQF_GID,	PSQF_ID,	PSQF_INODE,	PSQF_MODE,	
 	PSQF_OP,	PSQF_ORDER,	PSQF_PATH,	PSQF_PERM,
-	PSQF_RESULT,	PSQF_SEVERITY,	PSQF_STAMP,	PSQF_TAG,
-	PSQF_TEXT,	PSQF_UID,
+	PSQF_PROGRAM,	PSQF_RESULT,	PSQF_SEVERITY,	PSQF_STAMP,
+	PSQF_TAG,	PSQF_TEXT,	PSQF_TYPE,	PSQF_UID,
 	PSQF_MAX
 } pseudo_query_field_t;
 extern char *pseudo_query_field_name(pseudo_query_field_t id);

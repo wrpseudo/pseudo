@@ -18,6 +18,6 @@
  *
  */
 extern int pseudo_server_start(int);
-extern int pseudo_server_response(pseudo_msg_t *msg, const char *tag);
+extern int pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag);
 extern int pseudo_server_timeout;
 extern int opt_l;

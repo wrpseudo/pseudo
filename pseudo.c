@@ -45,7 +45,7 @@ long opt_p = 0;
 char *opt_r = NULL;
 int opt_S = 0;
 
-static int pseudo_op(pseudo_msg_t *msg, const char *tag);
+static int pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag);
 
 void
 usage(int status) {
@@ -273,7 +273,7 @@ main(int argc, char *argv[]) {
  * sanity checks, then implements the fairly small DB changes required.
  */
 int
-pseudo_op(pseudo_msg_t *msg, const char *tag) {
+pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	pseudo_msg_t msg_header;
 	pseudo_msg_t by_path = { .op = 0 }, by_ino = { .op = 0 };
 	pseudo_msg_t db_header;
@@ -678,27 +678,27 @@ pseudo_op(pseudo_msg_t *msg, const char *tag) {
 		free(path_by_ino);
 	pseudo_debug(2, "completed %s.\n", pseudo_op_name(msg->op));
 	if (opt_l)
-		pdb_log_msg(SEVERITY_INFO, msg, tag, NULL);
+		pdb_log_msg(SEVERITY_INFO, msg, program, tag, NULL);
 	return 0;
 }
 
 /* SHUTDOWN does not get this far, it's handled in pseudo_server.c */
 int
-pseudo_server_response(pseudo_msg_t *msg, const char *tag) {
+pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag) {
 	switch (msg->type) {
 	case PSEUDO_MSG_PING:
 		msg->result = RESULT_SUCCEED;
 		if (opt_l)
-			pdb_log_msg(SEVERITY_INFO, msg, tag, "ping");
+			pdb_log_msg(SEVERITY_INFO, msg, program, tag, NULL);
 		return 0;
 		break;
 	case PSEUDO_MSG_OP:
-		return pseudo_op(msg, tag);
+		return pseudo_op(msg, program, tag);
 		break;
 	case PSEUDO_MSG_ACK:		/* FALLTHROUGH */
 	case PSEUDO_MSG_NAK:		/* FALLTHROUGH */
 	default:
-		pdb_log_msg(SEVERITY_WARN, msg, tag, "invalid message");
+		pdb_log_msg(SEVERITY_WARN, msg, program, tag, "invalid message");
 		return 1;
 	}
 }

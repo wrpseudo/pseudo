@@ -35,6 +35,7 @@
 #include "pseudo_db.h"
 
 static int opt_D = 0;
+static int opt_U = 0;
 static int opt_l = 0;
 
 static void display(log_entry *, char *format);
@@ -56,12 +57,14 @@ usage(int status) {
 		"o  operation (e.g. 'open')",
 		"O  order by (< DESC > ASC)",
 		"p  file path",
+		"P  program",
 		"r  result (e.g. 'succeed')",
 		"s  timestamp",
 		"S  severity",
 		"t  type (like find -type)",
 		"T  text (text field)",
 		"u  uid",
+		"y  type (op/ping/shutown)",
 		NULL,
 	};
 	FILE *f = (status == EXIT_SUCCESS) ? stdout : stderr;
@@ -69,7 +72,8 @@ usage(int status) {
 
 	fputs("pseudolog: create or report log entries. usage:\n", f);
 	fputs("pseudolog -l [-E timeformat] [SPECIFIERS] -- create entries\n", f);
-	fputs("pseudolog [-D] [-F format] [-E timeformat] [SPECIFIERS] -- report entries\n", f);
+	fputs("pseudolog [-U] [-F format] [-E timeformat] [SPECIFIERS] -- report entries\n", f);
+	fputs("pseudolog -D [-E timeformat] [SPECIFIERS] -- delete entries\n", f);
 	fputs("  format is a printf-like format string using the option letters\n", f);
 	fputs("  listed below as format specifiers for the corresponding field.\n", f);
 	fputs("  timeformat is a strftime-like format string, the default is '%x %X'.\n", f);
@@ -84,6 +88,9 @@ usage(int status) {
 	fputs("OPTION LETTERS:\n", f);
 	for (i = 0; options[i]; ++i) {
 		fprintf(f, "  %-28s%s", options[i], (i % 2) ? "\n" : "   ");
+	}
+	if (i % 2 == 1) {
+		fprintf(f, "\n");
 	}
 	exit(status);
 }
@@ -103,11 +110,13 @@ pseudo_query_field_t opt_to_field[UCHAR_MAX + 1] = {
 	['O'] = PSQF_ORDER,
 	['p'] = PSQF_PATH,
 	['r'] = PSQF_RESULT,
+	['R'] = PSQF_PROGRAM,
 	['s'] = PSQF_STAMP,
 	['S'] = PSQF_SEVERITY,
 	['t'] = PSQF_FTYPE,
 	['T'] = PSQF_TEXT,
 	['u'] = PSQF_UID,
+	['y'] = PSQF_TYPE,
 };
 
 pseudo_query_type_t
@@ -175,7 +184,7 @@ static char *time_formats[] = {
 	"%T",
 	NULL,
 };
-static char *timeformat = "%x %X";
+static char *timeformat = "%X";
 
 mode_t
 parse_file_type(char *string) {
@@ -432,6 +441,9 @@ plog_trait(int opt, char *string) {
 			return 0;
 		}
 		break;
+	case PSQF_TYPE:
+		new_trait->data.ivalue = pseudo_msg_type_id(string);
+		break;
 	case PSQF_CLIENT:
 	case PSQF_DEV:
 	case PSQF_FD:
@@ -464,6 +476,7 @@ plog_trait(int opt, char *string) {
 		}
 		break;
 	case PSQF_PATH:		/* FALLTHROUGH */
+	case PSQF_PROGRAM:	/* FALLTHROUGH */
 	case PSQF_TEXT:		/* FALLTHROUGH */
 	case PSQF_TAG:
 		/* Plain strings */
@@ -495,9 +508,9 @@ main(int argc, char **argv) {
 	int query_only = 0;
 	int o;
 	int bad_args = 0;
-	char *format = "%s %-7o %7r: [mode %04m, %2a] %p %T";
+	char *format = "%s %-12.12R %-4y %7o: [mode %04m, %2a] %p %T";
 
-	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:r:s:S:t:T:u:")) != -1) {
+	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:r:R:s:S:t:T:u:Uy:")) != -1) {
 		switch (o) {
 		case 'P':
 			setenv("PSEUDO_PREFIX", optarg, 1);
@@ -520,6 +533,10 @@ main(int argc, char **argv) {
 			format = strdup(optarg);
 			query_only = 1;
 			break;
+		case 'U':
+			opt_U = 1;
+			query_only = 1;
+			break;
 		case 'I':		/* PSQF_ID */
 			query_only = 1;
 					/* FALLTHROUGH */
@@ -536,11 +553,13 @@ main(int argc, char **argv) {
 		case 'O':		/* PSQF_ORDER */
 		case 'p':		/* PSQF_PATH */
 		case 'r':		/* PSQF_RESULT */
+		case 'R':		/* PSQF_PROGRAM */
 		case 's':		/* PSQF_STAMP */
 		case 'S':		/* PSQF_SEVERITY */
 		case 't':		/* PSQF_FTYPE */
 		case 'T':		/* PSQF_TEXT */
 		case 'u':		/* PSQF_UID */
+		case 'y':		/* PSQF_TYPE */
 			new_trait = plog_trait(o, optarg);
 			if (!new_trait) {
 				bad_args = 1;
@@ -595,7 +614,7 @@ main(int argc, char **argv) {
 			pseudo_diag("couldn't parse format string (%s).\n", format);
 			return EXIT_FAILURE;
 		}
-		history = pdb_history(traits, fields, opt_D);
+		history = pdb_history(traits, fields, opt_U, opt_D);
 		if (history) {
 			log_entry *e;
 			while ((e = pdb_history_entry(history)) != NULL) {
@@ -604,8 +623,10 @@ main(int argc, char **argv) {
 			}
 			pdb_history_free(history);
 		} else {
-			pseudo_diag("could not retrieve history.\n");
-			return EXIT_FAILURE;
+			if (!opt_D) {
+				pseudo_diag("could not retrieve history.\n");
+				return EXIT_FAILURE;
+			}
 		}
 	}
 	return 0;
@@ -617,7 +638,7 @@ main(int argc, char **argv) {
 static char *
 format_one(log_entry *e, char *format) {
 	char fmtbuf[256];
-	size_t len = strcspn(format, "acdfgGimMoprsStTu"), real_len;
+	size_t len = strcspn(format, "acdfgGimMoprRsStTuy"), real_len;
 	char scratch[4096];
 	time_t stamp_sec;
 	struct tm stamp_tm;
@@ -719,6 +740,10 @@ format_one(log_entry *e, char *format) {
 		strcpy(s, "s");
 		printf(fmtbuf, pseudo_res_name(e->result));
 		break;
+	case 'R':		/* PSQF_PROGRAM */
+		strcpy(s, "s");
+		printf(fmtbuf, e->program ? e->program : "");
+		break;
 	case 's':		/* PSQF_STAMP */
 		strcpy(s, "s");
 		stamp_sec = e->stamp;
@@ -757,6 +782,10 @@ format_one(log_entry *e, char *format) {
 		strcpy(s, "d");
 		printf(fmtbuf, (int) e->uid);
 		break;
+	case 'y':		/* PSQF_TYPE */
+		strcpy(s, "s");
+		printf(fmtbuf, pseudo_msg_type_name(e->type));
+		break;
 	}
 	return format + len;
 }
@@ -769,7 +798,7 @@ format_scan(char *format) {
 	pseudo_query_field_t field;
 
 	for (s = format; (s = strchr(s, '%')) != NULL; ++s) {
-		len = strcspn(s, "acdfgGimMoprsStTu");
+		len = strcspn(s, "acdfgGimMoprRsStTuy");
 		s += len;
 		if (!*s) {
 			pseudo_diag("Unknown format: '%.3s'\n",
@@ -792,10 +821,12 @@ format_scan(char *format) {
 		case PSQF_MODE:		/* FALLTHROUGH */
 		case PSQF_OP:		/* FALLTHROUGH */
 		case PSQF_PATH:		/* FALLTHROUGH */
+		case PSQF_PROGRAM:	/* FALLTHROUGH */
 		case PSQF_RESULT:	/* FALLTHROUGH */
 		case PSQF_STAMP:	/* FALLTHROUGH */
 		case PSQF_SEVERITY:	/* FALLTHROUGH */
 		case PSQF_TEXT:		/* FALLTHROUGH */
+		case PSQF_TYPE:		/* FALLTHROUGH */
 		case PSQF_UID:
 			fields |= (1 << field);
 			break;

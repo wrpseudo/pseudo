@@ -223,6 +223,10 @@ static struct sql_migration {
 	{ "ALTER TABLE logs ADD gid INTEGER;" },
 	/* track access types (read/write, etc) */
 	{ "ALTER TABLE logs ADD access INTEGER;" },
+	/* client program/path */
+	{ "ALTER TABLE logs ADD program VARCHAR;" },
+	/* message type (ping, op) */
+	{ "ALTER TABLE logs ADD type INTEGER;" },
 	{ NULL },
 };
 
@@ -595,6 +599,10 @@ pdb_log_traits(pseudo_query_t *traits) {
 		case PSQF_PERM:
 			e->mode |= (trait->data.ivalue & ~(S_IFMT) & 0177777);
 			break;
+		case PSQF_PROGRAM:
+			e->program = trait->data.svalue ?
+					strdup(trait->data.svalue) : NULL;
+			break;
 		case PSQF_RESULT:
 			e->result = trait->data.ivalue;
 			break;
@@ -611,6 +619,9 @@ pdb_log_traits(pseudo_query_t *traits) {
 		case PSQF_TEXT:
 			e->text = trait->data.svalue ?
 					strdup(trait->data.svalue) : NULL;
+			break;
+		case PSQF_TYPE:
+			e->type = trait->data.ivalue;
 			break;
 		case PSQF_UID:
 			e->uid = trait->data.ivalue;
@@ -634,9 +645,9 @@ pdb_log_traits(pseudo_query_t *traits) {
 int
 pdb_log_entry(log_entry *e) {
 	char *sql = "INSERT INTO logs "
-		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, severity, text, tag, uid)"
+		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, severity, text, program, tag, type, uid)"
 		    " VALUES "
-		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	static sqlite3_stmt *insert;
 	int field;
 	int rc;
@@ -680,11 +691,17 @@ pdb_log_entry(log_entry *e) {
 		} else {
 			sqlite3_bind_null(insert, field++);
 		}
+		if (e->program) {
+			sqlite3_bind_text(insert, field++, e->program, -1, SQLITE_STATIC);
+		} else {
+			sqlite3_bind_null(insert, field++);
+		}
 		if (e->tag) {
 			sqlite3_bind_text(insert, field++, e->tag, -1, SQLITE_STATIC);
 		} else {
 			sqlite3_bind_null(insert, field++);
 		}
+		sqlite3_bind_int(insert, field++, e->type);
 		sqlite3_bind_int(insert, field++, e->uid);
 	} else {
 		sqlite3_bind_int(insert, field++, (unsigned long) time(NULL));
@@ -700,6 +717,8 @@ pdb_log_entry(log_entry *e) {
 		sqlite3_bind_int(insert, field++, 0);
 		sqlite3_bind_null(insert, field++);
 		sqlite3_bind_null(insert, field++);
+		sqlite3_bind_null(insert, field++);
+		sqlite3_bind_int(insert, field++, 0);
 		sqlite3_bind_int(insert, field++, 0);
 	}
 
@@ -713,11 +732,11 @@ pdb_log_entry(log_entry *e) {
 }
 /* create a log from a given message, with tag and text */
 int
-pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *tag, const char *text, ...) {
+pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...) {
 	char *sql = "INSERT INTO logs "
-		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, uid, severity, text, tag)"
+		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, uid, severity, text, program, tag, type)"
 		    " VALUES "
-		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+		    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	static sqlite3_stmt *insert;
 	char buffer[8192];
 	int field;
@@ -779,10 +798,20 @@ pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *tag, const char *t
 	} else {
 		sqlite3_bind_null(insert, field++);
 	}
+	if (program) {
+		sqlite3_bind_text(insert, field++, program, -1, SQLITE_STATIC);
+	} else {
+		sqlite3_bind_null(insert, field++);
+	}
 	if (tag) {
 		sqlite3_bind_text(insert, field++, tag, -1, SQLITE_STATIC);
 	} else {
 		sqlite3_bind_null(insert, field++);
+	}
+	if (msg) {
+		sqlite3_bind_int(insert, field++, msg->type);
+	} else {
+		sqlite3_bind_int(insert, field++, 0);
 	}
 
 	rc = sqlite3_step(insert);
@@ -844,7 +873,7 @@ frag(buffer *b, char *fmt, ...) {
 }
 
 log_history
-pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
+pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_delete) {
 	log_history h = NULL;
 	pseudo_query_t *trait;
 	sqlite3_stmt *select;
@@ -856,7 +885,6 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 	pseudo_query_field_t f;
 	static buffer *sql;
 
-	/* this column arrangement is used by pdb_history_entry() */
 	if (!sql) {
 		sql = malloc(sizeof *sql);
 		if (!sql) {
@@ -872,23 +900,28 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 		}
 	}
 	sql->tail = sql->data;
-	frag(sql, "SELECT ");
+	if (do_delete)
+		frag(sql, "DELETE ");
+	else
+		frag(sql, "SELECT ");
 
 	if (!log_db && get_db(&log_db)) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
 
-	if (distinct)
-		frag(sql, "DISTINCT ");
+	if (!do_delete) {
+		if (unique)
+			frag(sql, "DISTINCT ");
 
-	done_any = 0;
-	for (f = PSQF_NONE + 1; f < PSQF_MAX; ++f) {
-		if (fields & (1 << f)) {
-			frag(sql, "%s%s",
-				done_any ? ", " : "",
-				pseudo_query_field_name(f));
-			done_any = 1;
+		done_any = 0;
+		for (f = PSQF_NONE + 1; f < PSQF_MAX; ++f) {
+			if (fields & (1 << f)) {
+				frag(sql, "%s%s",
+					done_any ? ", " : "",
+					pseudo_query_field_name(f));
+				done_any = 1;
+			}
 		}
 	}
 
@@ -905,6 +938,7 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			}
 		}
 		switch (trait->field) {
+		case PSQF_PROGRAM:	/* FALLTHROUGH */
 		case PSQF_TEXT:		/* FALLTHROUGH */
 		case PSQF_TAG:		/* FALLTHROUGH */
 		case PSQF_PATH:
@@ -996,13 +1030,14 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			break;
 		}
 	}
-	frag(sql, "ORDER BY %s %s;", order_by, order_dir);
+	if (!do_delete)
+		frag(sql, "ORDER BY %s %s;", order_by, order_dir);
 	pseudo_debug(1, "created SQL: <%s>\n", sql->data);
 
 	/* second, prepare it */
 	rc = sqlite3_prepare_v2(log_db, sql->data, strlen(sql->data), &select, NULL);
 	if (rc) {
-		dberr(log_db, "couldn't prepare SELECT statement");
+		dberr(log_db, "couldn't prepare %s statement", do_delete ? "DELETE" : "SELECT");
 		return 0;
 	}
 
@@ -1013,6 +1048,7 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 		case PSQF_ORDER:
 			/* this just creates a hunk of SQL above */
 			break;
+		case PSQF_PROGRAM:	/* FALLTHROUGH */
 		case PSQF_PATH:		/* FALLTHROUGH */
 		case PSQF_TAG:		/* FALLTHROUGH */
 		case PSQF_TEXT:
@@ -1032,6 +1068,7 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 		case PSQF_RESULT:	/* FALLTHROUGH */
 		case PSQF_SEVERITY:	/* FALLTHROUGH */
 		case PSQF_STAMP:	/* FALLTHROUGH */
+		case PSQF_TYPE:	/* FALLTHROUGH */
 		case PSQF_UID:		/* FALLTHROUGH */
 			sqlite3_bind_int(select, field++, trait->data.ivalue);
 			break;
@@ -1040,6 +1077,16 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int distinct) {
 			sqlite3_finalize(select);
 			return 0;
 		}
+	}
+
+	if (do_delete) {
+		/* no need to return it, so... */
+		int rc = sqlite3_step(select);
+		if (rc != SQLITE_DONE) {
+			dberr(log_db, "deletion failed");
+		}
+		sqlite3_finalize(select);
+		return  0;
 	}
 
 	/* fourth, return the statement, now ready to be stepped through */
@@ -1114,6 +1161,11 @@ pdb_history_entry(log_history h) {
 			if (s)
 				l->path = strdup((char *) s);
 			break;
+		case PSQF_PROGRAM:
+			s = sqlite3_column_text(h->stmt, column++);
+			if (s)
+				l->program = strdup((char *) s);
+			break;
 		case PSQF_RESULT:
 			l->result = sqlite3_column_int64(h->stmt, column++);
 			break;
@@ -1132,6 +1184,9 @@ pdb_history_entry(log_history h) {
 			s = sqlite3_column_text(h->stmt, column++);
 			if (s)
 				l->text = strdup((char *) s);
+			break;
+		case PSQF_TYPE:
+			l->type = sqlite3_column_int64(h->stmt, column++);
 			break;
 		case PSQF_UID:
 			l->uid = sqlite3_column_int64(h->stmt, column++);
@@ -1170,6 +1225,7 @@ log_entry_free(log_entry *e) {
 		return;
 	free(e->text);
 	free(e->path);
+	free(e->program);
 	free(e->tag);
 	free(e);
 }
@@ -1228,7 +1284,7 @@ pdb_link_file(pseudo_msg_t *msg) {
 /* pdb_unlink_file_dev:  Delete every instance of a dev/inode pair. */
 int
 pdb_unlink_file_dev(pseudo_msg_t *msg) {
-	static sqlite3_stmt *delete;
+	static sqlite3_stmt *sql_delete;
 	int rc;
 	char *sql = "DELETE FROM files WHERE dev = ? AND ino = ?;";
 
@@ -1236,8 +1292,8 @@ pdb_unlink_file_dev(pseudo_msg_t *msg) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
-	if (!delete) {
-		rc = sqlite3_prepare_v2(file_db, sql, strlen(sql), &delete, NULL);
+	if (!sql_delete) {
+		rc = sqlite3_prepare_v2(file_db, sql, strlen(sql), &sql_delete, NULL);
 		if (rc) {
 			dberr(file_db, "couldn't prepare DELETE statement");
 			return 1;
@@ -1246,14 +1302,14 @@ pdb_unlink_file_dev(pseudo_msg_t *msg) {
 	if (!msg) {
 		return 1;
 	}
-	sqlite3_bind_int(delete, 1, msg->dev);
-	sqlite3_bind_int(delete, 2, msg->ino);
-	rc = sqlite3_step(delete);
+	sqlite3_bind_int(sql_delete, 1, msg->dev);
+	sqlite3_bind_int(sql_delete, 2, msg->ino);
+	rc = sqlite3_step(sql_delete);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete by inode may have failed");
 	}
-	sqlite3_reset(delete);
-	sqlite3_clear_bindings(delete);
+	sqlite3_reset(sql_delete);
+	sqlite3_clear_bindings(sql_delete);
 	return rc != SQLITE_DONE;
 }
 

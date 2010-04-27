@@ -37,6 +37,9 @@
 #include "pseudo_ipc.h"
 #include "pseudo_client.h"
 
+/* GNU extension */
+extern char *program_invocation_name;
+
 static char *base_path(int dirfd, const char *path, int leave_last);
 
 static int connect_fd = -1;
@@ -465,20 +468,24 @@ static int
 client_ping(void) {
 	pseudo_msg_t ping;
 	pseudo_msg_t *ack;
+	char tagbuf[pseudo_path_max()];
 	char *tag = getenv("PSEUDO_TAG");
 
 	ping.type = PSEUDO_MSG_PING;
 	ping.op = OP_NONE;
-	if (tag) {
-		ping.pathlen = strlen(tag);
-	} else {
-		ping.pathlen = 0;
-	}
+
+	if (!tag)
+		tag = "";
+
+	ping.pathlen = snprintf(tagbuf, sizeof(tagbuf), "%s%c%s",
+		program_invocation_name ? program_invocation_name : "<unknown>",
+		0,
+		tag);
 	ping.client = getpid();
 	ping.result = 0;
 	errno = 0;
 	pseudo_debug(4, "sending ping\n");
-	if (pseudo_msg_send(connect_fd, &ping, ping.pathlen, tag)) {
+	if (pseudo_msg_send(connect_fd, &ping, ping.pathlen, tagbuf)) {
 		pseudo_debug(3, "error pinging server: %s\n", strerror(errno));
 		return 1;
 	}

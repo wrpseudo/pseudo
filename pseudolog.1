@@ -26,7 +26,7 @@
 .RI [ SPECIFICATIONS ]
 .PP
 .B pseudolog
-.RB [ \-DPv ]
+.RB [ \-UPv ]
 [
 .B \-E
 .I timeformat
@@ -37,13 +37,21 @@
 ]
 .PP
 .B pseudolog \-h
+.PP
+.B pseudolog \-D
+.RB [ \-Pv ]
+[
+.B \-E
+.I timeformat
+]
+.RI [ SPECIFICATIONS ]
 .RI [ SPECIFICATIONS ]
 .SH DESCRIPTION
 The
 .I pseudolog
-utility displays log entries created by the
+utility displays, creates, or deletes log entries associated with the
 .I pseudo
-daemon, or creates log entries.  Creation of log entries is useful only to
+daemon.  Creation of log entries is useful only to
 create timestamps or notes; for instance, you could create a log entry before
 beginning a process, so there would be a timestamp for the beginning of
 that process.  There are a number of special options used to match or create
@@ -60,11 +68,7 @@ The following other options are supported:
 Print a usage message and exit.
 .TP 8
 .B \-D
-Restrict query output to distinct rows.  Rows will have members defined by
-the
-.B \-F
-(format) option.  If all members are the same between two rows, only one
-is displayed.  Applies only to queries.
+Delete rows selected by the query.  This is not reversible.
 .TP 8
 .BI \-E \ timeformat
 Specify a format string (for
@@ -96,6 +100,13 @@ Specify that
 should be used as the
 .B PSEUDO_PREFIX
 value, overriding any environment setting.
+.TP 8
+.B \-U
+Restrict query output to unique rows.  Rows will have members defined by
+the
+.B \-F
+(format) option.  If all members are the same between two rows, only one
+is displayed.  Applies only to queries.
 .TP 8
 .B \-v
 Increase verbosity (debug level).  Not useful except when debugging pseudo.
@@ -261,6 +272,12 @@ usually means that there was no entry in the
 .I pseudo
 database.
 .TP 8
+.B R
+Program.  This is the program name (as retrieved by glibc's
+.I program_invocation_name
+variable), which has the full path if and only if the program
+was invoked by full path name.
+.TP 8
 .B s
 Timestamp.  The format of this field is controlled by the
 .B \-E
@@ -291,6 +308,13 @@ logged.  It is, of course, a text field.
 .TP 8
 .B u
 UID.  The user ID associated with an entry.
+.TP 8
+.B y
+Type.  This is usually "op" for operations, or "ping" for the ping
+messages clients send to confirm server availability.  Other types
+should rarely occur, but include "ack" and "nak" for server
+responses (which are never logged), and "halt" for shutdown messages
+(currently not logged).
 
 .SH EXAMPLES
 The following examples illustrate some of the likely usage patterns for
