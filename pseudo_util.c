@@ -47,6 +47,7 @@ static int pseudo_append_elements(char **newpath, char **root, size_t *allocated
 extern char **environ;
 static ssize_t pseudo_max_pathlen = -1;
 static ssize_t pseudo_sys_max_pathlen = -1;
+static char *libpseudo_name = "libpseudo" PSEUDO_SUFFIX ".so";
 
 char *pseudo_version = PSEUDO_VERSION;
 
@@ -358,75 +359,166 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
 
 /* remove the pseudo stuff from the environment (leaving other preloads
  * alone).
+ * There's an implicit memory leak here, but this is called only right
+ * before an exec(), or at most once in a given run.
+ *
+ * we don't try to fix the library path.
  */
-void
-pseudo_dropenv(void) {
-	char *ld_env = getenv("LD_PRELOAD");
+char **
+pseudo_dropenv(char * const *environ) {
+	char **new_environ;
+	int env_count = 0, found_preload = 0;
+	int i, j;
 
-	/* why do this two ways?  Because calling setenv(), then execing,
-	 * in bash seems to result in the variables still being set in the
-	 * new environment.
-	 * we remove the entire LD_PRELOAD, because our use case would have
-	 * fakechroot and fakepasswd in it too -- and we don't want that.
-	 * we don't touch LD_LIBRARY_PATH because it might be being used for
-	 * other system libraries...
-	 */
-	if (ld_env) {
-		unsetenv("LD_PRELOAD");
+	for (i = 0; environ[i]; ++i) {
+		if (!memcmp(environ[i], "LD_PRELOAD=", 11))
+			found_preload = 1;
+		++env_count;
 	}
+	new_environ = malloc((env_count + 1) * sizeof(*new_environ));
+	if (!new_environ) {
+		pseudo_diag("fatal: can't allocate new environment.\n");
+		return NULL;
+	}
+	j = 0;
+	for (i = 0; environ[i]; ++i) {
+		if (!memcmp(environ[i], "LD_PRELOAD=", 11)) {
+			char *s = environ[i] + 11;
+			char *p;
+			if (!strcmp(s, libpseudo_name)) {
+				/* drop it completely */
+			} else if ((p = strstr(s, libpseudo_name)) != NULL) {
+				char *without = strdup(environ[i]);
+				if (!without) {
+					pseudo_diag("fatal: can't allocate new environment variable.\n");
+					return 0;
+				}
+				p = strstr(without, libpseudo_name);
+				/* strip out that hunk */
+				memmove(p, p + strlen(libpseudo_name),
+					strlen(p) - strlen(libpseudo_name) + 1);
+				new_environ[j++] = without;
+			} else {
+				/* leave it alone */
+				new_environ[j++] = environ[i];
+			}
+		} else {
+			new_environ[j++] = environ[i];
+		}
+	}
+	new_environ[j++] = NULL;
+	return new_environ;
 }
 
 /* add pseudo stuff to the environment.
+ * We can't just use setenv(), because one use case is that we're trying
+ * to modify the environment of a process about to be forked through
+ * exec().
  */
-void
-pseudo_setupenv(char *opts) {
-	char *ld_env;
-	char *newenv;
+char **
+pseudo_setupenv(char * const *environ, char *opts) {
+	char **new_environ;
+	int env_count = 0;
+	int found_preload = 0, found_libpath = 0, found_debug = 0, found_opts = 0;
+	int i, j;
 	size_t len;
-	char debugvalue[64];
+	char *newenv;
 
-	newenv = "libpseudo.so";
-	setenv("LD_PRELOAD", newenv, 1);
+	for (i = 0; environ[i]; ++i) {
+		if (!memcmp(environ[i], "LD_PRELOAD=", 11))
+			found_preload = 1;
+		if (!memcmp(environ[i], "PSEUDO_OPTS=", 12))
+			found_opts = 1;
+		if (!memcmp(environ[i], "PSEUDO_DEBUG=", 13))
+			found_debug = 1;
+		if (!memcmp(environ[i], "LD_LIBRARY_PATH=", 16))
+			found_libpath = 1;
+		++env_count;
+	}
+	env_count += 4 - (found_preload + found_libpath + found_debug + found_opts);
 
-	ld_env = getenv("LD_LIBRARY_PATH");
-	if (ld_env) {
-		char *prefix = pseudo_prefix_path(NULL);
-		if (!strstr(ld_env, prefix)) {
-			char *e1, *e2;
-			e1 = pseudo_prefix_path("lib");
-			e2 = pseudo_prefix_path("lib64");
-			len = strlen(ld_env) + strlen(e1) + strlen(e2) + 3;
-			newenv = malloc(len);
-			snprintf(newenv, len, "%s:%s:%s", ld_env, e1, e2);
-			free(e1);
-			free(e2);
-			setenv("LD_LIBRARY_PATH", newenv, 1);
-			free(newenv);
+	new_environ = malloc((env_count + 1) * sizeof(*new_environ));
+	if (!new_environ) {
+		pseudo_diag("fatal: can't allocate new environment.\n");
+		return NULL;
+	}
+
+	j = 0;
+	for (i = 0; environ[i]; ++i) {
+		if (!memcmp(environ[i], "LD_PRELOAD=", 11)) {
+			if (!strstr(environ[i], libpseudo_name)) {
+				len = strlen(environ[i]) + strlen(libpseudo_name) + 2;
+				newenv = malloc(len);
+				if (!newenv) {
+					pseudo_diag("fatal: can't allocate new environment variable.\n");
+				}
+				snprintf(newenv, len, "%s %s", environ[i], libpseudo_name);
+				new_environ[j++] = newenv;
+			} else {
+				new_environ[j++] = environ[i];
+			}
+		} else if (!memcmp(environ[i], "LD_LIBRARY_PATH=", 16)) {
+			if (!strstr(environ[i], PSEUDO_PREFIX)) {
+				char *e1, *e2;
+				e1 = pseudo_prefix_path("lib");
+				e2 = pseudo_prefix_path("lib64");
+				len = strlen(environ[i]) + strlen(e1) + strlen(e2) + 3;
+				newenv = malloc(len);
+				if (!newenv) {
+					pseudo_diag("fatal: can't allocate new environment variable.\n");
+				}
+				snprintf(newenv, len, "%s:%s:%s", environ[i], e1, e2);
+				free(e1);
+				free(e2);
+				new_environ[j++] = newenv;
+			} else {
+				new_environ[j++] = environ[i];
+			}
+		} else {
+			new_environ[j++] = environ[i];
 		}
-		free(prefix);
-	} else {
+	}
+	if (!found_libpath) {
 		char *e1, *e2;
 		e1 = pseudo_prefix_path("lib");
 		e2 = pseudo_prefix_path("lib64");
-		len = strlen(e1) + strlen(e2) + 2;
+		len = 16 + strlen(e1) + strlen(e2) + 2;
 		newenv = malloc(len);
-		snprintf(newenv, len, "%s:%s", e1, e2);
-		setenv("LD_LIBRARY_PATH", newenv, 1);
-		free(newenv);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s", e1, e2);
+		new_environ[j++] = newenv;
 	}
-
-	if (max_debug_level) {
-		sprintf(debugvalue, "%d", max_debug_level);
-		setenv("PSEUDO_DEBUG", debugvalue, 1);
-	} else {
-		unsetenv("PSEUDO_DEBUG");
+	if (!found_preload) {
+		len = 11 + strlen(libpseudo_name) + 1;
+		newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "LD_PRELOAD=%s", libpseudo_name);
+		new_environ[j++] = newenv;
 	}
-
-	if (opts) {
-		setenv("PSEUDO_OPTS", opts, 1);
-	} else {
-		unsetenv("PSEUDO_OPTS");
+	if (!found_debug && max_debug_level > 0) {
+		len = 16;
+		newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "PSEUDO_DEBUG=%d", max_debug_level);
+		new_environ[j++] = newenv;
 	}
+	if (!found_opts && opts) {
+		len = 12 + strlen(opts) + 1;
+		newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "PSEUDO_OPTS=%s", opts);
+		new_environ[j++] = newenv;
+	}
+	new_environ[j++] = NULL;
+	return new_environ;
 }
 
 /* get the full path to a file under $PSEUDO_PREFIX.  Other ways of

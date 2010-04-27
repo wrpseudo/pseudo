@@ -403,6 +403,7 @@ client_spawn_server(void) {
 	} else {
 		char *base_args[] = { NULL, NULL, NULL };
 		char **argv;
+		char **new_environ;
 		int args;
 		int fd;
 
@@ -437,9 +438,6 @@ client_spawn_server(void) {
 		} else {
 			argv = base_args;
 		}
-		pseudo_dropenv();
-		pseudo_debug(4, "calling execve on %s\n", argv[0]);
-		/* and now, execute the server */
 		if (fchdir(pseudo_dir_fd)) {
 			pseudo_diag("Couldn't change to server dir [%d]: %s\n",
 				pseudo_dir_fd, strerror(errno));
@@ -458,7 +456,10 @@ client_spawn_server(void) {
 			if (fd != pseudo_util_debug_fd)
 				close(fd);
 		}
-		execve(argv[0], argv, environ);
+		/* and now, execute the server */
+		new_environ = pseudo_dropenv(environ);
+		pseudo_debug(4, "calling execve on %s\n", argv[0]);
+		execve(argv[0], argv, new_environ);
 		pseudo_diag("critical failure: exec of pseudo daemon failed: %s\n", strerror(errno));
 		exit(1);
 	}

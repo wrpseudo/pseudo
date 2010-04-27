@@ -83,6 +83,7 @@ main(int argc, char *argv[]) {
 
 	if (ld_env && strstr(ld_env, "libpseudo")) {
 		extern char **environ;
+		char **new_environ;
 
 		pseudo_debug(2, "can't run daemon with libpseudo in LD_PRELOAD\n");
 		if (getenv("PSEUDO_RELOADED")) {
@@ -90,8 +91,8 @@ main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 		setenv("PSEUDO_RELOADED", "YES", 1);
-		pseudo_dropenv();
-		execve(argv[0], argv, environ);
+		new_environ = pseudo_dropenv(environ);
+		execve(argv[0], argv, new_environ);
 		exit(EXIT_FAILURE);
 	}
 	unsetenv("PSEUDO_RELOADED");
@@ -202,6 +203,11 @@ main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 	} else {
+		char fullpath[pseudo_path_max()];
+		char *path;
+		extern char **environ;
+		char **new_environ;
+
 		if (opt_r) {
 			if (chdir(opt_r) == -1) {
 				pseudo_diag("failed to chdir to '%s': %s\n",
@@ -225,8 +231,35 @@ main(int argc, char *argv[]) {
 		}
 		/* build an environment containing libpseudo */
 		pseudo_debug(2, "setting up pseudo environment.\n");
-		pseudo_setupenv(opts);
-		rc = execvp(argv[0], argv);
+		new_environ = pseudo_setupenv(environ, opts);
+		if (strchr(argv[0], '/')) {
+			snprintf(fullpath, pseudo_path_max(), "%s", argv[0]);
+		} else {
+			int found = 0;
+			if ((path = getenv("PATH")) == NULL)
+				path = "/bin:/usr/bin";
+			while (*path) {
+				struct stat64 buf;
+				int len = strcspn(path, ":");
+				snprintf(fullpath, pseudo_path_max(), "%.*s/%s",
+					len, path, argv[0]);
+				path += len;
+				if (*path == ':')
+					++path;
+				if (!stat64(fullpath, &buf)) {
+					if (buf.st_mode & 0111) {
+						found = 1;
+						break;
+					}
+				}
+			}
+			if (!found) {
+				pseudo_diag("Can't find '%s' in $PATH.\n",
+					argv[0]);
+				exit(EXIT_FAILURE);
+			}
+		}
+		rc = execve(fullpath, argv, new_environ);
 		if (rc == -1) {
 			pseudo_diag("pseudo: can't run %s: %s\n",
 				argv[0], strerror(errno));

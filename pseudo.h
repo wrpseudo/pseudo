@@ -121,8 +121,8 @@ void pseudo_new_pid(void);
 /* pseudo_fix_path resolves symlinks up to this depth */
 #define PSEUDO_MAX_LINK_RECURSION 16
 extern char *pseudo_fix_path(const char *, const char *, size_t, size_t, size_t *, int);
-extern void pseudo_dropenv(void);
-extern void pseudo_setupenv(char *);
+extern char **pseudo_dropenv(char * const *);
+extern char **pseudo_setupenv(char * const *, char *);
 extern char *pseudo_prefix_path(char *);
 extern char *pseudo_get_prefix(char *);
 extern ssize_t pseudo_sys_path_max(void);
