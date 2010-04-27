@@ -32,11 +32,20 @@
 
 #include "pseudo.h"
 #include "pseudo_ipc.h"
+#include "pseudo_client.h"
 #include "pseudo_db.h"
 
 static int opt_D = 0;
 static int opt_U = 0;
 static int opt_l = 0;
+
+/* when the client is linked with pseudo_wrappers, these are defined there.
+ * when it is linked with pseudo_server, though, we have to provide different
+ * versions (pseudo_wrappers must not be linked with the server, or Bad Things
+ * happen).
+ */
+void pseudo_magic(void) { }
+void pseudo_antimagic(void) { }
 
 static void display(log_entry *, char *format);
 static int format_scan(char *format);
@@ -71,12 +80,13 @@ usage(int status) {
 	int i;
 
 	fputs("pseudolog: create or report log entries. usage:\n", f);
-	fputs("pseudolog -l [-E timeformat] [SPECIFIERS] -- create entries\n", f);
-	fputs("pseudolog [-U] [-F format] [-E timeformat] [SPECIFIERS] -- report entries\n", f);
-	fputs("pseudolog -D [-E timeformat] [SPECIFIERS] -- delete entries\n", f);
-	fputs("  format is a printf-like format string using the option letters\n", f);
+	fputs("pseudolog -l [-P pfx] [-E timefmt] [SPECIFIERS] -- create entries\n", f);
+	fputs("pseudolog [-U] [-P pfx] [-F fmt] [-E timefmt] [SPECIFIERS] -- report entries\n", f);
+	fputs("pseudolog -D [-P pfx] [-E timefmt] [SPECIFIERS] -- delete entries\n", f);
+	fputs("  fmt is a printf-like format string using the option letters\n", f);
 	fputs("  listed below as format specifiers for the corresponding field.\n", f);
-	fputs("  timeformat is a strftime-like format string, the default is '%x %X'.\n", f);
+	fputs("  timefmt is a strftime-like format string, the default is '%x %X'.\n", f);
+	fputs("  pfx is the PSEUDO_PREFIX in which to find the database.\n", f);
 	fputs("\n", f);
 	fputs("SPECIFIERS are options of the form -X <value>, where X is one of\n", f);
 	fputs("the following option letters, and value is the value to match.\n", f);
@@ -504,16 +514,20 @@ plog_trait(int opt, char *string) {
 int
 main(int argc, char **argv) {
 	pseudo_query_t *traits = 0, *current = 0, *new_trait = 0;
+	char *s;
 	log_history history;
 	int query_only = 0;
 	int o;
 	int bad_args = 0;
 	char *format = "%s %-12.12R %-4y %7o: [mode %04m, %2a] %p %T";
 
-	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:r:R:s:S:t:T:u:Uy:")) != -1) {
+	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:P:r:R:s:S:t:T:u:Uy:")) != -1) {
 		switch (o) {
 		case 'P':
-			setenv("PSEUDO_PREFIX", optarg, 1);
+			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
+			if (!s)
+				pseudo_diag("Can't resolve prefix path '%s'\n", optarg);
+			setenv("PSEUDO_PREFIX", s, 1);
 			break;
 		case 'v':
 			pseudo_debug_verbose();

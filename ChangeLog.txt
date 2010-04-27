@@ -1,3 +1,6 @@
+2010-04-27:
+	* (seebs) fix -P in pseudolog
+
 2010-04-26:
 	* (seebs) many bug fixes and updates
 	* (seebs) allow deleting entries in pseudolog
