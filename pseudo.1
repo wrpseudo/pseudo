@@ -289,6 +289,17 @@ to run at.  In general, this is useful only for debugging
 .I pseudo
 itself.
 .TP 8
+.B PSEUDO_DEBUG_FILE
+The name of a file to use for debugging messages from the pseudo client;
+the default is to log to standard error.  If the string contains a single
+.BR %s ,
+that string is replaced with the short program name, and if it contains
+a single
+.BR %d ,
+that string is replaced with the process ID.  The presence of other
+format specifiers, or more than one of either of these, may produce
+undesired behavior.
+.TP 8
 .B PSEUDO_ENOSYS_ABORT
 If this variable is set, the
 .I pseudo

@@ -1,5 +1,6 @@
 2010-04-27:
 	* (seebs) fix -P in pseudolog
+	* (seebs) document PSEUDO_DEBUG_FILE
 
 2010-04-26:
 	* (seebs) many bug fixes and updates
