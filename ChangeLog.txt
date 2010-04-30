@@ -1,5 +1,6 @@
 2010-04-30:
 	* (seebs) rework pdb_history
+	* (seebs) small cleanups and bulletproofing.
 
 2010-04-27:
 	* (seebs) fix -P in pseudolog

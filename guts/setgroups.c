@@ -7,6 +7,9 @@
  *	int rc = -1;
  */
 
+	/* let gcc know we're ignoring these */
+	(void) size;
+	(void) list;
 	/* you always have all group privileges.  we're like magic! */
 	rc = 0;
 

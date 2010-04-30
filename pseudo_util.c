@@ -367,14 +367,11 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
 char **
 pseudo_dropenv(char * const *environ) {
 	char **new_environ;
-	int env_count = 0, found_preload = 0;
+	int env_count = 0;
 	int i, j;
 
-	for (i = 0; environ[i]; ++i) {
-		if (!memcmp(environ[i], "LD_PRELOAD=", 11))
-			found_preload = 1;
+	for (i = 0; environ[i]; ++i)
 		++env_count;
-	}
 	new_environ = malloc((env_count + 1) * sizeof(*new_environ));
 	if (!new_environ) {
 		pseudo_diag("fatal: can't allocate new environment.\n");
@@ -387,6 +384,7 @@ pseudo_dropenv(char * const *environ) {
 			char *p;
 			if (!strcmp(s, libpseudo_name)) {
 				/* drop it completely */
+				continue;
 			} else if ((p = strstr(s, libpseudo_name)) != NULL) {
 				char *without = strdup(environ[i]);
 				if (!without) {

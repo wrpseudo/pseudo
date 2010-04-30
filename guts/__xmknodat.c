@@ -9,6 +9,9 @@
  	pseudo_msg_t *msg;
 	struct stat64 buf;
 
+	/* we don't use underlying call, so _ver is irrelevant to us */
+	(void) ver;
+
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
 		errno = ENOSYS;

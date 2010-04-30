@@ -278,10 +278,12 @@ EOF
 	 * by pseudo and could result in a deadlock.
 	 */
 	sigemptyset(&blocked);
-	sigaddset(&blocked, SIGCHLD);
-	sigaddset(&blocked, SIGALRM);
-	sigaddset(&blocked, SIGUSR1);
-	sigaddset(&blocked, SIGUSR2);
+	sigaddset(&blocked, SIGALRM);	/* every-N-seconds tasks */
+	sigaddset(&blocked, SIGCHLD);	/* reaping child processes */
+	sigaddset(&blocked, SIGHUP);	/* idiomatically, reloading config */
+	sigaddset(&blocked, SIGTERM);	/* shutdown/teardown operations */
+	sigaddset(&blocked, SIGUSR1);	/* reopening log files, sometimes */
+	sigaddset(&blocked, SIGUSR2);	/* who knows what people do */
 	sigprocmask(SIG_BLOCK, &blocked, &saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;

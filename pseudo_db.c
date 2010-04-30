@@ -1402,7 +1402,7 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 int
 pdb_unlink_file(pseudo_msg_t *msg) {
 	static sqlite3_stmt *delete_exact, *delete_sub;
-	int rc;
+	int rc, exact, sub;
 	char *sql_delete_exact = "DELETE FROM files WHERE path = ?;";
 	char *sql_delete_sub = "DELETE FROM files WHERE "
 				"(path > (? || '/') AND path < (? || '0'));";
@@ -1440,14 +1440,13 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete exact by path may have failed");
 	}
-	rc = sqlite3_changes(file_db);
-	pseudo_debug(2, "(exact %d, ", rc);
+	exact = sqlite3_changes(file_db);
 	rc = sqlite3_step(delete_sub);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete sub by path may have failed");
 	}
-	rc = sqlite3_changes(file_db);
-	pseudo_debug(2, "sub %d) ", rc);
+	sub = sqlite3_changes(file_db);
+	pseudo_debug(3, "(exact %d, sub %d) ", exact, sub);
 	sqlite3_reset(delete_exact);
 	sqlite3_reset(delete_sub);
 	sqlite3_clear_bindings(delete_exact);
@@ -1555,7 +1554,11 @@ pdb_update_inode(pseudo_msg_t *msg) {
 	sqlite3_bind_int(update, 2, msg->ino);
 	rc = sqlite3_bind_text(update, 3, msg->path, -1, SQLITE_STATIC);
 	if (rc) {
-		dberr(file_db, "error binding %s to select", msg->pathlen ? msg->path : "<nil>");
+		/* msg->path can never be null, and if msg didn't
+		 * have a non-zero pathlen, we'd already have exited
+		 * above
+		 */
+		dberr(file_db, "error binding %s to select", msg->path);
 	}
 
 	rc = sqlite3_step(update);
