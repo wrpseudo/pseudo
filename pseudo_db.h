@@ -76,7 +76,8 @@ extern pdb_file_list pdb_files(void);
 extern pseudo_msg_t *pdb_file(pdb_file_list);
 extern void pdb_files_done(pdb_file_list);
 
-extern log_history pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int delete);
+extern int pdb_delete(pseudo_query_t *traits, unsigned long fields);
+extern log_history pdb_history(pseudo_query_t *traits, unsigned long fields, int unique);
 extern log_entry *pdb_history_entry(log_history h);
 extern void pdb_history_free(log_history h);
 extern void log_entry_free(log_entry *);

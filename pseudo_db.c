@@ -886,11 +886,10 @@ frag(buffer *b, char *fmt, ...) {
 	return rc;
 }
 
-log_history
-pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_delete) {
-	log_history h = NULL;
+sqlite3_stmt *
+pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int unique, int want_results) {
 	pseudo_query_t *trait;
-	sqlite3_stmt *select;
+	sqlite3_stmt *stmt;
 	int done_any = 0;
 	int field = 0;
 	char *order_by = "id";
@@ -899,32 +898,35 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 	pseudo_query_field_t f;
 	static buffer *sql;
 
+	if (!log_db && get_db(&log_db)) {
+		pseudo_diag("database error.\n");
+		return NULL;
+	}
+
+	if (!stmt_type) {
+		pseudo_diag("can't prepare a statement without a type.\n");
+	}
+
 	if (!sql) {
 		sql = malloc(sizeof *sql);
 		if (!sql) {
 			pseudo_diag("can't allocate SQL buffer.\n");
-			return 0;
+			return NULL;
 		}
 		sql->buflen = 512;
 		sql->data = malloc(sql->buflen);
 		if (!sql->data) {
 			pseudo_diag("can't allocate SQL text buffer.\n");
 			free(sql);
-			return 0;
+			sql = 0;
+			return NULL;
 		}
 	}
 	sql->tail = sql->data;
-	if (do_delete)
-		frag(sql, "DELETE ");
-	else
-		frag(sql, "SELECT ");
+	/* should be DELETE or SELECT */
+	frag(sql, "%s ", stmt_type);
 
-	if (!log_db && get_db(&log_db)) {
-		pseudo_diag("database error.\n");
-		return 0;
-	}
-
-	if (!do_delete) {
+	if (want_results) {
 		if (unique)
 			frag(sql, "DISTINCT ");
 
@@ -952,9 +954,9 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 			}
 		}
 		switch (trait->field) {
-		case PSQF_PROGRAM:	/* FALLTHROUGH */
-		case PSQF_TEXT:		/* FALLTHROUGH */
-		case PSQF_TAG:		/* FALLTHROUGH */
+		case PSQF_PROGRAM:
+		case PSQF_TEXT:
+		case PSQF_TAG:
 		case PSQF_PATH:
 			switch (trait->type) {
 			case PSQT_LIKE:
@@ -962,7 +964,7 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 					pseudo_query_field_name(trait->field),
 					pseudo_query_type_sql(trait->type));
 				break;
-			case PSQT_NOTLIKE:	/* FALLTHROUGH */
+			case PSQT_NOTLIKE:
 			case PSQT_SQLPAT:
 				frag(sql, "%s %s ?",
 					pseudo_query_field_name(trait->field),
@@ -977,8 +979,8 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 			break;
 		case PSQF_PERM:
 			switch (trait->type) {
-			case PSQT_LIKE:		/* FALLTHROUGH */
-			case PSQT_NOTLIKE:	/* FALLTHROUGH */
+			case PSQT_LIKE:
+			case PSQT_NOTLIKE:
 			case PSQT_SQLPAT:
 				pseudo_diag("Error:  Can't use a LIKE match on non-text fields.\n");
 				return 0;
@@ -994,8 +996,8 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 			break;
 		case PSQF_FTYPE:
 			switch (trait->type) {
-			case PSQT_LIKE:		/* FALLTHROUGH */
-			case PSQT_NOTLIKE:	/* FALLTHROUGH */
+			case PSQT_LIKE:
+			case PSQT_NOTLIKE:
 			case PSQT_SQLPAT:
 				pseudo_diag("Error:  Can't use a LIKE match on non-text fields.\n");
 				return 0;
@@ -1015,7 +1017,7 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 			case PSQT_LESS:
 				order_dir = "DESC";
 				break;
-			case PSQT_EXACT:	/* FALLTHROUGH */
+			case PSQT_EXACT:
 				/* this was already the default */
 				break;
 			case PSQT_GREATER:
@@ -1029,8 +1031,8 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 			break;
 		default:
 			switch (trait->type) {
-			case PSQT_LIKE:		/* FALLTHROUGH */
-			case PSQT_NOTLIKE:	/* FALLTHROUGH */
+			case PSQT_LIKE:
+			case PSQT_NOTLIKE:
 			case PSQT_SQLPAT:
 				pseudo_diag("Error:  Can't use a LIKE match on non-text fields.\n");
 				return 0;
@@ -1044,15 +1046,15 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 			break;
 		}
 	}
-	if (!do_delete)
+	if (want_results)
 		frag(sql, "ORDER BY %s %s;", order_by, order_dir);
 	pseudo_debug(1, "created SQL: <%s>\n", sql->data);
 
 	/* second, prepare it */
-	rc = sqlite3_prepare_v2(log_db, sql->data, strlen(sql->data), &select, NULL);
+	rc = sqlite3_prepare_v2(log_db, sql->data, strlen(sql->data), &stmt, NULL);
 	if (rc) {
-		dberr(log_db, "couldn't prepare %s statement", do_delete ? "DELETE" : "SELECT");
-		return 0;
+		dberr(log_db, "couldn't prepare %s statement", stmt_type);
+		return NULL;
 	}
 
 	/* third, bind the fields */
@@ -1062,60 +1064,84 @@ pdb_history(pseudo_query_t *traits, unsigned long fields, int unique, int do_del
 		case PSQF_ORDER:
 			/* this just creates a hunk of SQL above */
 			break;
-		case PSQF_PROGRAM:	/* FALLTHROUGH */
-		case PSQF_PATH:		/* FALLTHROUGH */
-		case PSQF_TAG:		/* FALLTHROUGH */
+		case PSQF_PROGRAM:
+		case PSQF_PATH:
+		case PSQF_TAG:
 		case PSQF_TEXT:
-			sqlite3_bind_text(select, field++,
+			sqlite3_bind_text(stmt, field++,
 				trait->data.svalue, -1, SQLITE_STATIC);
 			break;
-		case PSQF_ACCESS:	/* FALLTHROUGH */
-		case PSQF_CLIENT:	/* FALLTHROUGH */
-		case PSQF_DEV:		/* FALLTHROUGH */
-		case PSQF_FD:		/* FALLTHROUGH */
-		case PSQF_FTYPE:	/* FALLTHROUGH */
-		case PSQF_INODE:	/* FALLTHROUGH */
-		case PSQF_GID:		/* FALLTHROUGH */
-		case PSQF_PERM:		/* FALLTHROUGH */
-		case PSQF_MODE:		/* FALLTHROUGH */
-		case PSQF_OP:		/* FALLTHROUGH */
-		case PSQF_RESULT:	/* FALLTHROUGH */
-		case PSQF_SEVERITY:	/* FALLTHROUGH */
-		case PSQF_STAMP:	/* FALLTHROUGH */
-		case PSQF_TYPE:	/* FALLTHROUGH */
-		case PSQF_UID:		/* FALLTHROUGH */
-			sqlite3_bind_int(select, field++, trait->data.ivalue);
+		case PSQF_ACCESS:
+		case PSQF_CLIENT:
+		case PSQF_DEV:
+		case PSQF_FD:
+		case PSQF_FTYPE:
+		case PSQF_INODE:
+		case PSQF_GID:
+		case PSQF_PERM:
+		case PSQF_MODE:
+		case PSQF_OP:
+		case PSQF_RESULT:
+		case PSQF_SEVERITY:
+		case PSQF_STAMP:
+		case PSQF_TYPE:
+		case PSQF_UID:
+			sqlite3_bind_int(stmt, field++, trait->data.ivalue);
 			break;
 		default:
 			pseudo_diag("Inexplicably invalid field type %d\n", trait->field);
-			sqlite3_finalize(select);
-			return 0;
+			sqlite3_finalize(stmt);
+			return NULL;
 		}
 	}
+	return stmt;
+}
 
-	if (do_delete) {
-		/* no need to return it, so... */
-		int rc = sqlite3_step(select);
+int
+pdb_delete(pseudo_query_t *traits, unsigned long fields) {
+	sqlite3_stmt *stmt;
+
+	stmt = pdb_query("DELETE", traits, fields, 0, 0);
+
+	/* no need to return it, so... */
+	if (stmt) {
+		int rc = sqlite3_step(stmt);
 		if (rc != SQLITE_DONE) {
 			dberr(log_db, "deletion failed");
+			return -1;
 		} else {
 			pseudo_diag("Deleted records, vacuuming log database (may take a while).\n");
+			/* we can't do anything about it if this fails... */
 			sqlite3_exec(log_db, "VACUUM;", NULL, NULL, NULL);
 		}
-		sqlite3_finalize(select);
-		return  0;
+		sqlite3_finalize(stmt);
+		return 0;
 	}
+	return -1;
+}
 
-	/* fourth, return the statement, now ready to be stepped through */
-	h = malloc(sizeof(*h));
-	if (h) {
-		h->rc = 0;
-		h->fields = fields;
-		h->stmt = select;
+log_history
+pdb_history(pseudo_query_t *traits, unsigned long fields, int unique) {
+	log_history h = NULL;
+	sqlite3_stmt *stmt;
+
+	stmt = pdb_query("SELECT", traits, fields, unique, 1);
+
+	if (stmt) {
+		/* fourth, return the statement, now ready to be stepped through */
+		h = malloc(sizeof(*h));
+		if (h) {
+			h->rc = 0;
+			h->fields = fields;
+			h->stmt = stmt;
+		} else {
+			pseudo_diag("failed to allocate memory for log_history\n");
+			sqlite3_finalize(stmt);
+		}
+		return h;
 	} else {
-		pseudo_diag("failed to allocate memory for log_history\n");
+		return NULL;
 	}
-	return h;
 }
 
 log_entry *
@@ -1208,8 +1234,8 @@ pdb_history_entry(log_history h) {
 		case PSQF_UID:
 			l->uid = sqlite3_column_int64(h->stmt, column++);
 			break;
-		case PSQF_ORDER:	/* FALLTHROUGH */
-		case PSQF_FTYPE:	/* FALLTHROUGH */
+		case PSQF_ORDER:
+		case PSQF_FTYPE:
 		case PSQF_PERM:
 			pseudo_diag("field %s should not be in the fields list.\n",
 				pseudo_query_field_name(f));

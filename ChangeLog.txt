@@ -1,3 +1,6 @@
+2010-04-30:
+	* (seebs) rework pdb_history
+
 2010-04-27:
 	* (seebs) fix -P in pseudolog
 	* (seebs) document PSEUDO_DEBUG_FILE

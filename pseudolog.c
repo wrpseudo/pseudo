@@ -628,16 +628,20 @@ main(int argc, char **argv) {
 			pseudo_diag("couldn't parse format string (%s).\n", format);
 			return EXIT_FAILURE;
 		}
-		history = pdb_history(traits, fields, opt_U, opt_D);
-		if (history) {
-			log_entry *e;
-			while ((e = pdb_history_entry(history)) != NULL) {
-				display(e, format);
-				log_entry_free(e);
+		if (opt_D) {
+			if (pdb_delete(traits, fields)) {
+				pseudo_diag("errors occurred trying to delete entries.\n");
 			}
-			pdb_history_free(history);
 		} else {
-			if (!opt_D) {
+			history = pdb_history(traits, fields, opt_U);
+			if (history) {
+				log_entry *e;
+				while ((e = pdb_history_entry(history)) != NULL) {
+					display(e, format);
+					log_entry_free(e);
+				}
+				pdb_history_free(history);
+			} else {
 				pseudo_diag("could not retrieve history.\n");
 				return EXIT_FAILURE;
 			}
