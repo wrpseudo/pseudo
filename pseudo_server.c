@@ -153,24 +153,11 @@ pseudo_server_start(int daemonize) {
 	fclose(fp);
 	free(pseudo_path);
 	if (daemonize) {
-		int fd;
-
 		pseudo_new_pid();
 		fclose(stdin);
 		fclose(stdout);
-		pseudo_path = pseudo_prefix_path(PSEUDO_LOGFILE);
-		if (!pseudo_path) {
-			pseudo_diag("can't get path for prefix/%s\n", PSEUDO_LOGFILE);
-			return 1;
-		}
-		fd = open(pseudo_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
-		if (fd == -1) {
-			pseudo_diag("help: can't open %s: %s\n", PSEUDO_LOGFILE, strerror(errno));
-		} else {
-			pseudo_util_debug_fd = fd;
+		if (!pseudo_logfile(PSEUDO_LOGFILE))
 			fclose(stderr);
-		}
-		free(pseudo_path);
 	}
 	signal(SIGHUP, quit_now);
 	signal(SIGINT, quit_now);

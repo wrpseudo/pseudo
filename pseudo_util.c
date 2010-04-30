@@ -17,6 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
+#include <ctype.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -768,3 +770,95 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 	return rc;
 }
 
+/* set up a log file */
+int
+pseudo_logfile(char *defname) {
+	char *pseudo_path;
+	char *filename, *s;
+	extern char *program_invocation_short_name; /* glibcism */
+	int fd;
+
+	if ((filename = getenv("PSEUDO_DEBUG_FILE")) == NULL) {
+		if (!defname) {
+			pseudo_debug(3, "no special log file requested, using stderr.\n");
+			return -1;
+		}
+		pseudo_path = pseudo_prefix_path(defname);
+		if (!pseudo_path) {
+			pseudo_diag("can't get path for prefix/%s\n", PSEUDO_LOGFILE);
+			return -1;
+		}
+	} else {
+		char *pid = NULL, *prog = NULL;
+		size_t len;
+		for (s = filename; *s; ++s) {
+			if (s[0] == '%') {
+				switch (s[1]) {
+				case '%': /* skip the %% */
+					++s;
+					break;
+				case 'd':
+					if (pid) {
+						pseudo_diag("found second %%d in PSEUDO_DEBUG_FILE, ignoring.\n");
+						return -1;
+					} else {
+						pid = s;
+					}
+					break;
+				case 's':
+					if (prog) {
+						pseudo_diag("found second %%s in PSEUDO_DEBUG_FILE, ignoring.\n");
+						return -1;
+					} else {
+						prog = s;
+					}
+					break;
+				default:
+					if (isprint(s[1])) {
+						pseudo_diag("found unknown format character '%c' in PSEUDO_DEBUG_FILE, ignoring.\n",
+							s[1]);
+					} else {
+						pseudo_diag("found unknown format character '\\x%02x' in PSEUDO_DEBUG_FILE, ignoring.\n",
+							(unsigned char) s[1]);
+					}
+					return -1;
+					break;
+				}
+			}
+		}
+		len = strlen(filename) + 1;
+		if (pid)
+			len += 8;
+		if (prog)
+			len += strlen(program_invocation_short_name);
+		pseudo_path = malloc(len);
+		if (!pseudo_path) {
+			pseudo_diag("can't allocate space for debug file name.\n");
+			return -1;
+		}
+		if (pid && prog) {
+			if (pid < prog) {
+				snprintf(pseudo_path, len, filename, getpid(), program_invocation_short_name);
+			} else {
+				snprintf(pseudo_path, len, filename, program_invocation_short_name, getpid());
+			}
+		} else if (pid) {
+			snprintf(pseudo_path, len, filename, getpid());
+		} else if (prog) {
+			snprintf(pseudo_path, len, filename, program_invocation_short_name);
+		} else {
+			strcpy(pseudo_path, filename);
+		}
+	}
+	fd = open(pseudo_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
+	if (fd == -1) {
+		pseudo_diag("help: can't open log file %s: %s\n", pseudo_path, strerror(errno));
+	} else {
+		pseudo_util_debug_fd = fd;
+	}
+	free(pseudo_path);
+	if (fd == -1)
+		return -1;
+	else
+		return 0;
+}

@@ -121,7 +121,6 @@ pseudo_populate_wrappers(void) {
 	char *debug;
 	static int done = 0;
 	char *pseudo_path = 0;
-	int fd;
 
 	if (done)
 		return done;
@@ -150,29 +149,9 @@ pseudo_populate_wrappers(void) {
 			pseudo_debug_verbose();
 		}
 	}
-	if (getenv("PSEUDO_DEBUG_FILE")) {
-		char filebuf[pseudo_path_max()], *fmt = getenv("PSEUDO_DEBUG_FILE");
-		char *name, *pid;
-		name = strstr(fmt, "%s");
-		pid = strstr(fmt, "%d");
-		if (name && pid) {
-			if (name > pid) {
-				snprintf(filebuf, pseudo_path_max(), fmt, getpid(), program_invocation_short_name);
-			} else {
-				snprintf(filebuf, pseudo_path_max(), fmt, program_invocation_short_name, getpid());
-			}
-		} else if (name) {
-			snprintf(filebuf, pseudo_path_max(), fmt, program_invocation_short_name);
-		} else if (pid) {
-			snprintf(filebuf, pseudo_path_max(), fmt, getpid());
-		} else {
-			snprintf(filebuf, pseudo_path_max(), "%s", fmt);
-		}
-		fd = open(filebuf, O_WRONLY | O_APPEND | O_CREAT, 0644);
-		if (fd >= 0) {
-			pseudo_util_debug_fd = fd;
-		}
-	}
+	/* if PSEUDO_DEBUG_FILE is set up, redirect logging there.
+	 */
+	pseudo_logfile(NULL);
 	/* must happen after wrappers are set up, because it can call
 	 * getcwd(), which needs wrappers, but must happen here so that
 	 * any attempt to use a path in a wrapper function will have a

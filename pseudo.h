@@ -125,6 +125,7 @@ extern char **pseudo_dropenv(char * const *);
 extern char **pseudo_setupenv(char * const *, char *);
 extern char *pseudo_prefix_path(char *);
 extern char *pseudo_get_prefix(char *);
+extern int pseudo_logfile(char *defname);
 extern ssize_t pseudo_sys_path_max(void);
 extern ssize_t pseudo_path_max(void);
 #define PSEUDO_PWD_MAX 4096

@@ -1,6 +1,7 @@
 2010-04-30:
 	* (seebs) rework pdb_history
 	* (seebs) small cleanups and bulletproofing.
+	* (seebs) fix up PSEUDO_DEBUG_FILE, use it for server as well.
 
 2010-04-27:
 	* (seebs) fix -P in pseudolog
