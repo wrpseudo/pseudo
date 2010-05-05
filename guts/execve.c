@@ -13,7 +13,7 @@
 	 * <CHROOT>/bin/sh.  This allows use of basic utilities.  This
 	 * design will likely be revisited.
 	 */
-	pseudo_client_op(OP_EXEC, PSA_EXEC, -1, 0, filename, 0);
+	pseudo_client_op(OP_EXEC, PSA_EXEC, -1, -1, filename, 0);
 	if (!getenv("PSEUDO_RELOADED"))
 		new_environ = pseudo_setupenv(envp, getenv("PSEUDO_OPTS"));
 	else
