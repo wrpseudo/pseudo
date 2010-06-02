@@ -9,7 +9,7 @@
  	struct stat64 buf;
 	char *roldname = 0;
 
-	if (oldname[0] == '/' && pseudo_chroot_len) {
+	if (oldname[0] == '/' && pseudo_chroot_len && !pseudo_nosymlinkexp) {
 		size_t len = pseudo_chroot_len + strlen(oldname) + 1;
 		roldname = malloc(len);
 		snprintf(roldname, len, "%s%s", pseudo_chroot, oldname);

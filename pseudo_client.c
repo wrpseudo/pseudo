@@ -63,6 +63,7 @@ static int nfds = 0;
 static int messages = 0;
 static struct timeval message_time = { .tv_sec = 0 };
 static int pseudo_inited = 0;
+int pseudo_nosymlinkexp = 0;
 
 /* note: these are int, not uid_t/gid_t, so I can use 'em with scanf */
 uid_t pseudo_ruid;

@@ -121,6 +121,7 @@ pseudo_populate_wrappers(void) {
 	char *debug;
 	static int done = 0;
 	char *pseudo_path = 0;
+	char *no_symlink_exp;
 
 	if (done)
 		return done;
@@ -148,6 +149,27 @@ pseudo_populate_wrappers(void) {
 		for (i = 0; i < level; ++i) {
 			pseudo_debug_verbose();
 		}
+	}
+	no_symlink_exp = getenv("PSEUDO_NOSYMLINKEXP");
+	if (no_symlink_exp) {
+		char *endptr;
+		/* if the environment variable is not an empty string,
+		 * parse it; "0" means turn NOSYMLINKEXP off, "1" means
+		 * turn it on (disabling the feature).  An empty string
+		 * or something we can't parse means to set the flag; this
+		 * is a safe default because if you didn't want the flag
+		 * set, you normally wouldn't set the environment variable
+		 * at all.
+		 */
+		if (*no_symlink_exp) {
+			pseudo_nosymlinkexp = strtol(no_symlink_exp, &endptr, 10);
+			if (*endptr)
+				pseudo_nosymlinkexp = 1;
+		} else {
+			pseudo_nosymlinkexp = 1;
+		}
+	} else {
+		pseudo_nosymlinkexp = 0;
 	}
 	/* if PSEUDO_DEBUG_FILE is set up, redirect logging there.
 	 */

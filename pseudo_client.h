@@ -60,6 +60,7 @@ extern char *pseudo_cwd_rel;
 extern char *pseudo_chroot;
 extern char *pseudo_passwd;
 extern size_t pseudo_chroot_len;
+extern int pseudo_nosymlinkexp;
 
 /* Root can read, write, and execute files which have no read, write,
  * or execute permissions.
