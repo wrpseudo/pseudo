@@ -13,3 +13,4 @@ int ftw64(const char *path, int (*fn)(const char *, const struct stat64 *, int),
 int glob64(const char *pattern, int flags, int (*errfunc)(const char *, int), glob64_t *pglob);
 int scandir64(const char *path, struct dirent64 ***namelist, int (*filter)(const struct dirent64 *), int (*compar)());
 int truncate64(const char *path, off64_t length);
+int mkstemp64(char *template); /* flags=AT_SYMLINK_NOFOLLOW */

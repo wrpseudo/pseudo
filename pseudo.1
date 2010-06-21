@@ -323,6 +323,18 @@ no function outside of debugging
 .I pseudo
 itself.
 .TP 8
+.B PSEUDO_NOSYMLINKEXP
+By default, when chrooted,
+.I pseudo
+prepends the chroot directory to
+the paths used for absolute symlinks; this behavior ensures that
+opening symlinks produces expected results in most cases.  In some
+cases you may want to suppress this.  If this variable is unset, or
+set to any value other than 0,
+.I pseudo
+expands symlink paths like this.  If this variable is set to 0,
+the behavior is disabled.
+.TP 8
 .BR PSEUDO_OPTS
 This variable holds options to be passed to any new
 .I pseudo

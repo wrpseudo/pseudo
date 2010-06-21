@@ -90,6 +90,7 @@ wrappers:
 	freopen
 	freopen64
 	mkstemp
+	mkstemp64
 	fcntl
 	fork
 	link
