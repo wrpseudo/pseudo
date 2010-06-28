@@ -49,7 +49,7 @@ static int pseudo_append_elements(char **newpath, char **root, size_t *allocated
 extern char **environ;
 static ssize_t pseudo_max_pathlen = -1;
 static ssize_t pseudo_sys_max_pathlen = -1;
-static char *libpseudo_name = "libpseudo" PSEUDO_SUFFIX ".so";
+static char *libpseudo_name = "libpseudo.so";
 
 char *pseudo_version = PSEUDO_VERSION;
 

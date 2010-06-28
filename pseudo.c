@@ -165,9 +165,8 @@ main(int argc, char *argv[]) {
 			break;
 		case 'V':
 			printf("pseudo version %s\n", pseudo_version ? pseudo_version : "<undefined>");
-			printf("pseudo configuration flags:\n  prefix: %s\n  suffix: %s\n",
-				PSEUDO_PREFIX,
-				PSEUDO_SUFFIX);
+			printf("pseudo configuration:\n  prefix: %s\n",
+				PSEUDO_PREFIX);
 			printf("Set PSEUDO_PREFIX to run with a different prefix.\n");
 			exit(0);
 			break;

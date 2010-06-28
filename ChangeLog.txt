@@ -1,3 +1,8 @@
+2010-06-28: 0.3
+	* (seebs) back out PSEUDO_SUFFIX -- it causes problem when
+	  rebuilding the library but not the server, but this is
+	  a permissible use case.
+
 2010-06-21:
 	* (seebs) add mkstemp64
 
