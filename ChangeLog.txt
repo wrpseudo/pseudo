@@ -1,6 +1,7 @@
 2010-06-29:
 	* (seebs) handle the other half of the suffix case -- when
 	  libpseudo is in LD_PRELOAD under another name.
+	* (seebs) remove a couple of debugging messages.
 
 2010-06-28: 0.3
 	* (seebs) back out PSEUDO_SUFFIX -- it causes problem when

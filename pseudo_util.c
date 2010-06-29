@@ -468,9 +468,6 @@ pseudo_dropenv(char * const *environ) {
 				/* don't keep an empty value */
 				if (strcmp(new_val, "LD_PRELOAD=")) {
 					new_environ[j++] = new_val;
-					pseudo_diag("LD_PRELOAD: <%s>\n", new_environ[j - 1]);
-				} else {
-					pseudo_diag("dropping empty LD_PRELOAD\n");
 				}
 			}
 		} else {
@@ -517,9 +514,7 @@ pseudo_setupenv(char * const *environ, char *opts) {
 	j = 0;
 	for (i = 0; environ[i]; ++i) {
 		if (!memcmp(environ[i], "LD_PRELOAD=", 11)) {
-			pseudo_diag("modifying existing LD_PRELOAD\n");
 			newenv = with_libpseudo(environ[i]);
-			pseudo_diag("LD_PRELOAD: <%s>\n", newenv);
 			if (!newenv) {
 				pseudo_diag("fatal: can't allocate new environment variable.\n");
 				return NULL;
@@ -559,13 +554,7 @@ pseudo_setupenv(char * const *environ, char *opts) {
 		new_environ[j++] = newenv;
 	}
 	if (!found_preload) {
-		pseudo_diag("creating new LD_PRELOAD\n");
-		newenv = "LD_PRELOAD=libpseudo.so";
-		pseudo_diag("newenv: %s\n", newenv);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		new_environ[j++] = newenv;
+		new_environ[j++] = "LD_PRELOAD=libpseudo.so";
 	}
 	if (!found_debug && max_debug_level > 0) {
 		len = 16;
