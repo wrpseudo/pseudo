@@ -24,6 +24,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <regex.h>
 #include <time.h>
 #include <unistd.h>
 #include <limits.h>
@@ -49,7 +50,84 @@ static int pseudo_append_elements(char **newpath, char **root, size_t *allocated
 extern char **environ;
 static ssize_t pseudo_max_pathlen = -1;
 static ssize_t pseudo_sys_max_pathlen = -1;
+
+/* in our installed system, we usually use a name of the form
+ * libpseudoCHECKSUM.so, where CHECKSUM is an md5 checksum of the host
+ * libc.so -- this forces rebuilds of the library when the C library
+ * changes.  The problem is that the pseudo binary may be
+ * a prebuilt, in which case it doesn't know about CHECKSUM, so it
+ * has to determine whether a given LD_PRELOAD contains libpseudo.so
+ * or libpseudoCHECKSUM.so, without prior knowledge... Fancy!
+ * 
+ * We search for anything matching libpseudo*.so, where * is any
+ * sequence of non-spaces (including an empty string), with either
+ * the beginning of the string or a space in front of it, and either
+ * the end of the string or a space after it.
+ */
 static char *libpseudo_name = "libpseudo.so";
+static char *libpseudo_pattern = "(=| )libpseudo[^ ]*\\.so($| )";
+static regex_t libpseudo_regex;
+static int libpseudo_regex_compiled = 0;
+
+static int
+libpseudo_regex_init(void) {
+	int rc;
+
+	if (libpseudo_regex_compiled)
+		return 0;
+	rc = regcomp(&libpseudo_regex, libpseudo_pattern, REG_EXTENDED);
+	if (rc == 0)
+		libpseudo_regex_compiled = 1;
+	return rc;
+}
+
+/* given a space-separated list of files, ala LD_PRELOAD, return that
+ * list without any variants of libpseudo*.so.
+ */
+static char *
+without_libpseudo(char *list) {
+	regmatch_t pmatch[1];
+	int counter = 0;
+	if (libpseudo_regex_init())
+		return NULL;
+
+
+	if (regexec(&libpseudo_regex, list, 1, pmatch, 0)) {
+		return list;
+	}
+	list = strdup(list);
+	while (!regexec(&libpseudo_regex, list, 1, pmatch, 0)) {
+		char *start = list + pmatch[0].rm_so;
+		char *end = list + pmatch[0].rm_eo;
+		/* don't copy over the space or = */
+		++start;
+		memmove(start, end, strlen(end) + 1);
+		++counter;
+		if (counter > 5) {
+			pseudo_diag("Found way too many libpseudo.so in environment, giving up.\n");
+			return list;
+		}
+	}
+	return list;
+}
+
+static char *
+with_libpseudo(char *list) {
+	regmatch_t pmatch[1];
+	if (libpseudo_regex_init())
+		return NULL;
+	if (regexec(&libpseudo_regex, list, 1, pmatch, 0)) {
+		/* <%s %s\0> */
+		size_t len = strlen(list) + 1 + strlen(libpseudo_name) + 1;
+		char *new = malloc(len);
+		if (new)
+			snprintf(new, len, "%s %s", list,
+				libpseudo_name);
+		return new;
+	} else {
+		return list;
+	}
+}
 
 char *pseudo_version = PSEUDO_VERSION;
 
@@ -382,25 +460,18 @@ pseudo_dropenv(char * const *environ) {
 	j = 0;
 	for (i = 0; environ[i]; ++i) {
 		if (!memcmp(environ[i], "LD_PRELOAD=", 11)) {
-			char *s = environ[i] + 11;
-			char *p;
-			if (!strcmp(s, libpseudo_name)) {
-				/* drop it completely */
-				continue;
-			} else if ((p = strstr(s, libpseudo_name)) != NULL) {
-				char *without = strdup(environ[i]);
-				if (!without) {
-					pseudo_diag("fatal: can't allocate new environment variable.\n");
-					return 0;
-				}
-				p = strstr(without, libpseudo_name);
-				/* strip out that hunk */
-				memmove(p, p + strlen(libpseudo_name),
-					strlen(p) - strlen(libpseudo_name) + 1);
-				new_environ[j++] = without;
+			char *new_val = without_libpseudo(environ[i]);
+			if (!new_val) {
+				pseudo_diag("fatal: can't allocate new environment variable.\n");
+				return 0;
 			} else {
-				/* leave it alone */
-				new_environ[j++] = environ[i];
+				/* don't keep an empty value */
+				if (strcmp(new_val, "LD_PRELOAD=")) {
+					new_environ[j++] = new_val;
+					pseudo_diag("LD_PRELOAD: <%s>\n", new_environ[j - 1]);
+				} else {
+					pseudo_diag("dropping empty LD_PRELOAD\n");
+				}
 			}
 		} else {
 			new_environ[j++] = environ[i];
@@ -446,17 +517,14 @@ pseudo_setupenv(char * const *environ, char *opts) {
 	j = 0;
 	for (i = 0; environ[i]; ++i) {
 		if (!memcmp(environ[i], "LD_PRELOAD=", 11)) {
-			if (!strstr(environ[i], libpseudo_name)) {
-				len = strlen(environ[i]) + strlen(libpseudo_name) + 2;
-				newenv = malloc(len);
-				if (!newenv) {
-					pseudo_diag("fatal: can't allocate new environment variable.\n");
-				}
-				snprintf(newenv, len, "%s %s", environ[i], libpseudo_name);
-				new_environ[j++] = newenv;
-			} else {
-				new_environ[j++] = environ[i];
+			pseudo_diag("modifying existing LD_PRELOAD\n");
+			newenv = with_libpseudo(environ[i]);
+			pseudo_diag("LD_PRELOAD: <%s>\n", newenv);
+			if (!newenv) {
+				pseudo_diag("fatal: can't allocate new environment variable.\n");
+				return NULL;
 			}
+			new_environ[j++] = newenv;
 		} else if (!memcmp(environ[i], "LD_LIBRARY_PATH=", 16)) {
 			if (!strstr(environ[i], PSEUDO_PREFIX)) {
 				char *e1, *e2;
@@ -491,12 +559,12 @@ pseudo_setupenv(char * const *environ, char *opts) {
 		new_environ[j++] = newenv;
 	}
 	if (!found_preload) {
-		len = 11 + strlen(libpseudo_name) + 1;
-		newenv = malloc(len);
+		pseudo_diag("creating new LD_PRELOAD\n");
+		newenv = "LD_PRELOAD=libpseudo.so";
+		pseudo_diag("newenv: %s\n", newenv);
 		if (!newenv) {
 			pseudo_diag("fatal: can't allocate new environment variable.\n");
 		}
-		snprintf(newenv, len, "LD_PRELOAD=%s", libpseudo_name);
 		new_environ[j++] = newenv;
 	}
 	if (!found_debug && max_debug_level > 0) {

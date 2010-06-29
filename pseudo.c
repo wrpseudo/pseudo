@@ -88,6 +88,7 @@ main(int argc, char *argv[]) {
 		pseudo_debug(2, "can't run daemon with libpseudo in LD_PRELOAD\n");
 		if (getenv("PSEUDO_RELOADED")) {
 			pseudo_diag("I can't seem to make LD_PRELOAD go away.  Sorry.\n");
+			pseudo_diag("LD_PRELOAD: %s\n", ld_env);
 			exit(EXIT_FAILURE);
 		}
 		setenv("PSEUDO_RELOADED", "YES", 1);
