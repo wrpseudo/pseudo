@@ -1392,20 +1392,11 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 }
 
 /* unlink a file, by path */
-/* SQLite limitations:
- * path LIKE foo '/%' -> can't use index
- * path = A OR path = B -> can't use index
- * Solution: 
- * 1.  Use two separate queries, so there's no OR.
- * 2.  (From the SQLite page):  Use > and < instead of a glob at the end.
- */
 int
 pdb_unlink_file(pseudo_msg_t *msg) {
-	static sqlite3_stmt *delete_exact, *delete_sub;
-	int rc, exact, sub;
+	static sqlite3_stmt *delete_exact;
+	int rc, exact;
 	char *sql_delete_exact = "DELETE FROM files WHERE path = ?;";
-	char *sql_delete_sub = "DELETE FROM files WHERE "
-				"(path > (? || '/') AND path < (? || '0'));";
 
 	if (!file_db && get_db(&file_db)) {
 		pseudo_diag("database error.\n");
@@ -1418,6 +1409,45 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 			return 1;
 		}
 	}
+	if (!msg) {
+		return 1;
+	}
+	if (msg->pathlen) {
+		sqlite3_bind_text(delete_exact, 1, msg->path, -1, SQLITE_STATIC);
+	} else {
+		pseudo_debug(1, "cannot unlink a file without a path.");
+		return 1;
+	}
+	rc = sqlite3_step(delete_exact);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "delete exact by path may have failed");
+	}
+	exact = sqlite3_changes(file_db);
+	pseudo_debug(3, "(exact %d) ", exact);
+	sqlite3_reset(delete_exact);
+	sqlite3_clear_bindings(delete_exact);
+	return rc != SQLITE_DONE;
+}
+
+/* Unlink all the contents of directory
+ * SQLite performance limitations:
+ * path LIKE foo '/%' -> can't use index
+ * path = A OR path = B -> can't use index
+ * Solution: 
+ * 1.  From web http://web.utk.edu/~jplyon/sqlite/SQLite_optimization_FAQ.html
+ *         Use > and < instead of a glob at the end.
+ */
+int
+pdb_unlink_contents( pseudo_msg_t *msg) {
+	static sqlite3_stmt *delete_sub;
+	int rc, sub;
+	char *sql_delete_sub = "DELETE FROM files WHERE "
+				"(path > (? || '/') AND path < (? || '0'));";
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
 	if (!delete_sub) {
 		rc = sqlite3_prepare_v2(file_db, sql_delete_sub, strlen(sql_delete_sub), &delete_sub, NULL);
 		if (rc) {
@@ -1429,27 +1459,19 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 		return 1;
 	}
 	if (msg->pathlen) {
-		sqlite3_bind_text(delete_exact, 1, msg->path, -1, SQLITE_STATIC);
 		sqlite3_bind_text(delete_sub, 1, msg->path, -1, SQLITE_STATIC);
 		sqlite3_bind_text(delete_sub, 2, msg->path, -1, SQLITE_STATIC);
 	} else {
 		pseudo_debug(1, "cannot unlink a file without a path.");
 		return 1;
 	}
-	rc = sqlite3_step(delete_exact);
-	if (rc != SQLITE_DONE) {
-		dberr(file_db, "delete exact by path may have failed");
-	}
-	exact = sqlite3_changes(file_db);
 	rc = sqlite3_step(delete_sub);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete sub by path may have failed");
 	}
 	sub = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d, sub %d) ", exact, sub);
-	sqlite3_reset(delete_exact);
+	pseudo_debug(3, "sub %d) ", sub);
 	sqlite3_reset(delete_sub);
-	sqlite3_clear_bindings(delete_exact);
 	sqlite3_clear_bindings(delete_sub);
 	return rc != SQLITE_DONE;
 }

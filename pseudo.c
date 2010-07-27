@@ -691,6 +691,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		 * server's response didn't make it, the client would resend.
 		 */
 		pdb_unlink_file(msg);
+		pdb_unlink_contents(msg);
 		/* If we are seeing an unlink for something with only one
 		 * link, we should delete all records for that inode, even
 		 * ones through different paths.  This handles the case
