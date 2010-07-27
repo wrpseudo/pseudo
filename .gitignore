@@ -1,0 +1,9 @@
+*.o
+Makefile
+libpseudo.so
+pseudo_wrapfuncs.*
+pseudo_wrapper_table.c
+pseudo
+pseudodb
+pseudolog
+
