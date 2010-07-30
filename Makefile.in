@@ -47,35 +47,40 @@ SHOBJS=pseudo_table.o pseudo_util.o
 DBOBJS=pseudo_db.o -ldl -lpthread
 WRAPOBJS=pseudo_wrappers.o
 
-test: install
-	@echo "No tests yet."
+PSEUDO=bin/pseudo
+PSEUDODB=bin/pseudodb
+PSEUDOLOG=bin/pseudolog
 
-all: libpseudo.so pseudo pseudodb pseudolog
+
+all: libpseudo.so $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
+
+test: all
+	@./run_tests.sh
 
 install-lib: libpseudo.so
 	mkdir -p $(DESTDIR)$(LIBDIR)
 	cp libpseudo*.so $(DESTDIR)$(LIBDIR)
 
-install-bin: pseudo pseudodb pseudolog
+install-bin: $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
 	mkdir -p $(DESTDIR)$(BINDIR)
-	cp pseudo pseudodb pseudolog $(DESTDIR)$(BINDIR)
+	cp $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG) $(DESTDIR)$(BINDIR)
 
 install-data:
 	mkdir -p $(DESTDIR)$(DATADIR)
 
 install: all install-lib install-bin install-data
 
-pseudo: pseudo.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_server.o pseudo_ipc.o
-	$(CC) $(CFLAGS) -o pseudo \
+$(PSEUDO): pseudo.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_server.o pseudo_ipc.o
+	$(CC) $(CFLAGS) -o $(PSEUDO) \
 		pseudo.o pseudo_server.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
-pseudolog: pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_ipc.o
-	$(CC) $(CFLAGS) -o pseudolog pseudolog.o pseudo_client.o pseudo_ipc.o \
+$(PSEUDOLOG): pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_ipc.o
+	$(CC) $(CFLAGS) -o $(PSEUDOLOG) pseudolog.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
-pseudodb: pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
-	$(CC) $(CFLAGS) -o pseudodb pseudodb.o \
+$(PSEUDODB): pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
+	$(CC) $(CFLAGS) -o $(PSEUDODB) pseudodb.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS) pseudo_ipc.o
 
 libpseudo.so: $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
@@ -110,7 +115,7 @@ offsets64:
 	$(CC) -m64 -o offsets64 offsets.c
 
 clean:
-	rm -f *.o *.so pseudo pseudodb pseudolog \
+	rm -f *.o *.so $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG) \
 		pseudo_wrapfuncs.h pseudo_wrapfuncs.c \
 		pseudo_wrapper_table.c \
 		pseudo_wrapfuncs.c.old pseudo_wrapfuncs.h.old \
