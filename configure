@@ -62,6 +62,22 @@ if [ -z "$opt_prefix" ]; then
   usage
 fi
 
+if [ ! -f "${opt_sqlite}/include/sqlite3.h" ]; then
+    echo >&2 "SQLite3 headers not found in at ${opt_sqlite}/include/sqlite3.h. Please check that SQLite3 and SQLite3 headers are installed."
+    exit 1
+fi
+
+read t1 t2 SQLITE3_VERSION << EOF
+  `grep "#define SQLITE_VERSION_NUMBER " ${opt_sqlite}/include/sqlite3.h`
+EOF
+
+echo "SQLite header for version ${SQLITE3_VERSION} found."
+
+if [ "${SQLITE3_VERSION}" -lt "03006000" ]; then
+    echo >&2 "Pseudo requires SQLite version 3, 3.6.x or later."
+    exit 1
+fi
+
 sed -e '
   s,@PREFIX@,'"$opt_prefix"',g
   s,@SUFFIX@,'"$opt_suffix"',g
