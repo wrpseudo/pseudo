@@ -1,3 +1,10 @@
+2010-07-30:
+    * (kscherer) added .gitignore file
+    * (kscherer) added sqlite version check to configure script
+    * (kscherer) added basic test harness
+    * (kscherer) fixed bug that when moving a directory the contents
+       of the dir were removed from the db
+
 2010-06-29:
 	* (seebs) handle the other half of the suffix case -- when
 	  libpseudo is in LD_PRELOAD under another name.
