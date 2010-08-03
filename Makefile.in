@@ -37,7 +37,7 @@ CFLAGS_CODE=-fPIC -D_LARGEFILE64_SOURCE -D_ATFILE_SOURCE -m$(BITS)
 CFLAGS_DEFS=-DPSEUDO_PREFIX='"$(PREFIX)"' -DPSEUDO_SUFFIX='"$(SUFFIX)"' -DPSEUDO_VERSION='"$(VERSION)"'
 CFLAGS_DEBUG=-O2 -g
 CFLAGS_SQL=-L$(SQLITE)/lib -I$(SQLITE)/include
-CFLAGS=$(CFLAGS_BASE) $(CFLAGS_CODE) $(CFLAGS_DEFS) \
+CFLAGS_PSEUDO=$(CFLAGS_BASE) $(CFLAGS_CODE) $(CFLAGS_DEFS) \
 	$(CFLAGS_DEBUG) $(CFLAGS_SQL)
 
 GLOB_PATTERN=guts/*.c
@@ -78,22 +78,25 @@ $(BIN) $(LIB) $(LOCALSTATE):
 	mkdir -p $@
 
 $(PSEUDO): $(BIN) pseudo.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_server.o pseudo_ipc.o
-	$(CC) $(CFLAGS) -o $(PSEUDO) \
+	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDO) \
 		pseudo.o pseudo_server.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
 $(PSEUDOLOG): $(BIN) pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_ipc.o
-	$(CC) $(CFLAGS) -o $(PSEUDOLOG) pseudolog.o pseudo_client.o pseudo_ipc.o \
+	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDOLOG) pseudolog.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
 $(PSEUDODB): $(BIN) pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
-	$(CC) $(CFLAGS) -o $(PSEUDODB) pseudodb.o \
+	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDODB) pseudodb.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS) pseudo_ipc.o
 
 $(LIBPSEUDO): $(LIB) $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
-	$(CC) $(CFLAGS) -shared -o $(LIBPSEUDO) \
+	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -shared -o $(LIBPSEUDO) \
 		pseudo_client.o pseudo_ipc.o \
 		$(WRAPOBJS) $(SHOBJS) -ldl
+
+%.o: %.c
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(CFLAGS_PSEUDO) $<
 
 pseudo_client.o pseudo_server.o pseudo_ipc.o: pseudo_ipc.h
 
@@ -110,7 +113,7 @@ pseudo_wrapfuncs.c pseudo_wrapfuncs.h: wrappers
 
 # no-strict-aliasing is needed for the function pointer trickery.
 pseudo_wrappers.o: $(GUTS) pseudo_wrappers.c pseudo_wrapfuncs.c pseudo_wrapfuncs.h
-	$(CC) -fno-strict-aliasing $(CFLAGS) -D_GNU_SOURCE -c -o pseudo_wrappers.o pseudo_wrappers.c
+	$(CC) -fno-strict-aliasing $(CFLAGS) $(CFLAGS_PSEUDO) -D_GNU_SOURCE -c -o pseudo_wrappers.o pseudo_wrappers.c
 
 offsets32:
 	$(CC) -m32 -o offsets32 offsets.c

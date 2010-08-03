@@ -1,5 +1,6 @@
 2010-08-03:
 	* (mhatle) Fix parallel build problem
+	* (mhatle) allow both environment CFLAGS and internals CFLAGS
 
 2010-07-30:
     * (kscherer) added .gitignore file
