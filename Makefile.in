@@ -106,7 +106,7 @@ wrappers: wrapfuncs.in $(USE_64) makewrappers
 
 .SECONDARY: wrappers
 
-pseudo_wrapfuncs.c: wrappers
+pseudo_wrapfuncs.c pseudo_wrapfuncs.h: wrappers
 
 # no-strict-aliasing is needed for the function pointer trickery.
 pseudo_wrappers.o: $(GUTS) pseudo_wrappers.c pseudo_wrapfuncs.c pseudo_wrapfuncs.h

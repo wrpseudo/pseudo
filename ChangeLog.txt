@@ -1,3 +1,6 @@
+2010-08-03:
+	* (mhatle) Fix parallel build problem
+
 2010-07-30:
     * (kscherer) added .gitignore file
     * (kscherer) added sqlite version check to configure script
