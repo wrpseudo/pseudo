@@ -25,9 +25,12 @@ BITS=@BITS@
 MARK64=@MARK64@
 VERSION=0.3
 
-LIBDIR=$(PREFIX)/lib$(MARK64)
-BINDIR=$(PREFIX)/bin
-DATADIR=$(PREFIX)/var/pseudo
+LIB=lib$(MARK64)
+BIN=bin
+LOCALSTATE=var/pseudo
+LIBDIR=$(PREFIX)/$(LIB)
+BINDIR=$(PREFIX)/$(BIN)
+LOCALSTATEDIR=$(PREFIX)/$(LOCALSTATE)
 
 CFLAGS_BASE=-pipe -std=gnu99 -Wall -W -Wextra
 CFLAGS_CODE=-fPIC -D_LARGEFILE64_SOURCE -D_ATFILE_SOURCE -m$(BITS)
@@ -47,49 +50,50 @@ SHOBJS=pseudo_table.o pseudo_util.o
 DBOBJS=pseudo_db.o -ldl -lpthread
 WRAPOBJS=pseudo_wrappers.o
 
-PSEUDO=bin/pseudo
-PSEUDODB=bin/pseudodb
-PSEUDOLOG=bin/pseudolog
+PSEUDO=$(BIN)/pseudo
+PSEUDODB=$(BIN)/pseudodb
+PSEUDOLOG=$(BIN)/pseudolog
+LIBPSEUDO=$(LIB)/libpseudo$(SUFFIX).so
 
 
-all: libpseudo.so $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
+all: $(LIBPSEUDO) $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
 
-test: all
+test: all $(BIN) $(LIB) $(LOCALSTATE)
 	@./run_tests.sh
 
-install-lib: libpseudo.so
+install-lib: $(LIBPSEUDO)
 	mkdir -p $(DESTDIR)$(LIBDIR)
-	cp libpseudo*.so $(DESTDIR)$(LIBDIR)
+	cp $(LIBPSEUDO) $(DESTDIR)$(LIBDIR)
 
 install-bin: $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
 	mkdir -p $(DESTDIR)$(BINDIR)
 	cp $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG) $(DESTDIR)$(BINDIR)
 
 install-data:
-	mkdir -p $(DESTDIR)$(DATADIR)
+	mkdir -p $(DESTDIR)$(LOCALSTATEDIR)
 
 install: all install-lib install-bin install-data
 
-$(PSEUDO): pseudo.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_server.o pseudo_ipc.o
+$(BIN) $(LIB) $(LOCALSTATE):
+	mkdir -p $@
+
+$(PSEUDO): $(BIN) pseudo.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_server.o pseudo_ipc.o
 	$(CC) $(CFLAGS) -o $(PSEUDO) \
 		pseudo.o pseudo_server.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
-$(PSEUDOLOG): pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_ipc.o
+$(PSEUDOLOG): $(BIN) pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_ipc.o
 	$(CC) $(CFLAGS) -o $(PSEUDOLOG) pseudolog.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
-$(PSEUDODB): pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
+$(PSEUDODB): $(BIN) pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
 	$(CC) $(CFLAGS) -o $(PSEUDODB) pseudodb.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS) pseudo_ipc.o
 
-libpseudo.so: $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
-	$(CC) $(CFLAGS) -shared -o libpseudo.so \
+$(LIBPSEUDO): $(LIB) $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
+	$(CC) $(CFLAGS) -shared -o $(LIBPSEUDO) \
 		pseudo_client.o pseudo_ipc.o \
 		$(WRAPOBJS) $(SHOBJS) -ldl
-	if test -n "$(SUFFIX)"; then \
-	  cp libpseudo.so libpseudo$(SUFFIX).so ; \
-	fi
 
 pseudo_client.o pseudo_server.o pseudo_ipc.o: pseudo_ipc.h
 
@@ -123,6 +127,7 @@ clean:
 
 distclean: clean
 	rm -f Makefile
+	rm -rf ./$(BIN) ./$(LIB) ./$(LOCALSTATE)
 	@echo "WARNING: Makefile has been removed.  You must reconfigure to do anything else."
 
 nuke: distclean
