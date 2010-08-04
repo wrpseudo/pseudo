@@ -124,7 +124,13 @@ extern char *pseudo_fix_path(const char *, const char *, size_t, size_t, size_t 
 extern char **pseudo_dropenv(char * const *);
 extern char **pseudo_setupenv(char * const *, char *);
 extern char *pseudo_prefix_path(char *);
+extern char *pseudo_bindir_path(char *);
+extern char *pseudo_libdir_path(char *);
+extern char *pseudo_localstatedir_path(char *);
 extern char *pseudo_get_prefix(char *);
+extern char *pseudo_get_bindir();
+extern char *pseudo_get_libdir();
+extern char *pseudo_get_localstatedir();
 extern int pseudo_logfile(char *defname);
 extern ssize_t pseudo_sys_path_max(void);
 extern ssize_t pseudo_path_max(void);
@@ -134,11 +140,22 @@ extern int pseudo_etc_file(const char *filename, char *realname, int flags, char
 
 extern char *pseudo_version;
 
-#define PSEUDO_DATA "var/pseudo/"
-#define PSEUDO_LOCKFILE PSEUDO_DATA "pseudo.lock"
-#define PSEUDO_LOGFILE PSEUDO_DATA "pseudo.log"
-#define PSEUDO_PIDFILE PSEUDO_DATA "pseudo.pid"
-#define PSEUDO_SOCKET PSEUDO_DATA "pseudo.socket"
+#ifndef PSEUDO_BINDIR
+ #define PSEUDO_BINDIR "bin"
+#endif
+
+#ifndef PSEUDO_LIBDIR
+ #define PSEUDO_LIBDIR "lib"
+#endif
+
+#ifndef PSEUDO_LOCALSTATEDIR
+ #define PSEUDO_LOCALSTATEDIR "var/pseudo"
+#endif
+
+#define PSEUDO_LOCKFILE "pseudo.lock"
+#define PSEUDO_LOGFILE "pseudo.log"
+#define PSEUDO_PIDFILE "pseudo.pid"
+#define PSEUDO_SOCKET "pseudo.socket"
 
 /* some systems might not have *at().  We like to define operations in
  * terms of each other, and for instance, open(...) is the same as

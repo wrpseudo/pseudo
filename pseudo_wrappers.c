@@ -181,16 +181,32 @@ pseudo_populate_wrappers(void) {
 	 */
 	pseudo_client_reset();
 	pseudo_path = pseudo_prefix_path(NULL);
-	if (pseudo_dir_fd == -1) {
+	if (pseudo_prefix_dir_fd == -1) {
 		if (pseudo_path) {
-			pseudo_dir_fd = open(pseudo_path, O_RDONLY);
-			pseudo_dir_fd = pseudo_fd(pseudo_dir_fd, MOVE_FD);
+			pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+			pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, MOVE_FD);
 			free(pseudo_path);
 		} else {
 			pseudo_diag("No prefix available to to find server.\n");
 			exit(1);
 		}
-		if (pseudo_dir_fd == -1) {
+		if (pseudo_prefix_dir_fd == -1) {
+			pseudo_diag("Can't open prefix path (%s) for server.\n",
+				strerror(errno));
+			exit(1);
+		}
+	}
+	pseudo_path = pseudo_localstatedir_path(NULL);
+	if (pseudo_localstate_dir_fd == -1) {
+		if (pseudo_path) {
+			pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+			pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
+			free(pseudo_path);
+		} else {
+			pseudo_diag("No prefix available to to find server.\n");
+			exit(1);
+		}
+		if (pseudo_localstate_dir_fd == -1) {
 			pseudo_diag("Can't open prefix path (%s) for server.\n",
 				strerror(errno));
 			exit(1);

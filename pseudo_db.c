@@ -471,11 +471,11 @@ get_db(sqlite3 **db) {
 	if (*db)
 		return 0;
 	if (db == &file_db) {
-		dbfile = pseudo_prefix_path(PSEUDO_DATA "files.db");
+		dbfile = pseudo_localstatedir_path("files.db");
 		rc = sqlite3_open(dbfile, db);
 		free(dbfile);
 	} else {
-		dbfile = pseudo_prefix_path(PSEUDO_DATA "logs.db");
+		dbfile = pseudo_localstatedir_path("logs.db");
 		rc = sqlite3_open(dbfile, db);
 		free(dbfile);
 	}

@@ -521,18 +521,16 @@ pseudo_setupenv(char * const *environ, char *opts) {
 			}
 			new_environ[j++] = newenv;
 		} else if (!memcmp(environ[i], "LD_LIBRARY_PATH=", 16)) {
-			if (!strstr(environ[i], PSEUDO_PREFIX)) {
-				char *e1, *e2;
-				e1 = pseudo_prefix_path("lib");
-				e2 = pseudo_prefix_path("lib64");
-				len = strlen(environ[i]) + strlen(e1) + strlen(e2) + 3;
+			if (!strstr(environ[i], pseudo_libdir_path(NULL))) {
+				char *e1;
+				e1 = pseudo_libdir_path(NULL);
+				len = strlen(environ[i]) + strlen(e1) + (strlen(e1) + 2) + 3;
 				newenv = malloc(len);
 				if (!newenv) {
 					pseudo_diag("fatal: can't allocate new environment variable.\n");
 				}
-				snprintf(newenv, len, "%s:%s:%s", environ[i], e1, e2);
+				snprintf(newenv, len, "%s:%s:%s64", environ[i], e1, e1);
 				free(e1);
-				free(e2);
 				new_environ[j++] = newenv;
 			} else {
 				new_environ[j++] = environ[i];
@@ -542,15 +540,14 @@ pseudo_setupenv(char * const *environ, char *opts) {
 		}
 	}
 	if (!found_libpath) {
-		char *e1, *e2;
-		e1 = pseudo_prefix_path("lib");
-		e2 = pseudo_prefix_path("lib64");
-		len = 16 + strlen(e1) + strlen(e2) + 2;
+		char *e1;
+		e1 = pseudo_libdir_path(NULL);
+		len = 16 + strlen(e1) + (strlen(e1) + 2) + 2;
 		newenv = malloc(len);
 		if (!newenv) {
 			pseudo_diag("fatal: can't allocate new environment variable.\n");
 		}
-		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s", e1, e2);
+		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s64", e1, e1);
 		new_environ[j++] = newenv;
 	}
 	if (!found_preload) {
@@ -578,23 +575,11 @@ pseudo_setupenv(char * const *environ, char *opts) {
 	return new_environ;
 }
 
-/* get the full path to a file under $PSEUDO_PREFIX.  Other ways of
- * setting the prefix all set it in the environment.
- */
+/* Append the file value to the prefix value. */
 char *
-pseudo_prefix_path(char *file) {
-	static char *prefix = NULL;
-	static size_t prefix_len;
+pseudo_append_path(const char * prefix, size_t prefix_len, char *file) {
 	char *path;
 
-	if (!prefix) {
-		prefix = getenv("PSEUDO_PREFIX");
-		if (!prefix) {
-			pseudo_diag("You must set the PSEUDO_PREFIX environment variable to run pseudo.\n");
-			exit(1);
-		}
-		prefix_len = strlen(prefix);
-	}
 	if (!file) {
 		return strdup(prefix);
 	} else {
@@ -619,6 +604,81 @@ pseudo_prefix_path(char *file) {
 		}
 		return path;
 	}
+}
+
+
+/* get the full path to a file under $PSEUDO_PREFIX.  Other ways of
+ * setting the prefix all set it in the environment.
+ */
+char *
+pseudo_prefix_path(char *file) {
+	static char *prefix = NULL;
+	static size_t prefix_len;
+
+	if (!prefix) {
+		prefix = getenv("PSEUDO_PREFIX");
+		if (!prefix) {
+			pseudo_diag("You must set the PSEUDO_PREFIX environment variable to run pseudo.\n");
+			exit(1);
+		}
+		prefix_len = strlen(prefix);
+	}
+
+	return pseudo_append_path(prefix, prefix_len, file);
+}
+
+/* get the full path to a file under $PSEUDO_BINDIR. */
+char *
+pseudo_bindir_path(char *file) {
+	static char *bindir = NULL;
+	static size_t bindir_len;
+
+	if (!bindir) {
+		bindir = pseudo_get_bindir();
+		if (!bindir) {
+			pseudo_diag("You must set the PSEUDO_BINDIR environment variable to run pseudo.\n");
+			exit(1);
+		}
+		bindir_len = strlen(bindir);
+	}
+
+	return pseudo_append_path(bindir, bindir_len, file);
+}
+
+/* get the full path to a file under $PSEUDO_LIBDIR. */
+char *
+pseudo_libdir_path(char *file) {
+	static char *libdir = NULL;
+	static size_t libdir_len;
+
+	if (!libdir) {
+		libdir = pseudo_get_libdir();
+		if (!libdir) {
+			pseudo_diag("You must set the PSEUDO_LIBDIR environment variable to run pseudo.\n");
+			exit(1);
+		}
+		libdir_len = strlen(libdir);
+	}
+
+	return pseudo_append_path(libdir, libdir_len, file);
+}
+
+/* get the full path to a file under $PSEUDO_LOCALSTATEDIR. */
+char *
+pseudo_localstatedir_path(char *file) {
+	static char *localstatedir = NULL;
+	static size_t localstatedir_len;
+
+	if (!localstatedir) {
+		localstatedir = pseudo_get_localstatedir();
+		if (!localstatedir) {
+			pseudo_diag("You must set the PSEUDO_LOCALSTATEDIR environment variable to run pseudo.\n");
+			exit(1);
+		}
+		localstatedir_len = strlen(localstatedir);
+	}
+
+	return pseudo_append_path(localstatedir, localstatedir_len, file);
 }
 
 char *
@@ -672,6 +732,64 @@ pseudo_get_prefix(char *pathname) {
 			mypath);
 		setenv("PSEUDO_PREFIX", mypath, 1);
 		s = getenv("PSEUDO_PREFIX");
+	}
+	return s;
+}
+
+char *
+pseudo_get_bindir() {
+	char *s;
+	s = getenv("PSEUDO_BINDIR");
+	if (!s) {
+		char *pseudo_bindir;
+		pseudo_bindir = pseudo_prefix_path(PSEUDO_BINDIR);
+		if (pseudo_bindir) {
+			setenv("PSEUDO_BINDIR", pseudo_bindir, 1);
+			s = getenv("PSEUDO_BINDIR");
+		}
+	}
+	return s;
+}
+
+char *
+pseudo_get_libdir() {
+	char *s;
+	s = getenv("PSEUDO_LIBDIR");
+	if (!s) {
+		char *pseudo_libdir;
+		pseudo_libdir = pseudo_prefix_path(PSEUDO_LIBDIR);
+		if (pseudo_libdir) {
+			setenv("PSEUDO_LIBDIR", pseudo_libdir, 1);
+			s = getenv("PSEUDO_LIBDIR");
+		}
+	}
+	/* If we somehow got lib64 in there, clean it down to just lib... */
+	if (s) {
+		size_t len = strlen(s);
+		if (s[len-2] == '6' && s[len-1] == '4') {
+			char mypath[pseudo_path_max()];
+			snprintf(mypath, pseudo_path_max(), "%s", s);
+			s = mypath + (strlen(mypath) - 2);
+			s[0] = '\0';
+			setenv("PSEUDO_LIBDIR", mypath, 1);
+			s = getenv("PSEUDO_LIBDIR");
+		}
+	}
+
+	return s;
+}
+
+char *
+pseudo_get_localstatedir() {
+	char *s;
+	s = getenv("PSEUDO_LOCALSTATEDIR");
+	if (!s) {
+		char *pseudo_localstatedir;
+		pseudo_localstatedir = pseudo_prefix_path(PSEUDO_LOCALSTATEDIR);
+		if (pseudo_localstatedir) {
+			setenv("PSEUDO_LOCALSTATEDIR", pseudo_localstatedir, 1);
+			s = getenv("PSEUDO_LOCALSTATEDIR");
+		}
 	}
 	return s;
 }
@@ -840,7 +958,7 @@ pseudo_logfile(char *defname) {
 			pseudo_debug(3, "no special log file requested, using stderr.\n");
 			return -1;
 		}
-		pseudo_path = pseudo_prefix_path(defname);
+		pseudo_path = pseudo_localstatedir_path(defname);
 		if (!pseudo_path) {
 			pseudo_diag("can't get path for prefix/%s\n", PSEUDO_LOGFILE);
 			return -1;

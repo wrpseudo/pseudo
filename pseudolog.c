@@ -619,6 +619,21 @@ main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+	if (!pseudo_get_bindir()) {
+		pseudo_diag("Can't figure out bindir.  Set PSEUDO_BINDIR.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (!pseudo_get_libdir()) {
+		pseudo_diag("Can't figure out libdir.  Set PSEUDO_LIBDIR.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (!pseudo_get_localstatedir()) {
+		pseudo_diag("Can't figure out localstatedir.  Set PSEUDO_LOCALSTATEDIR.\n");
+		exit(EXIT_FAILURE);
+	}
+
 	if (opt_l) {
 		pdb_log_traits(traits);
 	} else {

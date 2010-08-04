@@ -24,7 +24,6 @@ done
 #The tests will be run on the build dir, not the installed versions
 #This requires to following be set properly.
 export PSEUDO_PREFIX=${PWD}
-export LD_LIBRARY_PATH=".:${LD_LIBRARY_PATH}"
 
 num_tests=0
 num_passed_tests=0

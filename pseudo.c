@@ -184,6 +184,21 @@ main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
+	if (!pseudo_get_bindir()) {
+		pseudo_diag("Can't figure out bindir.  Set PSEUDO_BINDIR.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (!pseudo_get_libdir()) {
+		pseudo_diag("Can't figure out libdir.  Set PSEUDO_LIBDIR.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (!pseudo_get_localstatedir()) {
+		pseudo_diag("Can't figure out localstatedir.  Set PSEUDO_LOCALSTATEDIR.\n");
+		exit(EXIT_FAILURE);
+	}
+
 	if (opt_C) {
 		return pseudo_db_check();
 	}
@@ -272,7 +287,7 @@ main(int argc, char *argv[]) {
 	pseudo_new_pid();
 
 	pseudo_debug(3, "opening lock.\n");
-	lockname = pseudo_prefix_path(PSEUDO_LOCKFILE);
+	lockname = pseudo_localstatedir_path(PSEUDO_LOCKFILE);
 	if (!lockname) {
 		pseudo_diag("Couldn't allocate a file path.\n");
 		exit(EXIT_FAILURE);

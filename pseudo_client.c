@@ -44,7 +44,8 @@ static char *base_path(int dirfd, const char *path, int leave_last);
 
 static int connect_fd = -1;
 static int server_pid = 0;
-int pseudo_dir_fd = -1;
+int pseudo_prefix_dir_fd = -1;
+int pseudo_localstate_dir_fd = -1;
 int pseudo_pwd_fd = -1;
 int pseudo_pwd_lck_fd = -1;
 char *pseudo_pwd_lck_name = NULL;
@@ -358,7 +359,7 @@ client_spawn_server(void) {
 	int status;
 	FILE *fp;
 	extern char **environ;
-	int cwd_fd;
+	char * pseudo_pidfile;
 
 	if ((server_pid = fork()) != 0) {
 		if (server_pid == -1) {
@@ -371,24 +372,8 @@ client_spawn_server(void) {
 		 */
 		waitpid(server_pid, &status, 0);
 		server_pid = -2;
-		cwd_fd = open(".", O_RDONLY);
-		if (cwd_fd == -1) {
-			pseudo_diag("Couldn't stash directory before opening pidfile: %s",
-				strerror(errno));
-			close(connect_fd);
-			connect_fd = -1;
-			return 1;
-		}
-		if (fchdir(pseudo_dir_fd)) {
-			pseudo_diag("Couldn't change to server dir [%d]: %s\n",
-				pseudo_dir_fd, strerror(errno));
-		}
-		fp = fopen(PSEUDO_PIDFILE, "r");
-		if (fchdir(cwd_fd) == -1) {
-			pseudo_diag("return to previous directory failed: %s\n",
-				strerror(errno));
-		}
-		close(cwd_fd);
+		pseudo_pidfile = pseudo_localstatedir_path(PSEUDO_PIDFILE);
+		fp = fopen(pseudo_pidfile, "r");
 		if (fp) {
 			if (fscanf(fp, "%d", &server_pid) != 1) {
 				pseudo_debug(1, "Opened server PID file, but didn't get a pid.\n");
@@ -396,9 +381,10 @@ client_spawn_server(void) {
 			fclose(fp);
 		} else {
 			pseudo_diag("no pid file (%s): %s\n",
-				PSEUDO_PIDFILE, strerror(errno));
+				pseudo_pidfile, strerror(errno));
 		}
 		pseudo_debug(2, "read new pid file: %d\n", server_pid);
+		free(pseudo_pidfile);
 		/* at this point, we should have a new server_pid */
 		return 0;
 	} else {
@@ -409,7 +395,7 @@ client_spawn_server(void) {
 		int fd;
 
 		pseudo_new_pid();
-		base_args[0] = "bin/pseudo";
+		base_args[0] = pseudo_bindir_path("pseudo");
 		base_args[1] = "-d";
 		if (getenv("PSEUDO_OPTS")) {
 			char *option_string = strdup(getenv("PSEUDO_OPTS"));
@@ -438,10 +424,6 @@ client_spawn_server(void) {
 			argv[arg] = 0;
 		} else {
 			argv = base_args;
-		}
-		if (fchdir(pseudo_dir_fd)) {
-			pseudo_diag("Couldn't change to server dir [%d]: %s\n",
-				pseudo_dir_fd, strerror(errno));
 		}
 		/* close any higher-numbered fds which might be open,
 		 * such as sockets.  We don't have to worry about 0 and 1;
@@ -542,7 +524,7 @@ client_connect(void) {
 	connect_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	connect_fd = pseudo_fd(connect_fd, MOVE_FD);
 	if (connect_fd == -1) {
-		pseudo_diag("can't create socket: %s\n", strerror(errno));
+		pseudo_diag("can't create socket: %s (%s)\n", sun.sun_path, strerror(errno));
 		return 1;
 	}
 
@@ -555,9 +537,9 @@ client_connect(void) {
 		connect_fd = -1;
 		return 1;
 	}
-	if (fchdir(pseudo_dir_fd) == -1) {
+	if (fchdir(pseudo_localstate_dir_fd) == -1) {
 		pseudo_diag("Couldn't chdir to server directory [%d]: %s\n",
-			pseudo_dir_fd, strerror(errno));
+			pseudo_localstate_dir_fd, strerror(errno));
 		close(connect_fd);
 		close(cwd_fd);
 		connect_fd = -1;
@@ -585,6 +567,7 @@ client_connect(void) {
 
 static int
 pseudo_client_setup(void) {
+	char * pseudo_pidfile;
 	FILE *fp;
 	server_pid = 0;
 	int cwd_fd;
@@ -595,25 +578,8 @@ pseudo_client_setup(void) {
 		connect_fd = -1;
 	}
 
-	cwd_fd = open(".", O_RDONLY);
-	if (cwd_fd == -1) {
-		pseudo_diag("Couldn't stash directory before opening pidfile: %s",
-			strerror(errno));
-		close(connect_fd);
-		connect_fd = -1;
-		return 1;
-	}
-	if (fchdir(pseudo_dir_fd) != 1) {
-		fp = fopen(PSEUDO_PIDFILE, "r");
-		if (fchdir(cwd_fd) == -1) {
-			pseudo_diag("return to previous directory failed: %s\n",
-				strerror(errno));
-		}
-	} else {
-		fp = NULL;
-		pseudo_diag("couldn't change to pseudo working directory for pid file.\n");
-	}
-	close(cwd_fd);
+	pseudo_pidfile = pseudo_localstatedir_path(PSEUDO_PIDFILE);
+	fp = fopen(pseudo_pidfile, "r");
 	if (fp) {
 		if (fscanf(fp, "%d", &server_pid) != 1) {
 			pseudo_debug(1, "Opened server PID file, but didn't get a pid.\n");
@@ -711,17 +677,35 @@ pseudo_client_shutdown(void) {
 	char *pseudo_path;
 
 	pseudo_path = pseudo_prefix_path(NULL);
-	if (pseudo_dir_fd == -1) {
+	if (pseudo_prefix_dir_fd == -1) {
 		if (pseudo_path) {
-			pseudo_dir_fd = open(pseudo_path, O_RDONLY);
-			pseudo_dir_fd = pseudo_fd(pseudo_dir_fd, COPY_FD);
+			pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+			pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, COPY_FD);
 			free(pseudo_path);
 		} else {
 			pseudo_diag("No prefix available to to find server.\n");
 			exit(1);
 		}
-		if (pseudo_dir_fd == -1) {
-			pseudo_diag("Can't open prefix path (%s) for server.\n",
+		if (pseudo_prefix_dir_fd == -1) {
+			pseudo_diag("Can't open prefix path (%s) for server. (%s)\n",
+				pseudo_prefix_path(NULL),
+				strerror(errno));
+			exit(1);
+		}
+	}
+	pseudo_path = pseudo_localstatedir_path(NULL);
+	if (pseudo_localstate_dir_fd == -1) {
+		if (pseudo_path) {
+			pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+			pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, COPY_FD);
+			free(pseudo_path);
+		} else {
+			pseudo_diag("No prefix available to to find server.\n");
+			exit(1);
+		}
+		if (pseudo_localstate_dir_fd == -1) {
+			pseudo_diag("Can't open prefix path (%s) for server. (%s)\n",
+				pseudo_localstatedir_path(NULL),
 				strerror(errno));
 			exit(1);
 		}
@@ -934,8 +918,10 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 				}
 			} else if (fd == pseudo_util_debug_fd) {
 				pseudo_util_debug_fd = pseudo_fd(fd, COPY_FD);
-			} else if (fd == pseudo_dir_fd) {
-				pseudo_dir_fd = pseudo_fd(fd, COPY_FD);
+			} else if (fd == pseudo_prefix_dir_fd) {
+				pseudo_prefix_dir_fd = pseudo_fd(fd, COPY_FD);
+			} else if (fd == pseudo_localstate_dir_fd) {
+				pseudo_localstate_dir_fd = pseudo_fd(fd, COPY_FD);
 			} else if (fd == pseudo_pwd_fd) {
 				pseudo_pwd_fd = pseudo_fd(fd, COPY_FD);
 				/* since we have a FILE * on it, we close that... */

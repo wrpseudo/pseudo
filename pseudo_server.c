@@ -83,7 +83,7 @@ static void pseudo_server_loop(void);
 
 int
 pseudo_server_start(int daemonize) {
-	struct sockaddr_un sun = { AF_UNIX, "pseudo.socket" };
+	struct sockaddr_un sun = { AF_UNIX, PSEUDO_SOCKET };
 	char *pseudo_path;
 	int rc, newfd;
 	FILE *fp;
@@ -107,12 +107,8 @@ pseudo_server_start(int daemonize) {
 	}
 
 	/* cd to the data directory */
-	pseudo_path = pseudo_prefix_path(PSEUDO_DATA);
-	if (!pseudo_path) {
-		pseudo_diag("can't find prefix/%s directory.\n", PSEUDO_DATA);
-		return 1;
-	}
-	if (chdir(pseudo_path) == -1) {
+	pseudo_path = pseudo_localstatedir_path(NULL);
+	if (!pseudo_path || chdir(pseudo_path) == -1) {
 		pseudo_diag("can't get to '%s': %s\n",
 			pseudo_path, strerror(errno));
 		return 1;
@@ -138,7 +134,7 @@ pseudo_server_start(int daemonize) {
 		return 0;
 	}
 	setsid();
-	pseudo_path = pseudo_prefix_path(PSEUDO_PIDFILE);
+	pseudo_path = pseudo_localstatedir_path(PSEUDO_PIDFILE);
 	if (!pseudo_path) {
 		pseudo_diag("Couldn't get path for prefix/%s\n", PSEUDO_PIDFILE);
 		return 1;
