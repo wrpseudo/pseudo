@@ -488,6 +488,7 @@ pseudo_setupenv(char * const *environ, char *opts) {
 	char **new_environ;
 	int env_count = 0;
 	int found_preload = 0, found_libpath = 0, found_debug = 0, found_opts = 0;
+	int found_prefix = 0, found_bindir = 0, found_libdir = 0, found_localstatedir = 0;
 	int i, j;
 	size_t len;
 	char *newenv;
@@ -501,9 +502,17 @@ pseudo_setupenv(char * const *environ, char *opts) {
 			found_debug = 1;
 		if (!memcmp(environ[i], "LD_LIBRARY_PATH=", 16))
 			found_libpath = 1;
+		if (!memcmp(environ[i], "PSEUDO_PREFIX=", 14))
+			found_prefix = 1;
+		if (!memcmp(environ[i], "PSEUDO_BINDIR=", 14))
+			found_bindir = 1;
+		if (!memcmp(environ[i], "PSEUDO_LIBDIR=", 14))
+			found_libdir = 1;
+		if (!memcmp(environ[i], "PSEUDO_LOCALSTATEDIR=", 21))
+			found_localstatedir = 1;
 		++env_count;
 	}
-	env_count += 4 - (found_preload + found_libpath + found_debug + found_opts);
+	env_count += 4 - (found_preload + found_libpath + found_debug + found_opts + found_prefix + found_bindir + found_libdir + found_localstatedir);
 
 	new_environ = malloc((env_count + 1) * sizeof(*new_environ));
 	if (!new_environ) {
@@ -570,6 +579,50 @@ pseudo_setupenv(char * const *environ, char *opts) {
 		}
 		snprintf(newenv, len, "PSEUDO_OPTS=%s", opts);
 		new_environ[j++] = newenv;
+	}
+	if (!found_prefix) {
+		char * prefix_path = pseudo_prefix_path(NULL);
+		len = 14 + strlen(prefix_path) + 1;
+		newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "PSEUDO_PREFIX=%s", prefix_path);
+		new_environ[j++] = newenv;
+		free(prefix_path);
+	}
+	if (!found_bindir) {
+		char * bindir_path = pseudo_bindir_path(NULL);
+		len = 14 + strlen(bindir_path) + 1;
+		newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "PSEUDO_BINDIR=%s", bindir_path);
+		new_environ[j++] = newenv;
+		free(bindir_path);
+	}
+	if (!found_libdir) {
+		char * libdir_path = pseudo_libdir_path(NULL);
+		len = 14 + strlen(libdir_path) + 1;
+		newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "PSEUDO_LIBDIR=%s", libdir_path);
+		new_environ[j++] = newenv;
+		free(libdir_path);
+	}
+	if (!found_localstatedir) {
+		char * localstatedir_path = pseudo_localstatedir_path(NULL);
+		len = 21 + strlen(localstatedir_path) + 1;
+		newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new environment variable.\n");
+		}
+		snprintf(newenv, len, "PSEUDO_LOCALSTATEDIR=%s", localstatedir_path);
+		new_environ[j++] = newenv;
+		free(localstatedir_path);
 	}
 	new_environ[j++] = NULL;
 	return new_environ;

@@ -1,3 +1,6 @@
+2010-08-06:
+	* (mhatle) Fix an exec program with an empty environment
+
 2010-08-03:
 	* (mhatle) Fix parallel build problem
 	* (mhatle) allow both environment CFLAGS and internals CFLAGS
