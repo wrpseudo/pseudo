@@ -380,7 +380,7 @@ client_spawn_server(void) {
 			}
 			fclose(fp);
 		} else {
-			pseudo_diag("no pid file (%s): %s\n",
+			pseudo_debug(1, "no pid file (%s): %s\n",
 				pseudo_pidfile, strerror(errno));
 		}
 		pseudo_debug(2, "read new pid file: %d\n", server_pid);
