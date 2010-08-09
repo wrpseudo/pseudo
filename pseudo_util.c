@@ -512,7 +512,7 @@ pseudo_setupenv(char * const *environ, char *opts) {
 			found_localstatedir = 1;
 		++env_count;
 	}
-	env_count += 4 - (found_preload + found_libpath + found_debug + found_opts + found_prefix + found_bindir + found_libdir + found_localstatedir);
+	env_count += 8 - (found_preload + found_libpath + found_debug + found_opts + found_prefix + found_bindir + found_libdir + found_localstatedir);
 
 	new_environ = malloc((env_count + 1) * sizeof(*new_environ));
 	if (!new_environ) {
