@@ -42,7 +42,7 @@ do
     else
         echo "${filename/%.sh}: Failed."
     fi
-    rm -rf var
+    rm -rf var/pseudo/*
 done
 echo "${num_passed_tests}/${num_tests} test(s) passed."
 

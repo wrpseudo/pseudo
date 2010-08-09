@@ -97,7 +97,11 @@ do
 		IFS=$save_IFS
 		args=''
 		dummy_args=''
+		wrap_args=''
+		va_list_abort_on_real=''
 		optional_arg=false
+		make_va_list=false
+		maybe_va_end=''
 		prepend=''
 		depth=0
 		for arg
@@ -138,9 +142,24 @@ do
 			arg=${arg% }
 			prepend=''
 			case $arg in
+			...)
+				make_va_list=true
+				maybe_va_end='va_end(ap);'
+				va_list_abort_on_real='assert(!"cannot chain to real versions of variadic functions");'
+				args="$args${args+, }..."
+				dummy_args="$dummy_args${dummy_args:+, }..."
+				wrap_args="$wrap_args${wrap_args:+, }va_list ap"
+				arg="..."
+				argname="ap"
+				argnames="$argnames${argnames:+, }ap"
+				wrapargnames="$wrapargnames${wrapargnames:+, }ap"
+				# used for creating a va_list
+				optional_prev=$prev_argname
+				;;
 			...*)
 				optional_arg=true
 				args="$args${args:+, }..."
+				wrap_args="$wrap_args${wrap_args:+, }..."
 				dummy_args="$dummy_args${dummy_args:+, }..."
 				arg=`expr "$arg" : '\.\.\.{\(.*\)}'`
 				argname=`expr "$arg" : '.*[^a-zA-Z0-9_]\([a-zA-Z0-9_]*\)$'`
@@ -156,6 +175,7 @@ do
 			*\(*)	# function pointer
 				argname=`expr "$arg" : '[^(]*(\*\([a-zA-Z0-9_]*\).*'`
 				args="$args${args:+, }$arg"
+				wrap_args="$wrap_args${wrap_args:+, }$arg"
 				dummy_args="$dummy_args${dummy_args:+, }$arg __attribute__((unused))"
 				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
 				argnames="$argnames${argnames:+, }$argname"
@@ -164,6 +184,7 @@ do
 			*)
 				argname=`expr "$arg" : '.*[^a-zA-Z0-9_](*\([a-zA-Z0-9_]*\))*(*)*$'`
 				args="$args${args:+, }$arg"
+				wrap_args="$wrap_args${wrap_args:+, }$arg"
 				dummy_args="$dummy_args${dummy_args:+, }$arg __attribute__((unused))"
 				# special handling for canonicalization
 				# set this before changing path -> rpath, for guts files
@@ -268,9 +289,16 @@ $type
 $name($args) {
 EOF
 		fi
+		if $make_va_list; then
+			cat >&5 <<EOF
+	va_list ap;
+	va_start(ap, $optional_prev);
+EOF
+		fi
 		# and now the body of the wrapper:
 		cat >&5 <<EOF
 	sigset_t blocked, saved;
+	$(write_decl "$type" "rc" "$default_value")
 
 	pseudo_debug(4, "called: $name\n");
 	/* these are signals for which the handlers often
@@ -292,10 +320,14 @@ EOF
 	}
 	$decl_paths
 	if (pseudo_populate_wrappers()) {
-		$(write_decl "$type" "rc" "$default_value")
 		int save_errno;
 		if (antimagic > 0) {
 			if (real_$name) {
+				/* if this function takes ..., there is
+				 * no way to pass the real argument list
+				 * to it...
+				 */
+				$va_list_abort_on_real
 				$(write_assign rc) (*real_$name)($argnames);
 			} else {
 				$(write_assign rc) dummy_$name($argnames);
@@ -305,6 +337,7 @@ $alloc_paths
 			$(write_assign rc) wrap_$name($argnames);
 $free_paths
 		}
+		$maybe_va_end
 		save_errno = errno;
 		pseudo_droplock();
 		sigprocmask(SIG_SETMASK, &saved, NULL);
@@ -315,7 +348,9 @@ $free_paths
 		pseudo_droplock();
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		pseudo_debug(4, "completed: $name\n");
-		$(write_return "dummy_$name($argnames)");
+		$(write_assign rc) dummy_$name($argnames);
+		$maybe_va_end
+		$(write_return rc);
 	}
 }
 
@@ -332,7 +367,7 @@ EOF
 		if $optional_arg; then
 			cat >&5 << EOF
 static $type
-wrap_$name($args) {
+wrap_$name($wrap_args) {
 	$(write_decl "$type" "rc" "$default_value")
 	$optional_decl;
 
@@ -349,7 +384,7 @@ EOF
 		else
 			cat >&5 << EOF
 static $type
-wrap_$name($args) {
+wrap_$name($wrap_args) {
 	$(write_decl "$type" "rc" "$default_value")
 
 #include "$guts"
@@ -385,7 +420,7 @@ EOF
  * guts/COPYRIGHT for information.
  *
  * static $type
- * wrap_$name($args) {
+ * wrap_$name($wrap_args) {
  *	$(write_decl "$type" "rc" "$default_value")
  */
 
@@ -401,7 +436,7 @@ EOF
 		cat >&6 <<EOF
 /* $type $name($args); */
 static $type dummy_$name($args);
-static $type wrap_$name($args);
+static $type wrap_$name($wrap_args);
 static $type (*real_$name)($args);
 
 EOF

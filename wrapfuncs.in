@@ -88,7 +88,12 @@ char *tmpnam(char *s);
 int truncate(const char *path, off_t length);
 int utime(const char *path, const struct utimbuf *buf);
 int utimes(const char *path, const struct timeval *times);
+int execl(const char *path, const char *arg, ...);
+int execlp(const char *file, const char *arg, ...);
+int execle(const char *path, const char *arg, ...);
+int execv(const char *path, char *const *argv);
 int execve(const char *filename, char *const *argv, char *const *envp);
+int execvp(const char *file, char *const *argv);
 # for emulation of passwd utilities
 struct passwd *getpwnam(const char *name);
 struct passwd *getpwuid(uid_t uid);
