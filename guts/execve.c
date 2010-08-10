@@ -14,10 +14,13 @@
 	 * design will likely be revisited.
 	 */
 	pseudo_client_op(OP_EXEC, PSA_EXEC, -1, -1, filename, 0);
-	if (!getenv("PSEUDO_RELOADED"))
-		new_environ = pseudo_setupenv(envp, getenv("PSEUDO_OPTS"));
-	else
-		new_environ = envp;
+	if (!pseudo_get_value("PSEUDO_RELOADED"))
+		new_environ = pseudo_setupenvp(envp);
+	else {
+		new_environ = pseudo_setupenvp(envp);
+		new_environ = pseudo_dropenvp(new_environ);
+	}
+
 	rc = real_execve(filename, argv, new_environ);
 
 /*	return rc;

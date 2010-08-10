@@ -59,7 +59,7 @@ LIBPSEUDO=$(LIB)/libpseudo$(SUFFIX).so
 all: $(LIBPSEUDO) $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
 
 test: all $(BIN) $(LIB) $(LOCALSTATE)
-	@./run_tests.sh
+	@./run_tests.sh -v
 
 install-lib: $(LIBPSEUDO)
 	mkdir -p $(DESTDIR)$(LIBDIR)

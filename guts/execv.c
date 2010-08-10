@@ -6,7 +6,13 @@
  * wrap_execv(const char *path, char *const *argv) {
  *	int rc = -1;
  */
-	environ = pseudo_setupenv(environ, getenv("PSEUDO_OPTS"));
+
+	if (!pseudo_get_value("PSEUDO_RELOADED"))
+		pseudo_setupenv();
+	else {
+		pseudo_setupenv();
+		pseudo_dropenv();
+	}
 
 	rc = real_execv(path, argv);
 

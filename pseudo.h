@@ -20,6 +20,12 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
+struct pseudo_variables { char * key; size_t key_len; char * value; };
+
+void pseudo_dump_env(char **envp);
+int pseudo_set_value(const char * key, const char * value);
+char * pseudo_get_value(const char * key);
+
 typedef enum {
 	OP_UNKNOWN = -1,
 	OP_NONE = 0,
@@ -121,8 +127,10 @@ void pseudo_new_pid(void);
 /* pseudo_fix_path resolves symlinks up to this depth */
 #define PSEUDO_MAX_LINK_RECURSION 16
 extern char *pseudo_fix_path(const char *, const char *, size_t, size_t, size_t *, int);
-extern char **pseudo_dropenv(char * const *);
-extern char **pseudo_setupenv(char * const *, char *);
+extern void pseudo_dropenv(void);
+extern char **pseudo_dropenvp(char * const *);
+extern void pseudo_setupenv(void);
+extern char **pseudo_setupenvp(char * const *);
 extern char *pseudo_prefix_path(char *);
 extern char *pseudo_bindir_path(char *);
 extern char *pseudo_libdir_path(char *);

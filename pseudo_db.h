@@ -43,6 +43,7 @@ extern int pdb_unlink_file_dev(pseudo_msg_t *msg);
 extern int pdb_update_file(pseudo_msg_t *msg);
 extern int pdb_update_file_path(pseudo_msg_t *msg);
 extern int pdb_update_inode(pseudo_msg_t *msg);
+extern int pdb_unlink_contents(pseudo_msg_t *msg);
 extern int pdb_rename_file(const char *oldpath, pseudo_msg_t *msg);
 extern int pdb_find_file_exact(pseudo_msg_t *msg);
 extern int pdb_find_file_path(pseudo_msg_t *msg);

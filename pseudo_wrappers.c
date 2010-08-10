@@ -1,6 +1,7 @@
 /* wrapper code -- this is the shared code used around the pseduo
  * wrapper functions, which are in pseudo_wrapfuncs.c.
  */
+#include <assert.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -84,8 +85,10 @@ pseudo_magic() {
 static void
 pseudo_enosys(const char *func) {
 	pseudo_diag("pseudo: ENOSYS for '%s'.\n", func ? func : "<nil>");
-	if (getenv("PSEUDO_ENOSYS_ABORT"))
+	char * value = pseudo_get_value("PSEUDO_ENOSYS_ABORT");
+	if (value)
 		abort();
+	free(value);
 }
 
 /* de-chroot a string.
@@ -143,14 +146,15 @@ pseudo_populate_wrappers(void) {
 		}
 	}
 	done = 1;
-	debug = getenv("PSEUDO_DEBUG");
+	debug = pseudo_get_value("PSEUDO_DEBUG");
 	if (debug) {
 		int level = atoi(debug);
 		for (i = 0; i < level; ++i) {
 			pseudo_debug_verbose();
 		}
 	}
-	no_symlink_exp = getenv("PSEUDO_NOSYMLINKEXP");
+	free(debug);
+	no_symlink_exp = pseudo_get_value("PSEUDO_NOSYMLINKEXP");
 	if (no_symlink_exp) {
 		char *endptr;
 		/* if the environment variable is not an empty string,
@@ -171,6 +175,7 @@ pseudo_populate_wrappers(void) {
 	} else {
 		pseudo_nosymlinkexp = 0;
 	}
+	free(no_symlink_exp);
 	/* if PSEUDO_DEBUG_FILE is set up, redirect logging there.
 	 */
 	pseudo_logfile(NULL);
@@ -185,33 +190,35 @@ pseudo_populate_wrappers(void) {
 		if (pseudo_path) {
 			pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
 			pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, MOVE_FD);
-			free(pseudo_path);
 		} else {
 			pseudo_diag("No prefix available to to find server.\n");
 			exit(1);
 		}
 		if (pseudo_prefix_dir_fd == -1) {
-			pseudo_diag("Can't open prefix path (%s) for server.\n",
+			pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+				pseudo_path,
 				strerror(errno));
 			exit(1);
 		}
 	}
+	free(pseudo_path);
 	pseudo_path = pseudo_localstatedir_path(NULL);
 	if (pseudo_localstate_dir_fd == -1) {
 		if (pseudo_path) {
 			pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
 			pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
-			free(pseudo_path);
 		} else {
 			pseudo_diag("No prefix available to to find server.\n");
 			exit(1);
 		}
 		if (pseudo_localstate_dir_fd == -1) {
-			pseudo_diag("Can't open prefix path (%s) for server.\n",
+			pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+				pseudo_path,
 				strerror(errno));
 			exit(1);
 		}
 	}
+	free(pseudo_path);
 	pseudo_debug(2, "(%s) set up wrappers\n", program_invocation_short_name);
 	pseudo_magic();
 	pseudo_droplock();

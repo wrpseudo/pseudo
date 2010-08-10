@@ -527,7 +527,7 @@ main(int argc, char **argv) {
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
 				pseudo_diag("Can't resolve prefix path '%s'\n", optarg);
-			setenv("PSEUDO_PREFIX", s, 1);
+			pseudo_set_value("PSEUDO_PREFIX", s);
 			break;
 		case 'v':
 			pseudo_debug_verbose();

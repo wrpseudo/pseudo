@@ -173,7 +173,7 @@ pseudo_client_touchuid(void) {
 	static char uidbuf[256];
 	snprintf(uidbuf, 256, "%d,%d,%d,%d",
 		pseudo_ruid, pseudo_euid, pseudo_suid, pseudo_fuid);
-	setenv("PSEUDO_UIDS", uidbuf, 1);
+	pseudo_set_value("PSEUDO_UIDS", uidbuf);
 }
 
 void
@@ -181,7 +181,7 @@ pseudo_client_touchgid(void) {
 	static char gidbuf[256];
 	snprintf(gidbuf, 256, "%d,%d,%d,%d",
 		pseudo_rgid, pseudo_egid, pseudo_sgid, pseudo_fgid);
-	setenv("PSEUDO_GIDS", gidbuf, 1);
+	pseudo_set_value("PSEUDO_GIDS", gidbuf);
 }
 
 int
@@ -193,7 +193,7 @@ pseudo_client_chroot(const char *path) {
 	if (!strcmp(path, "/")) {
 		pseudo_chroot_len = 0;
 		pseudo_chroot = 0;
-		unsetenv("PSEUDO_CHROOT");
+		pseudo_set_value("PSEUDO_CHROOT", NULL);
 		return 0;
 	}
 	/* allocate new value */
@@ -206,7 +206,7 @@ pseudo_client_chroot(const char *path) {
 		return -1;
 	}
 	memcpy(pseudo_chroot, path, pseudo_chroot_len + 1);
-	setenv("PSEUDO_CHROOT", pseudo_chroot, 1);
+	pseudo_set_value("PSEUDO_CHROOT", pseudo_chroot);
 	return 0;
 }
 
@@ -320,19 +320,21 @@ pseudo_client_reset() {
 	if (!pseudo_inited) {
 		char *env;
 		
-		env = getenv("PSEUDO_UIDS");
+		env = pseudo_get_value("PSEUDO_UIDS");
 		if (env)
 			sscanf(env, "%d,%d,%d,%d",
 				&pseudo_ruid, &pseudo_euid,
 				&pseudo_suid, &pseudo_fuid);
+		free(env);
 
-		env = getenv("PSEUDO_GIDS");
+		env = pseudo_get_value("PSEUDO_GIDS");
 		if (env)
 			sscanf(env, "%d,%d,%d,%d",
 				&pseudo_rgid, &pseudo_egid,
 				&pseudo_sgid, &pseudo_fuid);
+		free(env);
 
-		env = getenv("PSEUDO_CHROOT");
+		env = pseudo_get_value("PSEUDO_CHROOT");
 		if (env) {
 			pseudo_chroot = strdup(env);
 			if (pseudo_chroot) {
@@ -341,11 +343,13 @@ pseudo_client_reset() {
 				pseudo_diag("can't store chroot path (%s)\n", env);
 			}
 		}
+		free(env);
 
-		env = getenv("PSEUDO_PASSWD");
+		env = pseudo_get_value("PSEUDO_PASSWD");
 		if (env) {
 			pseudo_passwd = strdup(env);
 		}
+		free(env);
 
 		pseudo_inited = 1;
 	}
@@ -358,7 +362,6 @@ static int
 client_spawn_server(void) {
 	int status;
 	FILE *fp;
-	extern char **environ;
 	char * pseudo_pidfile;
 
 	if ((server_pid = fork()) != 0) {
@@ -390,15 +393,14 @@ client_spawn_server(void) {
 	} else {
 		char *base_args[] = { NULL, NULL, NULL };
 		char **argv;
-		char **new_environ;
+		char *option_string = pseudo_get_value("PSEUDO_OPTS");
 		int args;
 		int fd;
 
 		pseudo_new_pid();
 		base_args[0] = pseudo_bindir_path("pseudo");
 		base_args[1] = "-d";
-		if (getenv("PSEUDO_OPTS")) {
-			char *option_string = strdup(getenv("PSEUDO_OPTS"));
+		if (option_string) {
 			char *s;
 			int arg;
 
@@ -425,6 +427,7 @@ client_spawn_server(void) {
 		} else {
 			argv = base_args;
 		}
+
 		/* close any higher-numbered fds which might be open,
 		 * such as sockets.  We don't have to worry about 0 and 1;
 		 * the server closes them already, and more importantly,
@@ -440,9 +443,14 @@ client_spawn_server(void) {
 				close(fd);
 		}
 		/* and now, execute the server */
-		new_environ = pseudo_dropenv(environ);
-		pseudo_debug(4, "calling execve on %s\n", argv[0]);
-		execve(argv[0], argv, new_environ);
+
+		pseudo_set_value("PSEUDO_RELOADED", "YES");
+		pseudo_setupenv();
+		pseudo_dropenv(); /* drop LD_PRELOAD */
+
+		pseudo_debug(4, "calling execv on %s\n", argv[0]);
+
+		execv(argv[0], argv);
 		pseudo_diag("critical failure: exec of pseudo daemon failed: %s\n", strerror(errno));
 		exit(1);
 	}
@@ -453,18 +461,19 @@ client_ping(void) {
 	pseudo_msg_t ping;
 	pseudo_msg_t *ack;
 	char tagbuf[pseudo_path_max()];
-	char *tag = getenv("PSEUDO_TAG");
+	char *tag = pseudo_get_value("PSEUDO_TAG");
 
 	ping.type = PSEUDO_MSG_PING;
 	ping.op = OP_NONE;
 
 	if (!tag)
-		tag = "";
+		tag = strdup("");
 
 	ping.pathlen = snprintf(tagbuf, sizeof(tagbuf), "%s%c%s",
 		program_invocation_name ? program_invocation_name : "<unknown>",
 		0,
 		tag);
+	free(tag);
 	ping.client = getpid();
 	ping.result = 0;
 	errno = 0;
@@ -570,7 +579,6 @@ pseudo_client_setup(void) {
 	char * pseudo_pidfile;
 	FILE *fp;
 	server_pid = 0;
-	int cwd_fd;
 
 	/* avoid descriptor leak, I hope */
 	if (connect_fd >= 0) {

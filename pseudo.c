@@ -73,30 +73,32 @@ main(int argc, char *argv[]) {
 
 	opts[0] = '\0';
 
-	s = getenv("PSEUDO_DEBUG");
+	s = pseudo_get_value("PSEUDO_DEBUG");
 	if (s) {
 		int level = atoi(s);
 		for (o = 0; o < level; ++o) {
 			pseudo_debug_verbose();
 		}
 	}
+	free(s);
 
 	if (ld_env && strstr(ld_env, "libpseudo")) {
-		extern char **environ;
-		char **new_environ;
-
 		pseudo_debug(2, "can't run daemon with libpseudo in LD_PRELOAD\n");
-		if (getenv("PSEUDO_RELOADED")) {
+		s = pseudo_get_value("PSEUDO_RELOADED");
+		if (s) {
 			pseudo_diag("I can't seem to make LD_PRELOAD go away.  Sorry.\n");
 			pseudo_diag("LD_PRELOAD: %s\n", ld_env);
 			exit(EXIT_FAILURE);
 		}
-		setenv("PSEUDO_RELOADED", "YES", 1);
-		new_environ = pseudo_dropenv(environ);
-		execve(argv[0], argv, new_environ);
+		free(s);
+		pseudo_set_value("PSEUDO_RELOADED", "YES");
+		pseudo_setupenv();
+		pseudo_dropenv(); /* Drop LD_PRELOAD */
+
+		execv(argv[0], argv);
 		exit(EXIT_FAILURE);
 	}
-	unsetenv("PSEUDO_RELOADED");
+	pseudo_set_value("PSEUDO_RELOADED", NULL);
 
 	/* we need cwd to canonicalize paths */
 	pseudo_client_getcwd();
@@ -131,20 +133,20 @@ main(int argc, char *argv[]) {
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
 				pseudo_diag("Can't resolve passwd path '%s'\n", optarg);
-			setenv("PSEUDO_PASSWD", s, 1);
+			pseudo_set_value("PSEUDO_PASSWD", s);
 			break;
 		case 'P':
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
 				pseudo_diag("Can't resolve prefix path '%s'\n", optarg);
-			setenv("PSEUDO_PREFIX", s, 1);
+			pseudo_set_value("PSEUDO_PREFIX", s);
 			break;
 		case 'r':	/* FALLTHROUGH */
 		case 'R':
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
 			if (!s)
 				pseudo_diag("Can't resolve root path '%s'\n", optarg);
-			setenv("PSEUDO_CHROOT", s, 1);
+			pseudo_set_value("PSEUDO_CHROOT", s);
 			if (o == 'r')
 				opt_r = s;
 			break;
@@ -178,24 +180,11 @@ main(int argc, char *argv[]) {
 			break;
 		}
 	}
+	/* Options are processed, preserve them... */
+	pseudo_set_value("PSEUDO_OPTS", opts);
 
 	if (!pseudo_get_prefix(argv[0])) {
 		pseudo_diag("Can't figure out prefix.  Set PSEUDO_PREFIX or invoke with full path.\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (!pseudo_get_bindir()) {
-		pseudo_diag("Can't figure out bindir.  Set PSEUDO_BINDIR.\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (!pseudo_get_libdir()) {
-		pseudo_diag("Can't figure out libdir.  Set PSEUDO_LIBDIR.\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (!pseudo_get_localstatedir()) {
-		pseudo_diag("Can't figure out localstatedir.  Set PSEUDO_LOCALSTATEDIR.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -220,8 +209,6 @@ main(int argc, char *argv[]) {
 	} else {
 		char fullpath[pseudo_path_max()];
 		char *path;
-		extern char **environ;
-		char **new_environ;
 
 		if (opt_r) {
 			if (chdir(opt_r) == -1) {
@@ -244,9 +231,7 @@ main(int argc, char *argv[]) {
 				argv[0] = "/bin/sh";
 			argv[1] = NULL;
 		}
-		/* build an environment containing libpseudo */
-		pseudo_debug(2, "setting up pseudo environment.\n");
-		new_environ = pseudo_setupenv(environ, opts);
+
 		if (strchr(argv[0], '/')) {
 			snprintf(fullpath, pseudo_path_max(), "%s", argv[0]);
 		} else {
@@ -274,7 +259,9 @@ main(int argc, char *argv[]) {
 				exit(EXIT_FAILURE);
 			}
 		}
-		rc = execve(fullpath, argv, new_environ);
+		pseudo_setupenv();
+
+		rc = execv(fullpath, argv);
 		if (rc == -1) {
 			pseudo_diag("pseudo: can't run %s: %s\n",
 				argv[0], strerror(errno));

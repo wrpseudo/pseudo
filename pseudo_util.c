@@ -33,6 +33,114 @@
 #include "pseudo_ipc.h"
 #include "pseudo_db.h"
 
+/* The order below is not arbitrary, but based on the assumption
+ * of how often things will be used.
+ */
+const struct pseudo_variables pseudo_env[] = {
+	{ "PSEUDO_PREFIX", 13, NULL },
+	{ "PSEUDO_BINDIR", 13, NULL },
+	{ "PSEUDO_LIBDIR", 13, NULL },
+	{ "PSEUDO_LOCALSTATEDIR", 20, NULL },
+	{ "PSEUDO_PASSWD", 13, NULL },
+	{ "PSEUDO_CHROOT", 13, NULL },
+	{ "PSEUDO_UIDS", 11, NULL },
+	{ "PSEUDO_GIDS", 11, NULL },
+	{ "PSEUDO_OPTS", 11, NULL },
+	{ "PSEUDO_DEBUG", 12, NULL },
+	{ "PSEUDO_DEBUG_FILE", 17, NULL },
+	{ "PSEUDO_TAG", 10, NULL },
+	{ "PSEUDO_ENOSYS_ABORT", 19, NULL },
+	{ "PSEUDO_NOSYMLINKEXP", 19, NULL },
+	{ "PSEUDO_RELOADED", 15, NULL },
+	{ NULL, 0, NULL } /* Magic terminator */
+};
+
+/* -1 - init hasn't been run yet
+ * 0 - init has been run
+ * 1 - init is running
+ *
+ * There are cases where the constructor is run AFTER the
+ * program starts playing with things, so we need to do our
+ * best to handle that case.
+ */
+int _in_init = -1;  /* Not yet run */
+
+static void _libpseudo_init(void) __attribute__ ((constructor));
+
+void dump_env(char **envp) {
+	size_t i = 0;
+	for (i = 0; envp[i]; i++) {
+		pseudo_debug(0,"dump_envp: [%d]%s\n", i,envp[i]);
+	}
+
+	for (i = 0; pseudo_env[i].key; i++) {
+		pseudo_debug(0,"dump_envp: {%d}%s=%s\n", i, pseudo_env[i].key, pseudo_env[i].value);
+	}
+
+	pseudo_debug(0, "dump_envp: _in_init %d\n", _in_init);
+}
+
+/* Caller must free memory! */
+char * pseudo_get_value(const char * key) {
+	size_t i = 0;
+	char * value;
+
+	if (_in_init == -1) _libpseudo_init();
+
+	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++) ;
+
+	/* Check if the environment has it and we don't ...
+	 * if so, something went wrong... so we'll attempt to recover
+	 */
+	if (pseudo_env[i].key && !pseudo_env[i].value && getenv(pseudo_env[i].key))
+		_libpseudo_init();
+
+	if (pseudo_env[i].value) value = strdup(pseudo_env[i].value);
+	else value = NULL;
+
+	if (!pseudo_env[i].key) 
+		pseudo_diag("Unknown variable %s.\n", key);
+
+	return value;
+}
+
+/* We make a copy, so the original values should be freed. */
+int pseudo_set_value(const char * key, const char * value) {
+	int rc = 0;
+	size_t i = 0;
+
+	if (_in_init == -1) _libpseudo_init();
+
+	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++) ;
+
+	if (pseudo_env[i].key) {
+		if (pseudo_env[i].value) free(pseudo_env[i].value);
+		if (value)
+			((struct pseudo_variables *)pseudo_env)[i].value = strdup(value);
+		else
+			((struct pseudo_variables *)pseudo_env)[i].value = NULL;
+	} else {
+		if (!_in_init) pseudo_diag("Unknown variable %s.\n", key);
+		rc = -EINVAL;
+	}
+
+	return rc;
+}
+
+static void _libpseudo_init(void) {
+	size_t i = 0;
+
+	_in_init = 1;
+
+	for (i = 0; pseudo_env[i].key; i++) {
+		if (pseudo_env[i].key)
+			if (getenv(pseudo_env[i].key))
+				pseudo_set_value(pseudo_env[i].key, getenv(pseudo_env[i].key));
+	}
+
+	_in_init = 0;
+}
+
 /* 5 = ridiculous levels of duplication
  * 4 = exhaustive detail
  * 3 = detailed protocol analysis
@@ -65,7 +173,7 @@ static ssize_t pseudo_sys_max_pathlen = -1;
  * the end of the string or a space after it.
  */
 static char *libpseudo_name = "libpseudo.so";
-static char *libpseudo_pattern = "(=| )libpseudo[^ ]*\\.so($| )";
+static char *libpseudo_pattern = "(^|=| )libpseudo[^ ]*\\.so($| )";
 static regex_t libpseudo_regex;
 static int libpseudo_regex_compiled = 0;
 
@@ -88,9 +196,13 @@ static char *
 without_libpseudo(char *list) {
 	regmatch_t pmatch[1];
 	int counter = 0;
+	int skip_start = 0;
+
 	if (libpseudo_regex_init())
 		return NULL;
 
+	if (list[0] == '=' || list[0] == ' ')
+		skip_start = 1;
 
 	if (regexec(&libpseudo_regex, list, 1, pmatch, 0)) {
 		return list;
@@ -100,7 +212,7 @@ without_libpseudo(char *list) {
 		char *start = list + pmatch[0].rm_so;
 		char *end = list + pmatch[0].rm_eo;
 		/* don't copy over the space or = */
-		++start;
+		start += skip_start;
 		memmove(start, end, strlen(end) + 1);
 		++counter;
 		if (counter > 5) {
@@ -135,11 +247,19 @@ void
 pseudo_debug_terse(void) {
 	if (max_debug_level > 0)
 		--max_debug_level;
+
+	char s[16];
+	snprintf(s, 16, "%d", max_debug_level);
+	pseudo_set_value("PSEUDO_DEBUG", s);
 }
 
 void
 pseudo_debug_verbose(void) {
 	++max_debug_level;
+
+	char s[16];
+	snprintf(s, 16, "%d", max_debug_level);
+	pseudo_set_value("PSEUDO_DEBUG", s);
 }
 
 int
@@ -437,195 +557,221 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
 	}
 }
 
-/* remove the pseudo stuff from the environment (leaving other preloads
+/* remove the libpseudo stuff from the environment (leaving other preloads
  * alone).
  * There's an implicit memory leak here, but this is called only right
  * before an exec(), or at most once in a given run.
  *
  * we don't try to fix the library path.
  */
+void pseudo_dropenv() {
+	char * ld_preload = getenv("LD_PRELOAD");
+
+	if (ld_preload) {
+		ld_preload = without_libpseudo(ld_preload);
+		if (!ld_preload) {
+			pseudo_diag("fatal: can't allocate new LD_PRELOAD variable.\n");
+		}
+		if (ld_preload && strlen(ld_preload))
+			setenv("LD_PRELOAD", ld_preload, 1);
+		else
+			unsetenv("LD_PRELOAD");
+	}
+}
+
 char **
-pseudo_dropenv(char * const *environ) {
-	char **new_environ;
-	int env_count = 0;
+pseudo_dropenvp(char * const *envp) {
+	char **new_envp;
 	int i, j;
 
-	for (i = 0; environ[i]; ++i)
-		++env_count;
-	new_environ = malloc((env_count + 1) * sizeof(*new_environ));
-	if (!new_environ) {
+	for (i = 0; envp[i]; ++i) ;
+
+	new_envp = malloc((i + 1) * sizeof(*new_envp));
+	if (!new_envp) {
 		pseudo_diag("fatal: can't allocate new environment.\n");
 		return NULL;
 	}
+
 	j = 0;
-	for (i = 0; environ[i]; ++i) {
-		if (!memcmp(environ[i], "LD_PRELOAD=", 11)) {
-			char *new_val = without_libpseudo(environ[i]);
+	for (i = 0; envp[i]; ++i) {
+		if (!memcmp(envp[i], "LD_PRELOAD=", 11)) {
+			char *new_val = without_libpseudo(envp[i]);
 			if (!new_val) {
 				pseudo_diag("fatal: can't allocate new environment variable.\n");
 				return 0;
 			} else {
 				/* don't keep an empty value */
-				if (strcmp(new_val, "LD_PRELOAD=")) {
-					new_environ[j++] = new_val;
+				if (memcmp(new_val, "LD_PRELOAD=", 11)) {
+					new_envp[j++] = new_val;
 				}
 			}
 		} else {
-			new_environ[j++] = environ[i];
+			new_envp[j++] = envp[i];
 		}
 	}
-	new_environ[j++] = NULL;
-	return new_environ;
+	new_envp[j++] = NULL;
+	return new_envp;
+}
+
+/* add pseudo stuff to the environment.
+ */
+void
+pseudo_setupenv() {
+	size_t i = 0;
+
+	pseudo_debug(2, "setting up pseudo environment.\n");
+
+	/* Make sure everything has been evaluated */
+	free(pseudo_get_prefix(NULL));
+	free(pseudo_get_bindir());
+	free(pseudo_get_libdir());
+	free(pseudo_get_localstatedir());
+
+        while (pseudo_env[i].key) {
+		if (pseudo_env[i].value)
+			setenv(pseudo_env[i].key, strdup(pseudo_env[i].value), 0);
+                i++;
+        }
+
+	char * ld_preload = getenv("LD_PRELOAD");
+	if (ld_preload) {
+		ld_preload = with_libpseudo(ld_preload);
+		if (!ld_preload) {
+			pseudo_diag("fatal: can't allocate new LD_PRELOAD variable.\n");
+		}
+		setenv("LD_PRELOAD", ld_preload, 1);
+	} else {
+		setenv("LD_PRELOAD", libpseudo_name, 1);
+	}
+
+	const char * ld_library_path = getenv("LD_LIBRARY_PATH");
+	char * libdir_path = pseudo_libdir_path(NULL);
+	if (ld_library_path && !strstr(ld_library_path, libdir_path)) {
+		size_t len = strlen(ld_library_path) + 1 + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
+		char *newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+		}
+		snprintf(newenv, len, "%s:%s:%s64", ld_preload, libdir_path, libdir_path);
+		setenv("LD_LIBRARY_PATH", newenv, 1);
+	} else {
+		size_t len = strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
+		char *newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+		}
+		snprintf(newenv, len, "%s:%s64", libdir_path, libdir_path);
+		setenv("LD_LIBRARY_PATH", newenv, 1);
+	}
+	free(libdir_path);
 }
 
 /* add pseudo stuff to the environment.
  * We can't just use setenv(), because one use case is that we're trying
  * to modify the environment of a process about to be forked through
- * exec().
+ * execve().
  */
 char **
-pseudo_setupenv(char * const *environ, char *opts) {
-	char **new_environ;
-	int env_count = 0;
-	int found_preload = 0, found_libpath = 0, found_debug = 0, found_opts = 0;
-	int found_prefix = 0, found_bindir = 0, found_libdir = 0, found_localstatedir = 0;
-	int i, j;
-	size_t len;
-	char *newenv;
+pseudo_setupenvp(char * const *envp) {
+	char **new_envp;
 
-	for (i = 0; environ[i]; ++i) {
-		if (!memcmp(environ[i], "LD_PRELOAD=", 11))
-			found_preload = 1;
-		if (!memcmp(environ[i], "PSEUDO_OPTS=", 12))
-			found_opts = 1;
-		if (!memcmp(environ[i], "PSEUDO_DEBUG=", 13))
-			found_debug = 1;
-		if (!memcmp(environ[i], "LD_LIBRARY_PATH=", 16))
-			found_libpath = 1;
-		if (!memcmp(environ[i], "PSEUDO_PREFIX=", 14))
-			found_prefix = 1;
-		if (!memcmp(environ[i], "PSEUDO_BINDIR=", 14))
-			found_bindir = 1;
-		if (!memcmp(environ[i], "PSEUDO_LIBDIR=", 14))
-			found_libdir = 1;
-		if (!memcmp(environ[i], "PSEUDO_LOCALSTATEDIR=", 21))
-			found_localstatedir = 1;
+	size_t i, j, k;
+	size_t env_count = 0;
+
+	size_t size_pseudoenv = 0;
+
+	char * ld_preload=NULL, * ld_library_path=NULL;
+
+	pseudo_debug(2, "setting up envp environment.\n");
+
+	/* Make sure everything has been evaluated */
+	free(pseudo_get_prefix(NULL));
+	free(pseudo_get_bindir());
+	free(pseudo_get_libdir());
+	free(pseudo_get_localstatedir());
+
+	for (i = 0; envp[i]; ++i) {
+		if (!memcmp(envp[i], "LD_PRELOAD=", 11)) {
+			ld_preload = envp[i];
+		}
+		if (!memcmp(envp[i], "LD_LIBRARY_PATH=", 11)) {
+			ld_library_path = envp[i];
+		}
 		++env_count;
 	}
-	env_count += 8 - (found_preload + found_libpath + found_debug + found_opts + found_prefix + found_bindir + found_libdir + found_localstatedir);
 
-	new_environ = malloc((env_count + 1) * sizeof(*new_environ));
-	if (!new_environ) {
-		pseudo_diag("fatal: can't allocate new environment.\n");
-		return NULL;
-	}
+        for (i = 0; pseudo_env[i].key; i++) {
+		size_pseudoenv++;
+        }
+
+	env_count += size_pseudoenv; /* We're going to over allocate */
 
 	j = 0;
-	for (i = 0; environ[i]; ++i) {
-		if (!memcmp(environ[i], "LD_PRELOAD=", 11)) {
-			newenv = with_libpseudo(environ[i]);
+	new_envp = malloc((env_count + 1) * sizeof(*new_envp));
+	if (!new_envp) {
+		pseudo_diag("fatal: can't allocate new environment.\n");
+		return NULL;
+	}	
+
+	if (ld_preload) {
+		ld_preload = with_libpseudo(ld_preload);
+		if (!ld_preload) {
+			pseudo_diag("fatal: can't allocate new LD_PRELOAD variable.\n");
+		}
+		new_envp[j++] = ld_preload;
+	} else {
+		size_t len = strlen("LD_PRELOAD=") + strlen(libpseudo_name) + 1;
+		char *newenv = malloc(len);
+		snprintf(newenv, len, "LD_PRELOAD=%s", libpseudo_name);
+		new_envp[j++] = newenv;
+	}
+
+	char * libdir_path = pseudo_libdir_path(NULL);
+	if (ld_library_path && !strstr(ld_library_path, libdir_path)) {
+		size_t len = strlen(ld_library_path) + 1 + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
+		char *newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+		}
+		snprintf(newenv, len, "%s:%s:%s64", ld_library_path, libdir_path, libdir_path);
+		new_envp[j++] = newenv;
+	} else {
+		size_t len = strlen("LD_LIBRARY_PATH=") + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
+		char *newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+		}
+		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s64", libdir_path, libdir_path);
+		new_envp[j++] = newenv;
+	}
+	free(libdir_path);
+
+	for (i = 0; envp[i]; ++i) {
+		if (!memcmp(envp[i], "LD_PRELOAD=", 11)) continue;
+		if (!memcmp(envp[i], "LD_LIBRARY_PATH=", 16)) continue;
+		new_envp[j++] = envp[i];
+	}
+
+	for (i = 0; pseudo_env[i].key; i++) {
+		int found = 0;
+		for (k = 0; k < j; k++) {
+			if (!strncmp(pseudo_env[i].key,new_envp[k],strlen(pseudo_env[i].key))) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found && pseudo_env[i].key && pseudo_env[i].value) {
+			size_t len = strlen(pseudo_env[i].key) + 1 + strlen(pseudo_env[i].value) + 1;
+			char *newenv = malloc(len);
 			if (!newenv) {
-				pseudo_diag("fatal: can't allocate new environment variable.\n");
-				return NULL;
+				pseudo_diag("fatal: can't allocate new variable.\n");
 			}
-			new_environ[j++] = newenv;
-		} else if (!memcmp(environ[i], "LD_LIBRARY_PATH=", 16)) {
-			if (!strstr(environ[i], pseudo_libdir_path(NULL))) {
-				char *e1;
-				e1 = pseudo_libdir_path(NULL);
-				len = strlen(environ[i]) + strlen(e1) + (strlen(e1) + 2) + 3;
-				newenv = malloc(len);
-				if (!newenv) {
-					pseudo_diag("fatal: can't allocate new environment variable.\n");
-				}
-				snprintf(newenv, len, "%s:%s:%s64", environ[i], e1, e1);
-				free(e1);
-				new_environ[j++] = newenv;
-			} else {
-				new_environ[j++] = environ[i];
-			}
-		} else {
-			new_environ[j++] = environ[i];
+			snprintf(newenv, len, "%s=%s", pseudo_env[i].key, pseudo_env[i].value);
+			new_envp[j++] = newenv;
 		}
 	}
-	if (!found_libpath) {
-		char *e1;
-		e1 = pseudo_libdir_path(NULL);
-		len = 16 + strlen(e1) + (strlen(e1) + 2) + 2;
-		newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s64", e1, e1);
-		new_environ[j++] = newenv;
-	}
-	if (!found_preload) {
-		new_environ[j++] = "LD_PRELOAD=libpseudo.so";
-	}
-	if (!found_debug && max_debug_level > 0) {
-		len = 16;
-		newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		snprintf(newenv, len, "PSEUDO_DEBUG=%d", max_debug_level);
-		new_environ[j++] = newenv;
-	}
-	if (!found_opts && opts) {
-		len = 12 + strlen(opts) + 1;
-		newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		snprintf(newenv, len, "PSEUDO_OPTS=%s", opts);
-		new_environ[j++] = newenv;
-	}
-	if (!found_prefix) {
-		char * prefix_path = pseudo_prefix_path(NULL);
-		len = 14 + strlen(prefix_path) + 1;
-		newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		snprintf(newenv, len, "PSEUDO_PREFIX=%s", prefix_path);
-		new_environ[j++] = newenv;
-		free(prefix_path);
-	}
-	if (!found_bindir) {
-		char * bindir_path = pseudo_bindir_path(NULL);
-		len = 14 + strlen(bindir_path) + 1;
-		newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		snprintf(newenv, len, "PSEUDO_BINDIR=%s", bindir_path);
-		new_environ[j++] = newenv;
-		free(bindir_path);
-	}
-	if (!found_libdir) {
-		char * libdir_path = pseudo_libdir_path(NULL);
-		len = 14 + strlen(libdir_path) + 1;
-		newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		snprintf(newenv, len, "PSEUDO_LIBDIR=%s", libdir_path);
-		new_environ[j++] = newenv;
-		free(libdir_path);
-	}
-	if (!found_localstatedir) {
-		char * localstatedir_path = pseudo_localstatedir_path(NULL);
-		len = 21 + strlen(localstatedir_path) + 1;
-		newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new environment variable.\n");
-		}
-		snprintf(newenv, len, "PSEUDO_LOCALSTATEDIR=%s", localstatedir_path);
-		new_environ[j++] = newenv;
-		free(localstatedir_path);
-	}
-	new_environ[j++] = NULL;
-	return new_environ;
+	new_envp[j++] = NULL;
+	return new_envp;
 }
 
 /* Append the file value to the prefix value. */
@@ -665,80 +811,77 @@ pseudo_append_path(const char * prefix, size_t prefix_len, char *file) {
  */
 char *
 pseudo_prefix_path(char *file) {
-	static char *prefix = NULL;
-	static size_t prefix_len;
+	char * rc;
+	char * prefix = pseudo_get_prefix(NULL);
 
 	if (!prefix) {
-		prefix = getenv("PSEUDO_PREFIX");
-		if (!prefix) {
-			pseudo_diag("You must set the PSEUDO_PREFIX environment variable to run pseudo.\n");
-			exit(1);
-		}
-		prefix_len = strlen(prefix);
+		pseudo_diag("You must set the PSEUDO_PREFIX environment variable to run pseudo.\n");
+		exit(1);
 	}
 
-	return pseudo_append_path(prefix, prefix_len, file);
+	rc = pseudo_append_path(prefix, strlen(prefix), file);	
+	free(prefix);
+
+	return rc;
 }
 
 /* get the full path to a file under $PSEUDO_BINDIR. */
 char *
 pseudo_bindir_path(char *file) {
-	static char *bindir = NULL;
-	static size_t bindir_len;
+	char * rc;
+	char * bindir = pseudo_get_bindir(NULL);
 
 	if (!bindir) {
-		bindir = pseudo_get_bindir();
-		if (!bindir) {
-			pseudo_diag("You must set the PSEUDO_BINDIR environment variable to run pseudo.\n");
-			exit(1);
-		}
-		bindir_len = strlen(bindir);
+		pseudo_diag("You must set the PSEUDO_BINDIR environment variable to run pseudo.\n");
+		exit(1);
 	}
 
-	return pseudo_append_path(bindir, bindir_len, file);
+	rc = pseudo_append_path(bindir, strlen(bindir), file);	
+	free(bindir);
+
+	return rc;
 }
 
 /* get the full path to a file under $PSEUDO_LIBDIR. */
 char *
 pseudo_libdir_path(char *file) {
-	static char *libdir = NULL;
-	static size_t libdir_len;
+	char * rc;
+	char * libdir = pseudo_get_libdir(NULL);
 
 	if (!libdir) {
-		libdir = pseudo_get_libdir();
-		if (!libdir) {
-			pseudo_diag("You must set the PSEUDO_LIBDIR environment variable to run pseudo.\n");
-			exit(1);
-		}
-		libdir_len = strlen(libdir);
+		pseudo_diag("You must set the PSEUDO_LIBDIR environment variable to run pseudo.\n");
+		exit(1);
 	}
 
-	return pseudo_append_path(libdir, libdir_len, file);
+	rc = pseudo_append_path(libdir, strlen(libdir), file);	
+	free(libdir);
+
+	return rc;
 }
 
 /* get the full path to a file under $PSEUDO_LOCALSTATEDIR. */
 char *
 pseudo_localstatedir_path(char *file) {
-	static char *localstatedir = NULL;
-	static size_t localstatedir_len;
+	char * rc;
+	char * localstatedir = pseudo_get_localstatedir(NULL);
 
 	if (!localstatedir) {
-		localstatedir = pseudo_get_localstatedir();
-		if (!localstatedir) {
-			pseudo_diag("You must set the PSEUDO_LOCALSTATEDIR environment variable to run pseudo.\n");
-			exit(1);
-		}
-		localstatedir_len = strlen(localstatedir);
+		pseudo_diag("You must set the PSEUDO_LOCALSTATEDIR environment variable to run pseudo.\n");
+		exit(1);
 	}
 
-	return pseudo_append_path(localstatedir, localstatedir_len, file);
+	rc = pseudo_append_path(localstatedir, strlen(localstatedir), file);	
+	free(localstatedir);
+
+	return rc;
 }
 
 char *
 pseudo_get_prefix(char *pathname) {
-	char *s;
-	s = getenv("PSEUDO_PREFIX");
-	if (!s) {
+	char *s = pseudo_get_value("PSEUDO_PREFIX");
+
+	/* Generate the PSEUDO_PREFIX if necessary, and possible... */
+	if (!s && pathname) {
 		char mypath[pseudo_path_max()];
 		char *dir;
 		char *tmp_path;
@@ -783,22 +926,20 @@ pseudo_get_prefix(char *pathname) {
 
 		pseudo_diag("Warning: PSEUDO_PREFIX unset, defaulting to %s.\n",
 			mypath);
-		setenv("PSEUDO_PREFIX", mypath, 1);
-		s = getenv("PSEUDO_PREFIX");
+		pseudo_set_value("PSEUDO_PREFIX", mypath);
+		s = pseudo_get_value("PSEUDO_PREFIX");
 	}
 	return s;
 }
 
 char *
 pseudo_get_bindir() {
-	char *s;
-	s = getenv("PSEUDO_BINDIR");
+	char *s = pseudo_get_value("PSEUDO_BINDIR");
 	if (!s) {
-		char *pseudo_bindir;
-		pseudo_bindir = pseudo_prefix_path(PSEUDO_BINDIR);
+		char *pseudo_bindir = pseudo_prefix_path(PSEUDO_BINDIR);;
 		if (pseudo_bindir) {
-			setenv("PSEUDO_BINDIR", pseudo_bindir, 1);
-			s = getenv("PSEUDO_BINDIR");
+			pseudo_set_value("PSEUDO_BINDIR", pseudo_bindir);
+			s = pseudo_bindir;
 		}
 	}
 	return s;
@@ -806,26 +947,20 @@ pseudo_get_bindir() {
 
 char *
 pseudo_get_libdir() {
-	char *s;
-	s = getenv("PSEUDO_LIBDIR");
+	char *s = pseudo_get_value("PSEUDO_LIBDIR");
 	if (!s) {
-		char *pseudo_libdir;
-		pseudo_libdir = pseudo_prefix_path(PSEUDO_LIBDIR);
+		char *pseudo_libdir = pseudo_prefix_path(PSEUDO_LIBDIR);
 		if (pseudo_libdir) {
-			setenv("PSEUDO_LIBDIR", pseudo_libdir, 1);
-			s = getenv("PSEUDO_LIBDIR");
+			pseudo_set_value("PSEUDO_LIBDIR", pseudo_libdir);
+			s = pseudo_libdir;
 		}
 	}
 	/* If we somehow got lib64 in there, clean it down to just lib... */
 	if (s) {
 		size_t len = strlen(s);
 		if (s[len-2] == '6' && s[len-1] == '4') {
-			char mypath[pseudo_path_max()];
-			snprintf(mypath, pseudo_path_max(), "%s", s);
-			s = mypath + (strlen(mypath) - 2);
-			s[0] = '\0';
-			setenv("PSEUDO_LIBDIR", mypath, 1);
-			s = getenv("PSEUDO_LIBDIR");
+			s[len-2] = '\0';
+			pseudo_set_value("PSEUDO_LIBDIR", s);
 		}
 	}
 
@@ -834,14 +969,12 @@ pseudo_get_libdir() {
 
 char *
 pseudo_get_localstatedir() {
-	char *s;
-	s = getenv("PSEUDO_LOCALSTATEDIR");
+	char *s = pseudo_get_value("PSEUDO_LOCALSTATEDIR");
 	if (!s) {
-		char *pseudo_localstatedir;
-		pseudo_localstatedir = pseudo_prefix_path(PSEUDO_LOCALSTATEDIR);
+		char *pseudo_localstatedir = pseudo_prefix_path(PSEUDO_LOCALSTATEDIR);
 		if (pseudo_localstatedir) {
-			setenv("PSEUDO_LOCALSTATEDIR", pseudo_localstatedir, 1);
-			s = getenv("PSEUDO_LOCALSTATEDIR");
+			pseudo_set_value("PSEUDO_LOCALSTATEDIR", pseudo_localstatedir);
+			s = pseudo_localstatedir;
 		}
 	}
 	return s;
@@ -1002,11 +1135,12 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 int
 pseudo_logfile(char *defname) {
 	char *pseudo_path;
-	char *filename, *s;
+	char *filename = pseudo_get_value("PSEUDO_DEBUG_FILE");
+	char *s;
 	extern char *program_invocation_short_name; /* glibcism */
 	int fd;
 
-	if ((filename = getenv("PSEUDO_DEBUG_FILE")) == NULL) {
+	if (!filename) {
 		if (!defname) {
 			pseudo_debug(3, "no special log file requested, using stderr.\n");
 			return -1;
@@ -1077,7 +1211,8 @@ pseudo_logfile(char *defname) {
 		} else {
 			strcpy(pseudo_path, filename);
 		}
-	}
+		free(filename);
+	}	
 	fd = open(pseudo_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
 	if (fd == -1) {
 		pseudo_diag("help: can't open log file %s: %s\n", pseudo_path, strerror(errno));
