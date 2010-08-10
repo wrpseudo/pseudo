@@ -77,18 +77,26 @@ install: all install-lib install-bin install-data
 $(BIN) $(LIB) $(LOCALSTATE):
 	mkdir -p $@
 
+pseudo: $(PSEUDO)
+
 $(PSEUDO): $(BIN) pseudo.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_server.o pseudo_ipc.o
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDO) \
 		pseudo.o pseudo_server.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
+pseudolog: $(PSEUDOLOG)
+
 $(PSEUDOLOG): $(BIN) pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_ipc.o
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDOLOG) pseudolog.o pseudo_client.o pseudo_ipc.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
 
+pseudodb: $(PSEUDODB)
+
 $(PSEUDODB): $(BIN) pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDODB) pseudodb.o \
 		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS) pseudo_ipc.o
+
+libpseudo: $(LIBPSEUDO)
 
 $(LIBPSEUDO): $(LIB) $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -shared -o $(LIBPSEUDO) \
