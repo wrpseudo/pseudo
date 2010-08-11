@@ -280,6 +280,14 @@ The following environment variables are used directly by
 .IR pseudo :
 
 .TP 8
+.B PSEUDO_BINDIR
+This directory holds the path to the
+.I pseudo
+binary; by default, it is the
+.I bin
+directory under
+.B PSEUDO_PREFIX.
+.TP 8
 .B PSEUDO_CHROOT
 This variable holds the current emulated
 .I chroot(2)
@@ -322,6 +330,25 @@ in the event of a call to a missing underlying function.  This variable has
 no function outside of debugging
 .I pseudo
 itself.
+.TP 8
+.B PSEUDO_LIBDIR
+This directory holds the path to the
+.I pseudo
+shared libraries; by default, it is the
+.I lib
+directory under
+.BR PSEUDO_PREFIX .
+(On 64-bit hosts,
+.I lib64
+is also used.)
+.TP 8
+.B PSEUDO_LOCALSTATEDIR
+This directory holds the
+.I pseudo
+database files and log files; by default, it is the
+.I var/pseudo
+directory under
+.BR PSEUDO_PREFIX .
 .TP 8
 .B PSEUDO_NOSYMLINKEXP
 By default, when chrooted,

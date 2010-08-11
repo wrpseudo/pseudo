@@ -1,3 +1,6 @@
+2010-08-11:
+	* (seebs) document the new variables.
+
 2010-08-10:
 	* (mhatle) add execl, execle, execlp, execv, and execvp wrappers
 	* (seebs) handle ... for execl, etc.
