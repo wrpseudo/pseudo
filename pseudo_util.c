@@ -33,10 +33,10 @@
 #include "pseudo_ipc.h"
 #include "pseudo_db.h"
 
-/* The order below is not arbitrary, but based on the assumption
+/* The order below is not arbitrary, but based on an assumption
  * of how often things will be used.
  */
-const struct pseudo_variables pseudo_env[] = {
+static struct pseudo_variables pseudo_env[] = {
 	{ "PSEUDO_PREFIX", 13, NULL },
 	{ "PSEUDO_BINDIR", 13, NULL },
 	{ "PSEUDO_LIBDIR", 13, NULL },
@@ -67,7 +67,7 @@ int _in_init = -1;  /* Not yet run */
 
 static void _libpseudo_init(void) __attribute__ ((constructor));
 
-void dump_env(char **envp) {
+static void dump_env(char **envp) {
 	size_t i = 0;
 	for (i = 0; envp[i]; i++) {
 		pseudo_debug(0,"dump_envp: [%d]%s\n", i,envp[i]);
@@ -116,9 +116,9 @@ int pseudo_set_value(const char * key, const char * value) {
 	if (pseudo_env[i].key) {
 		if (pseudo_env[i].value) free(pseudo_env[i].value);
 		if (value)
-			((struct pseudo_variables *)pseudo_env)[i].value = strdup(value);
+			pseudo_env[i].value = strdup(value);
 		else
-			((struct pseudo_variables *)pseudo_env)[i].value = NULL;
+			pseudo_env[i].value = NULL;
 	} else {
 		if (!_in_init) pseudo_diag("Unknown variable %s.\n", key);
 		rc = -EINVAL;

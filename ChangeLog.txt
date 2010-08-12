@@ -2,6 +2,7 @@
 	* (seebs) Fix install of libpseudo so the plain library is created
 		when using $(SUFFIX), this is needed so pseudo daemons don't
 		need to know $(SUFFIX) so you can use prebuilts.
+	* (seebs) Remove spurious "const" from modifiable table.
 
 2010-08-11:
 	* (seebs) document the new variables.
