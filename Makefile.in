@@ -53,7 +53,7 @@ WRAPOBJS=pseudo_wrappers.o
 PSEUDO=$(BIN)/pseudo
 PSEUDODB=$(BIN)/pseudodb
 PSEUDOLOG=$(BIN)/pseudolog
-LIBPSEUDO=$(LIB)/libpseudo$(SUFFIX).so
+LIBPSEUDO=$(LIB)/libpseudo.so
 
 
 all: $(LIBPSEUDO) $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
@@ -64,6 +64,7 @@ test: all $(BIN) $(LIB) $(LOCALSTATE)
 install-lib: $(LIBPSEUDO)
 	mkdir -p $(DESTDIR)$(LIBDIR)
 	cp $(LIBPSEUDO) $(DESTDIR)$(LIBDIR)
+	$(if $(SUFFIX),cp $(LIBPSEUDO) $(DESTDIR)$(LIBDIR)/libpseudo$(SUFFIX).so,:)
 
 install-bin: $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
 	mkdir -p $(DESTDIR)$(BINDIR)
