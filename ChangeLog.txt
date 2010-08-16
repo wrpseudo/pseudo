@@ -1,3 +1,6 @@
+2010-08-16:
+	* (rp) Fix ld_preload/ld_library_path mixup.
+
 2010-08-12:
 	* (seebs) Fix install of libpseudo so the plain library is created
 		when using $(SUFFIX), this is needed so pseudo daemons don't

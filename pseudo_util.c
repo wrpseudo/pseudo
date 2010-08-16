@@ -652,7 +652,7 @@ pseudo_setupenv() {
 		if (!newenv) {
 			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
 		}
-		snprintf(newenv, len, "%s:%s:%s64", ld_preload, libdir_path, libdir_path);
+		snprintf(newenv, len, "%s:%s:%s64", ld_library_path, libdir_path, libdir_path);
 		setenv("LD_LIBRARY_PATH", newenv, 1);
 	} else {
 		size_t len = strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
