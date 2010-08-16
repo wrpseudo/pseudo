@@ -466,13 +466,10 @@ client_ping(void) {
 	ping.type = PSEUDO_MSG_PING;
 	ping.op = OP_NONE;
 
-	if (!tag)
-		tag = strdup("");
-
 	ping.pathlen = snprintf(tagbuf, sizeof(tagbuf), "%s%c%s",
 		program_invocation_name ? program_invocation_name : "<unknown>",
 		0,
-		tag);
+		tag ? tag : "");
 	free(tag);
 	ping.client = getpid();
 	ping.result = 0;

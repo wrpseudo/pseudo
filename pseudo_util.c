@@ -111,13 +111,19 @@ int pseudo_set_value(const char * key, const char * value) {
 
 	if (_in_init == -1) _libpseudo_init();
 
-	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++) ;
+	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++)
+		;
 
 	if (pseudo_env[i].key) {
 		if (pseudo_env[i].value) free(pseudo_env[i].value);
-		if (value)
-			pseudo_env[i].value = strdup(value);
-		else
+		if (value) {
+			char *new = strdup(value);
+			if (new)
+				pseudo_env[i].value = new;
+			else
+				pseudo_diag("warning: failed to save new value (%s) for key %s\n",
+					value, key);
+		} else
 			pseudo_env[i].value = NULL;
 	} else {
 		if (!_in_init) pseudo_diag("Unknown variable %s.\n", key);
@@ -600,8 +606,9 @@ pseudo_dropenvp(char * const *envp) {
 				pseudo_diag("fatal: can't allocate new environment variable.\n");
 				return 0;
 			} else {
-				/* don't keep an empty value */
-				if (memcmp(new_val, "LD_PRELOAD=", 11)) {
+				/* don't keep an empty value; if the whole string is
+				 * LD_PRELOAD=, we just drop it. */
+				if (memcmp(new_val, "LD_PRELOAD=", 12)) {
 					new_envp[j++] = new_val;
 				}
 			}
@@ -629,7 +636,7 @@ pseudo_setupenv() {
 
         while (pseudo_env[i].key) {
 		if (pseudo_env[i].value)
-			setenv(pseudo_env[i].key, strdup(pseudo_env[i].value), 0);
+			setenv(pseudo_env[i].key, pseudo_env[i].value, 0);
                 i++;
         }
 

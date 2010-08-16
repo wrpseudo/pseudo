@@ -10,6 +10,12 @@
   size_t i = 0;
   size_t alloc_size = 256;
   const char **argv = malloc(sizeof (const char *) * alloc_size);
+  if (!argv) {
+	pseudo_debug(1, "execlp failed: couldn't allocate memory for %lu arguments\n",
+		(unsigned long) alloc_size);
+	errno = ENOMEM;
+	return -1;
+  }
 
   argv[i++] = arg;
 
@@ -18,6 +24,12 @@
 	if ( i > alloc_size - 1 ) {
 		alloc_size = alloc_size + 256;
 		argv = realloc(argv, sizeof (const char *) * alloc_size);
+		if (!argv) {
+			pseudo_debug(1, "execlp failed: couldn't allocate memory for %lu arguments\n",
+				(unsigned long) alloc_size);
+			errno = ENOMEM;
+			return -1;
+		}
 	}
   }
 
