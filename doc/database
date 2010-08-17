@@ -14,6 +14,7 @@ FILES:
 	gid (integer)
 	mode (integer)
 	rdev (integer)
+	deleting (integer)
 
 There are two indexes on the file database, one by path and one by device
 and inode.  Earlier versions of pseudo ignored symlinks, but this turned
@@ -30,9 +31,37 @@ to obtain the device and inode, then modifying all matching records.
 
 If a file shows up with no name (this should VERY rarely happen), it is stored
 in the database with the special name 'NAMELESS FILE'.  This name can never
-be sent by the client (all names are sent as absolute paths).  If a later
+be sent by the client (all names are sent as absolute paths).  If a laterThe
 request comes in with a valid name, the 'NAMELESS FILE' is renamed to it so
 it can be unlinked later.
+
+The "deleting" field is used to track files which are in the midst of
+being possibly-deleted.  The issue is that if you issue an unlink database
+operation only after removing a file, there is a window during which
+another program can genuinely create a new file with the same name or
+inode, and that request can reach the daemon before the unlink operation
+does.  To address this, three operations are addded:  may-unlink, did-unlink,
+and cancel-unlink.  The may-unlink operation tags a file for possible
+deletion, setting "deleting" to 1.  A clash involving a file marked for
+deletion is resolved by deleting the existing database entry without
+complaint.  A did-unlink operation deletes a file ONLY if it is marked
+for deletion.  A cancel-unlink operation unmarks a file for deletion.
+
+You can still have a race condition here, but it seems a lot less likely.
+The failure would be:
+	Process A marks file X for deletion.
+	Process A unlinks file X.
+	Process B creates file X.
+	Process B requests a link for X.
+	The server unlinks the previously marked X.
+	The server creates a new link for X, not marked for deletion.
+	Process B marks file X for deletion.
+	Process A's delete-marked-file request finally shows up.
+	The server unlinks the newly-marked X.
+	Process B fails to delete the file.
+	Process B attempts to cancel the mark-for-deletion.
+
+This shouldn't be a common occurrence.
 
 Rename operations use a pair of paths, separated by a null byte; the client
 sends the total length of both names (plus the null byte), and the server
@@ -88,3 +117,4 @@ opened.  These values are not completely reliable.  A value of 0 is typical
 for non-open operations, and a value outside the 0-15 range (usually -1)
 indicates that something went wrong trying to identify the mode of a given
 open.
+

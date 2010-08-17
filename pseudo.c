@@ -403,21 +403,24 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		 */
 		if (by_path.ino != msg_header.ino && msg_header.ino != 0) {
 			switch (msg->op) {
-			case OP_EXEC:	/* FALLTHROUGH */
-			case OP_RENAME:
-				/* A rename that crossed a filesystem can change the inode
-				 * number legitimately.
-				 */
-				pseudo_debug(2, "inode changed for '%s': %llu in db, %llu in request.\n",
-					msg->path,
-					(unsigned long long) by_path.ino,
-					(unsigned long long) msg_header.ino);
+			case OP_EXEC:
 				break;
 			default:
-				pseudo_diag("inode mismatch: '%s' ino %llu in db, %llu in request.\n",
-					msg->path,
-					(unsigned long long) by_path.ino,
-					(unsigned long long) msg_header.ino);
+				/* if the path is in the database with a
+				 * different inode, but we were expecting
+				 * it to get deleted, mark the old one
+				 * as deleted.
+				 */
+				if (by_path.deleting != 0) {
+					pseudo_debug(1, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
+						msg->path);
+					pdb_did_unlink_file(msg->path);
+				} else {
+					pseudo_diag("inode mismatch: '%s' ino %llu in db, %llu in request.\n",
+						msg->path,
+						(unsigned long long) by_path.ino,
+						(unsigned long long) msg_header.ino);
+				}
 			}
 		}
 		/* If the database entry disagrees on S_ISDIR, it's just
@@ -493,12 +496,22 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				break;
 			}
 			if (mismatch) {
-				pseudo_diag("path mismatch [%d link%s]: ino %llu db '%s' req '%s'.\n",
-					msg->nlink,
-					msg->nlink == 1 ? "" : "s",
-					(unsigned long long) msg_header.ino,
-					path_by_ino ? path_by_ino : "no path",
-					msg->path);
+				/* a mismatch, but we were planning to delete
+				 * the file, so it must have gotten deleted
+				 * already.
+				 */
+				if (by_ino.deleting != 0) {
+					pseudo_debug(1, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
+						msg->path);
+					pdb_did_unlink_file(path_by_ino);
+				} else {
+					pseudo_diag("path mismatch [%d link%s]: ino %llu db '%s' req '%s'.\n",
+						msg->nlink,
+						msg->nlink == 1 ? "" : "s",
+						(unsigned long long) msg_header.ino,
+						path_by_ino ? path_by_ino : "no path",
+						msg->path);
+					}
 			}
 		} else {
 			/* I don't think I've ever seen this one. */
@@ -686,6 +699,19 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		pdb_rename_file(oldpath, msg);
 		pdb_update_inode(msg);
 		break;
+	case OP_MAY_UNLINK:
+		if (pdb_may_unlink_file(msg)) {
+			/* harmless, but client wants to know so it knows
+			 * whether to follow up... */
+			msg->result = RESULT_FAIL;
+		}
+		break;
+	case OP_DID_UNLINK:
+		pdb_did_unlink_file(msg->path);
+		break;
+	case OP_CANCEL_UNLINK:
+		pdb_cancel_unlink_file(msg);
+		break;
 	case OP_UNLINK:
 		/* this removes any entries with the given path from the
 		 * database.  No response is needed.
@@ -707,16 +733,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				(unsigned long long) msg->ino);
 			pdb_unlink_file_dev(msg);
 		}
-		/* if we had a match for this path, stash it in the
-		 * message -- client may want to relink it if the
-		 * real_unlink() fails.
-		 */
-		if (found_path) {
-			*msg = by_path;
-			msg->result = RESULT_SUCCEED;
-		} else {
-			msg->result = RESULT_NONE;
-		}
+		msg->result = RESULT_NONE;
 		break;
 	case OP_MKDIR:		/* FALLTHROUGH */
 	case OP_MKNOD:

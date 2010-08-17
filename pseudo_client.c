@@ -952,28 +952,32 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 		pseudo_client_path(dirfd, fd_path(fd));
 		break;
 	/* operations for which we should use the magic uid/gid */
-	case OP_CHMOD:		/* FALLTHROUGH */
-	case OP_CREAT:		/* FALLTHROUGH */
-	case OP_FCHMOD:		/* FALLTHROUGH */
-	case OP_MKDIR:		/* FALLTHROUGH */
-	case OP_MKNOD:		/* FALLTHROUGH */
-	case OP_SYMLINK:	/* FALLTHROUGH */
+	case OP_CHMOD:
+	case OP_CREAT:
+	case OP_FCHMOD:
+	case OP_MKDIR:
+	case OP_MKNOD:
+	case OP_SYMLINK:
 		msg.uid = pseudo_fuid;
 		msg.gid = pseudo_fgid;
 		pseudo_debug(2, "fuid: %d ", pseudo_fuid);
-		/* fallthrough.  chown/fchown uid/gid already calculated, and
+		/* FALLTHROUGH */
+		/* chown/fchown uid/gid already calculated, and
 		 * a link or rename should not change a file's ownership.
 		 * (operations which can create should be CREAT or MKNOD
 		 * or MKDIR)
 		 */
-	case OP_EXEC:		/* FALLTHROUGH */
-	case OP_CHOWN:		/* FALLTHROUGH */
-	case OP_FCHOWN:		/* FALLTHROUGH */
-	case OP_FSTAT:		/* FALLTHROUGH */
-	case OP_LINK:		/* FALLTHROUGH */
-	case OP_RENAME:		/* FALLTHROUGH */
-	case OP_STAT:		/* FALLTHROUGH */
+	case OP_EXEC:
+	case OP_CHOWN:
+	case OP_FCHOWN:
+	case OP_FSTAT:
+	case OP_LINK:
+	case OP_RENAME:
+	case OP_STAT:
 	case OP_UNLINK:
+	case OP_DID_UNLINK:
+	case OP_CANCEL_UNLINK:
+	case OP_MAY_UNLINK:
 		do_request = 1;
 		break;
 	default:

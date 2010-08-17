@@ -6,30 +6,29 @@
  * wrap_rmdir(const char *path) {
  *	int rc = -1;
  */
-	pseudo_msg_t *old_file;
+	pseudo_msg_t *msg;
  	struct stat64 buf;
 	int save_errno;
+	int old_db_entry = 0;
 
 	rc = real___lxstat64(_STAT_VER, path, &buf);
 	if (rc == -1) {
 		return rc;
 	}
-	old_file = pseudo_client_op(OP_UNLINK, 0, -1, -1, path, &buf);
+	msg = pseudo_client_op(OP_MAY_UNLINK, 0, -1, -1, path, &buf);
+	if (msg && msg->result == RESULT_SUCCEED)
+		old_db_entry = 1;
 	rc = real_rmdir(path);
-	if (rc == -1) {
-		save_errno = errno;
-		if (old_file && old_file->result == RESULT_SUCCEED) {
-			pseudo_debug(1, "rmdir failed, trying to relink...\n");
-			buf.st_uid = old_file->uid;
-			buf.st_gid = old_file->uid;
-			buf.st_mode = old_file->mode;
-			buf.st_dev = old_file->dev;
-			buf.st_ino = old_file->ino;
-			pseudo_client_op(OP_LINK, 0, -1, -1, path, &buf);
+	if (old_db_entry) {
+		if (rc == -1) {
+			save_errno = errno;
+			pseudo_client_op(OP_CANCEL_UNLINK, 0, -1, -1, path, &buf);
+			errno = save_errno;
 		} else {
-			pseudo_debug(1, "rmdir failed, but found no database entry, ignoring.\n");
+			pseudo_client_op(OP_DID_UNLINK, 0, -1, -1, path, &buf);
 		}
-		errno = save_errno;
+	} else {
+		pseudo_debug(1, "rmdir on <%s>, not in database, no effect.\n", path);
 	}
 
 /*	return rc;

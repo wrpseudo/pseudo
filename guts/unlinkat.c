@@ -6,9 +6,10 @@
  * wrap_unlinkat(int dirfd, const char *path, int rflags) {
  *	int rc = -1;
  */
-	pseudo_msg_t *old_file;
+	pseudo_msg_t *msg;
 	int save_errno;
 	struct stat64 buf;
+	int old_db_entry;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
@@ -35,27 +36,26 @@
 	if (rc == -1) {
 		return rc;
 	}
-	old_file = pseudo_client_op(OP_UNLINK, 0, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_MAY_UNLINK, 0, -1, dirfd, path, &buf);
+	if (msg && msg->result == RESULT_SUCCEED)
+		old_db_entry = 1;
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	rc = real_unlink(path);
 #else
 	rc = real_unlinkat(dirfd, path, rflags);
 #endif
-	if (rc == -1) {
-		save_errno = errno;
-		if (old_file && old_file->result == RESULT_SUCCEED) {
-			pseudo_debug(1, "unlink failed, trying to relink...\n");
-			buf.st_uid = old_file->uid;
-			buf.st_gid = old_file->uid;
-			buf.st_mode = old_file->mode;
-			buf.st_dev = old_file->dev;
-			buf.st_ino = old_file->ino;
-			pseudo_client_op(OP_LINK, 0, -1, dirfd, path, &buf);
+	if (old_db_entry) {
+		if (rc == -1) {
+			save_errno = errno;
+			pseudo_client_op(OP_CANCEL_UNLINK, 0, -1, -1, path, &buf);
+			errno = save_errno;
 		} else {
-			pseudo_debug(1, "unlink failed, but found no database entry, ignoring.\n");
+			pseudo_client_op(OP_DID_UNLINK, 0, -1, -1, path, &buf);
 		}
-		errno = save_errno;
+	} else {
+		pseudo_debug(1, "unlink on <%s>, not in database, no effect.\n", path);
 	}
+
 /*	return rc;
  * }
  */

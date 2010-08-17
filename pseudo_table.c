@@ -47,6 +47,9 @@ static char *operation_names[] = {
 	"unlink",
 	"symlink",
 	"exec",
+	"may-unlink",
+	"did-unlink",
+	"cancel-unlink",
 	NULL
 };
 

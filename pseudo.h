@@ -51,6 +51,9 @@ typedef enum {
 	 */
 	OP_SYMLINK,
 	OP_EXEC,
+	OP_MAY_UNLINK,
+	OP_DID_UNLINK,
+	OP_CANCEL_UNLINK,
 	OP_MAX
 } op_id_t;
 extern char *pseudo_op_name(op_id_t id);

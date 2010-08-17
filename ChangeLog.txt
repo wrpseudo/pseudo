@@ -1,3 +1,7 @@
+2010-08-17:
+	* (seebs) create speculative-deletion logic
+	* (seebs) remove crackpot theories about cross-device renames
+
 2010-08-16:
 	* (rp) Fix ld_preload/ld_library_path mixup.
 	* (seebs) Handle failed allocations.

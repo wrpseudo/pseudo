@@ -213,6 +213,7 @@ static struct sql_migration {
 } file_migrations[] = {
 	{ create_migration_table },
 	{ index_migration_table },
+	{ "ALTER TABLE files ADD deleting INTEGER;" },
 	{ NULL },
 }, log_migrations[] = {
 	{ create_migration_table },
@@ -1283,8 +1284,8 @@ pdb_link_file(pseudo_msg_t *msg) {
 	static sqlite3_stmt *insert;
 	int rc;
 	char *sql = "INSERT INTO files "
-		    " ( path, dev, ino, uid, gid, mode, rdev ) "
-		    " VALUES (?, ?, ?, ?, ?, ?, ?);";
+		    " ( path, dev, ino, uid, gid, mode, rdev, deleting ) "
+		    " VALUES (?, ?, ?, ?, ?, ?, ?, 0);";
 
 	if (!file_db && get_db(&file_db)) {
 		pseudo_diag("database error.\n");
@@ -1391,6 +1392,120 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 	return rc != SQLITE_DONE;
 }
 
+/* mark a file for pending deletion */
+int
+pdb_may_unlink_file(pseudo_msg_t *msg) {
+	static sqlite3_stmt *mark_file;
+	int rc, exact;
+	char *sql_mark_file = "UPDATE files SET deleting = 1 WHERE path = ?;";
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
+	if (!mark_file) {
+		rc = sqlite3_prepare_v2(file_db, sql_mark_file, strlen(sql_mark_file), &mark_file, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare DELETE statement");
+			return 1;
+		}
+	}
+	if (!msg) {
+		return 1;
+	}
+	if (msg->pathlen) {
+		sqlite3_bind_text(mark_file, 1, msg->path, -1, SQLITE_STATIC);
+	} else {
+		pseudo_debug(1, "cannot mark a file for pending deletion without a path.");
+		return 1;
+	}
+	rc = sqlite3_step(mark_file);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "mark for deletion may have failed");
+		return 1;
+	}
+	exact = sqlite3_changes(file_db);
+	pseudo_debug(3, "(exact %d) ", exact);
+	sqlite3_reset(mark_file);
+	sqlite3_clear_bindings(mark_file);
+	/* indicate whether we marked something */
+	if (exact > 0)
+		return 0;
+	else
+		return 1;
+}
+
+/* unmark a file for pending deletion */
+int
+pdb_cancel_unlink_file(pseudo_msg_t *msg) {
+	static sqlite3_stmt *mark_file;
+	int rc, exact;
+	char *sql_mark_file = "UPDATE files SET deleting = 0 WHERE path = ?;";
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
+	if (!mark_file) {
+		rc = sqlite3_prepare_v2(file_db, sql_mark_file, strlen(sql_mark_file), &mark_file, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare DELETE statement");
+			return 1;
+		}
+	}
+	if (!msg) {
+		return 1;
+	}
+	if (msg->pathlen) {
+		sqlite3_bind_text(mark_file, 1, msg->path, -1, SQLITE_STATIC);
+	} else {
+		pseudo_debug(1, "cannot unmark a file for pending deletion without a path.");
+		return 1;
+	}
+	rc = sqlite3_step(mark_file);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "unmark for deletion may have failed");
+	}
+	exact = sqlite3_changes(file_db);
+	pseudo_debug(3, "(exact %d) ", exact);
+	sqlite3_reset(mark_file);
+	sqlite3_clear_bindings(mark_file);
+	return rc != SQLITE_DONE;
+}
+
+int
+pdb_did_unlink_file(char *path) {
+	static sqlite3_stmt *delete_exact;
+	int rc, exact;
+	char *sql_delete_exact = "DELETE FROM files WHERE path = ? AND deleting = 1;";
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
+	if (!delete_exact) {
+		rc = sqlite3_prepare_v2(file_db, sql_delete_exact, strlen(sql_delete_exact), &delete_exact, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare DELETE statement");
+			return 1;
+		}
+	}
+	if (!path) {
+		pseudo_debug(1, "cannot unlink a file without a path.");
+		return 1;
+	}
+	sqlite3_bind_text(delete_exact, 1, path, -1, SQLITE_STATIC);
+	rc = sqlite3_step(delete_exact);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "cleanup of file marked for deletion may have failed");
+	}
+	exact = sqlite3_changes(file_db);
+	pseudo_debug(3, "(exact %d)\n", exact);
+	sqlite3_reset(delete_exact);
+	sqlite3_clear_bindings(delete_exact);
+	return rc != SQLITE_DONE;
+}
+
 /* unlink a file, by path */
 int
 pdb_unlink_file(pseudo_msg_t *msg) {
@@ -1438,7 +1553,7 @@ pdb_unlink_file(pseudo_msg_t *msg) {
  *         Use > and < instead of a glob at the end.
  */
 int
-pdb_unlink_contents( pseudo_msg_t *msg) {
+pdb_unlink_contents(pseudo_msg_t *msg) {
 	static sqlite3_stmt *delete_sub;
 	int rc, sub;
 	char *sql_delete_sub = "DELETE FROM files WHERE "
@@ -1470,7 +1585,7 @@ pdb_unlink_contents( pseudo_msg_t *msg) {
 		dberr(file_db, "delete sub by path may have failed");
 	}
 	sub = sqlite3_changes(file_db);
-	pseudo_debug(3, "sub %d) ", sub);
+	pseudo_debug(3, "(sub %d) ", sub);
 	sqlite3_reset(delete_sub);
 	sqlite3_clear_bindings(delete_sub);
 	return rc != SQLITE_DONE;
@@ -1673,6 +1788,7 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 		msg->gid = (unsigned long) sqlite3_column_int64(select, 5);
 		msg->mode = (unsigned long) sqlite3_column_int64(select, 6);
 		msg->rdev = (unsigned long) sqlite3_column_int64(select, 7);
+		msg->deleting = (int) sqlite3_column_int64(select, 8);
 		rc = 0;
 		break;
 	case SQLITE_DONE:
@@ -1728,6 +1844,7 @@ pdb_find_file_path(pseudo_msg_t *msg) {
 		msg->gid = sqlite3_column_int64(select, 5);
 		msg->mode = sqlite3_column_int64(select, 6);
 		msg->rdev = sqlite3_column_int64(select, 7);
+		msg->deleting = (int) sqlite3_column_int64(select, 8);
 		rc = 0;
 		break;
 	case SQLITE_DONE:
@@ -1824,6 +1941,7 @@ pdb_find_file_dev(pseudo_msg_t *msg) {
 		msg->gid = (unsigned long) sqlite3_column_int64(select, 5);
 		msg->mode = (unsigned long) sqlite3_column_int64(select, 6);
 		msg->rdev = (unsigned long) sqlite3_column_int64(select, 7);
+		msg->deleting = (int) sqlite3_column_int64(select, 8);
 		rc = 0;
 		break;
 	case SQLITE_DONE:
@@ -1872,6 +1990,7 @@ pdb_find_file_ino(pseudo_msg_t *msg) {
 		msg->gid = (unsigned long) sqlite3_column_int64(select, 5);
 		msg->mode = (unsigned long) sqlite3_column_int64(select, 6);
 		msg->rdev = (unsigned long) sqlite3_column_int64(select, 7);
+		msg->deleting = (int) sqlite3_column_int64(select, 8);
 		rc = 0;
 		break;
 	case SQLITE_DONE:

@@ -10,6 +10,7 @@
  	struct stat64 oldbuf, newbuf;
 	int oldrc, newrc;
 	int save_errno;
+	int old_db_entry = 0;
 
 	pseudo_debug(2, "rename: %s->%s\n",
 		oldpath ? oldpath : "<nil>",
@@ -28,24 +29,24 @@
 	errno = save_errno;
 
 	/* newpath must be removed. */
-	/* as with unlink, we have to do the remove before the operation
-	 */
-	msg = pseudo_client_op(OP_UNLINK, 0, -1, -1, newpath, newrc ? NULL : &newbuf);
-	/* stash the server's old data */
+	/* as with unlink, we have to mark that the file may get deleted */
+	msg = pseudo_client_op(OP_MAY_UNLINK, 0, -1, -1, newpath, newrc ? NULL : &newbuf);
+	if (msg && msg->result == RESULT_SUCCEED)
+		old_db_entry = 1;
 	rc = real_rename(oldpath, newpath);
 	save_errno = errno;
-	if (rc == -1) {
-		if (msg && msg->result == RESULT_SUCCEED) {
-			newbuf.st_uid = msg->uid;
-			newbuf.st_gid = msg->uid;
-			newbuf.st_mode = msg->mode;
-			newbuf.st_dev = msg->dev;
-			newbuf.st_ino = msg->ino;
+	if (old_db_entry) {
+		if (rc == -1) {
 			/* since we failed, that wasn't really unlinked -- put
 			 * it back.
 			 */
-			pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &newbuf);
+			pseudo_client_op(OP_CANCEL_UNLINK, 0, -1, -1, newpath, &newbuf);
+		} else {
+			/* confirm that the file was removed */
+			pseudo_client_op(OP_DID_UNLINK, 0, -1, -1, newpath, &newbuf);
 		}
+	}
+	if (rc == -1) {
 		/* and we're done. */
 		errno = save_errno;
 		return rc;
@@ -72,21 +73,7 @@
 	 * we may have to rename or remove directory trees even though in
 	 * theory rename can never destroy a directory tree.
 	 */
-
-	/* re-stat the new file.  Why?  Because if something got moved
-	 * across device boundaries, its dev/ino changed!
-	 */
-	newrc = real___lxstat64(_STAT_VER, newpath, &newbuf);
-	if (msg && msg->result == RESULT_SUCCEED) {
-		pseudo_stat_msg(&oldbuf, msg);
-		if (newrc == 0) {
-			if (newbuf.st_dev != oldbuf.st_dev) {
-				oldbuf.st_dev = newbuf.st_dev;
-				oldbuf.st_ino = newbuf.st_ino;
-			}
-		}
-		pseudo_debug(1, "renaming %s, got old mode of 0%o\n", oldpath, (int) msg->mode);
-	} else {
+	if (!old_db_entry) {
 		/* create an entry under the old name, which will then be
 		 * renamed; this way, children would get renamed too, if there
 		 * were any.

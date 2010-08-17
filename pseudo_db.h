@@ -37,7 +37,10 @@ typedef struct {
 	char *program;
 } log_entry;
 
+extern int pdb_cancel_unlink_file(pseudo_msg_t *msg);
+extern int pdb_did_unlink_file(char *path);
 extern int pdb_link_file(pseudo_msg_t *msg);
+extern int pdb_may_unlink_file(pseudo_msg_t *msg);
 extern int pdb_unlink_file(pseudo_msg_t *msg);
 extern int pdb_unlink_file_dev(pseudo_msg_t *msg);
 extern int pdb_update_file(pseudo_msg_t *msg);

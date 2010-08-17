@@ -48,6 +48,7 @@ typedef struct {
 	dev_t rdev;
 	unsigned int pathlen;
 	int nlink;
+	int deleting;
 	char path[];
 } pseudo_msg_t;
 
