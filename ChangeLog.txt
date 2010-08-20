@@ -1,3 +1,6 @@
+2010-08-19:
+	* (seebs) handle insane edge case involving regcomp/regexec
+
 2010-08-17:
 	* (seebs) create speculative-deletion logic
 	* (seebs) remove crackpot theories about cross-device renames

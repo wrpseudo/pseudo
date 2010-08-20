@@ -17,6 +17,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
+/* we need access to RTLD_NEXT for a horrible workaround */
+#define _GNU_SOURCE
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -28,6 +31,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <limits.h>
+
+/* see the comments below about (*real_regcomp)() */
+#include <dlfcn.h>
 
 #include "pseudo.h"
 #include "pseudo_ipc.h"
@@ -182,6 +188,18 @@ static char *libpseudo_name = "libpseudo.so";
 static char *libpseudo_pattern = "(^|=| )libpseudo[^ ]*\\.so($| )";
 static regex_t libpseudo_regex;
 static int libpseudo_regex_compiled = 0;
+/* Okay, so, there's a funny story behind this.  On one of the systems
+ * we need to run on, /usr/bin/find happens to provide its own
+ * definitions of regcomp and regexec which are INCOMPATIBLE with the
+ * ones in the C library, and not only that, but which have buggy and/or
+ * incompatible semantics, such that they trash elements of the pmatch
+ * array.  So we do our best to call the "real" regcomp/regexec in the
+ * C library.  If we can't find them, we just do our best and hope that
+ * no one called us from a program with incompatible variants.
+ *
+ */
+static int (*real_regcomp)(regex_t *__restrict __preg, const char *__restrict __pattern, int __cflags);
+static int (*real_regexec)(const regex_t *__restrict __preg, const char *__restrict __string, size_t __nmatch, regmatch_t __pmatch[__restrict_arr], int __eflags);
 
 static int
 libpseudo_regex_init(void) {
@@ -189,7 +207,13 @@ libpseudo_regex_init(void) {
 
 	if (libpseudo_regex_compiled)
 		return 0;
-	rc = regcomp(&libpseudo_regex, libpseudo_pattern, REG_EXTENDED);
+	real_regcomp = dlsym(RTLD_NEXT, "regcomp");
+	if (!real_regcomp)
+		real_regcomp = regcomp;
+	real_regexec = dlsym(RTLD_NEXT, "regexec");
+	if (!real_regexec)
+		real_regexec = regexec;
+	rc = (*real_regcomp)(&libpseudo_regex, libpseudo_pattern, REG_EXTENDED);
 	if (rc == 0)
 		libpseudo_regex_compiled = 1;
 	return rc;
@@ -210,11 +234,11 @@ without_libpseudo(char *list) {
 	if (list[0] == '=' || list[0] == ' ')
 		skip_start = 1;
 
-	if (regexec(&libpseudo_regex, list, 1, pmatch, 0)) {
+	if ((*real_regexec)(&libpseudo_regex, list, 1, pmatch, 0)) {
 		return list;
 	}
 	list = strdup(list);
-	while (!regexec(&libpseudo_regex, list, 1, pmatch, 0)) {
+	while (!(*real_regexec)(&libpseudo_regex, list, 1, pmatch, 0)) {
 		char *start = list + pmatch[0].rm_so;
 		char *end = list + pmatch[0].rm_eo;
 		/* don't copy over the space or = */
@@ -234,7 +258,7 @@ with_libpseudo(char *list) {
 	regmatch_t pmatch[1];
 	if (libpseudo_regex_init())
 		return NULL;
-	if (regexec(&libpseudo_regex, list, 1, pmatch, 0)) {
+	if ((*real_regexec)(&libpseudo_regex, list, 1, pmatch, 0)) {
 		/* <%s %s\0> */
 		size_t len = strlen(list) + 1 + strlen(libpseudo_name) + 1;
 		char *new = malloc(len);
