@@ -318,6 +318,8 @@ EOF
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		$(write_return $default_value);
 	}
+	/* this may get restored if we end up calling exec*() */
+	pseudo_saved_sigmask = saved;
 	$decl_paths
 	if (pseudo_populate_wrappers()) {
 		int save_errno;
@@ -341,8 +343,8 @@ $free_paths
 		save_errno = errno;
 		pseudo_droplock();
 		sigprocmask(SIG_SETMASK, &saved, NULL);
-		errno = save_errno;
 		pseudo_debug(4, "completed: $name\n");
+		errno = save_errno;
 		$(write_return rc);
 	} else {
 		pseudo_droplock();

@@ -14,6 +14,10 @@
 		pseudo_dropenv();
 	}
 
+	/* if exec() fails, we may end up taking signals unexpectedly...
+	 * not much we can do about that.
+	 */
+	sigprocmask(SIG_SETMASK, &pseudo_saved_sigmask, NULL);
 	rc = real_execvp(file, argv);
 
 /*	return rc;

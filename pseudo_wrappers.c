@@ -42,6 +42,7 @@ static void pseudo_droplock(void);
 static size_t pseudo_dechroot(char *, size_t);
 
 extern char *program_invocation_short_name;
+static sigset_t pseudo_saved_sigmask;
 
 /* the generated code goes here */
 #include "pseudo_wrapper_table.c"
