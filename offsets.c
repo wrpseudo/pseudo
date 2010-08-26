@@ -36,7 +36,7 @@ main(void) {
 	printf("type: %d\n", (int) offsetof(pseudo_msg_t, type));
 	printf("op: %d\n", (int) offsetof(pseudo_msg_t, op));
 	printf("result: %d\n", (int) offsetof(pseudo_msg_t, result));
-	printf("rwx: %d\n", (int) offsetof(pseudo_msg_t, rwx));
+	printf("access: %d\n", (int) offsetof(pseudo_msg_t, access));
 	printf("client: %d\n", (int) offsetof(pseudo_msg_t, client));
 	printf("dev: %d\n", (int) offsetof(pseudo_msg_t, dev));
 	printf("ino: %d\n", (int) offsetof(pseudo_msg_t, ino));
@@ -45,6 +45,8 @@ main(void) {
 	printf("mode: %d\n", (int) offsetof(pseudo_msg_t, mode));
 	printf("rdev: %d\n", (int) offsetof(pseudo_msg_t, rdev));
 	printf("pathlen: %d\n", (int) offsetof(pseudo_msg_t, pathlen));
+	printf("nlink: %d\n", (int) offsetof(pseudo_msg_t, nlink));
+	printf("deleting: %d\n", (int) offsetof(pseudo_msg_t, deleting));
 	printf("path: %d\n", (int) offsetof(pseudo_msg_t, path));
 	printf("size: %d\n", (int) sizeof(pseudo_msg_t));
 	return 0;

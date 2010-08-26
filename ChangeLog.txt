@@ -1,3 +1,6 @@
+2010-08-26:
+	* (seebs) make offsets.c slightly less useless
+
 2010-08-25:
 	* (seebs) fix the signal mask restore
 
