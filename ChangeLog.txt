@@ -1,3 +1,6 @@
+2010-08-25:
+	* (seebs) fix the signal mask restore
+
 2010-08-24:
 	* (seebs) try to restore signal mask before calling exec()
 	* (seebs) move errno restoration after code which could set errno

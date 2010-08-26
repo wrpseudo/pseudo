@@ -318,8 +318,6 @@ EOF
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		$(write_return $default_value);
 	}
-	/* this may get restored if we end up calling exec*() */
-	pseudo_saved_sigmask = saved;
 	$decl_paths
 	if (pseudo_populate_wrappers()) {
 		int save_errno;
@@ -336,6 +334,8 @@ EOF
 			}
 		} else {
 $alloc_paths
+			/* exec*() use this to restore the sig mask */
+			pseudo_saved_sigmask = saved;
 			$(write_assign rc) wrap_$name($argnames);
 $free_paths
 		}
