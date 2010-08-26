@@ -675,9 +675,17 @@ pseudo_setupenv() {
 		setenv("LD_PRELOAD", libpseudo_name, 1);
 	}
 
-	const char * ld_library_path = getenv("LD_LIBRARY_PATH");
+	const char *ld_library_path = getenv("LD_LIBRARY_PATH");
 	char * libdir_path = pseudo_libdir_path(NULL);
-	if (ld_library_path && !strstr(ld_library_path, libdir_path)) {
+	if (!ld_library_path) {
+		size_t len = strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
+		char *newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+		}
+		snprintf(newenv, len, "%s:%s64", libdir_path, libdir_path);
+		setenv("LD_LIBRARY_PATH", newenv, 1);
+	} else if (!strstr(ld_library_path, libdir_path)) {
 		size_t len = strlen(ld_library_path) + 1 + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
 		char *newenv = malloc(len);
 		if (!newenv) {
@@ -686,13 +694,8 @@ pseudo_setupenv() {
 		snprintf(newenv, len, "%s:%s:%s64", ld_library_path, libdir_path, libdir_path);
 		setenv("LD_LIBRARY_PATH", newenv, 1);
 	} else {
-		size_t len = strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
-		char *newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
-		}
-		snprintf(newenv, len, "%s:%s64", libdir_path, libdir_path);
-		setenv("LD_LIBRARY_PATH", newenv, 1);
+		/* nothing to do, ld_library_path exists and contains
+		 * our preferred path */
 	}
 	free(libdir_path);
 }
@@ -711,7 +714,7 @@ pseudo_setupenvp(char * const *envp) {
 
 	size_t size_pseudoenv = 0;
 
-	char * ld_preload=NULL, * ld_library_path=NULL;
+	char *ld_preload = NULL, *ld_library_path = NULL;
 
 	pseudo_debug(2, "setting up envp environment.\n");
 
@@ -757,8 +760,16 @@ pseudo_setupenvp(char * const *envp) {
 		new_envp[j++] = newenv;
 	}
 
-	char * libdir_path = pseudo_libdir_path(NULL);
-	if (ld_library_path && !strstr(ld_library_path, libdir_path)) {
+	char *libdir_path = pseudo_libdir_path(NULL);
+	if (!ld_library_path) {
+		size_t len = strlen("LD_LIBRARY_PATH=") + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
+		char *newenv = malloc(len);
+		if (!newenv) {
+			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+		}
+		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s64", libdir_path, libdir_path);
+		new_envp[j++] = newenv;
+	} else if (!strstr(ld_library_path, libdir_path)) {
 		size_t len = strlen(ld_library_path) + 1 + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
 		char *newenv = malloc(len);
 		if (!newenv) {
@@ -767,13 +778,8 @@ pseudo_setupenvp(char * const *envp) {
 		snprintf(newenv, len, "%s:%s:%s64", ld_library_path, libdir_path, libdir_path);
 		new_envp[j++] = newenv;
 	} else {
-		size_t len = strlen("LD_LIBRARY_PATH=") + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
-		char *newenv = malloc(len);
-		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
-		}
-		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s64", libdir_path, libdir_path);
-		new_envp[j++] = newenv;
+		/* keep old value */
+		new_envp[j++] = ld_library_path;
 	}
 	free(libdir_path);
 
