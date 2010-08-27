@@ -159,6 +159,8 @@ extern char *pseudo_version;
  #define PSEUDO_LIBDIR "lib"
 #endif
 
+#define STARTSWITH(x, y) (!memcmp((x), (y), sizeof(y) - 1))
+
 #ifndef PSEUDO_LOCALSTATEDIR
  #define PSEUDO_LOCALSTATEDIR "var/pseudo"
 #endif
@@ -191,3 +193,4 @@ extern char *pseudo_version;
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
 #endif
+

@@ -624,7 +624,7 @@ pseudo_dropenvp(char * const *envp) {
 
 	j = 0;
 	for (i = 0; envp[i]; ++i) {
-		if (!memcmp(envp[i], "LD_PRELOAD=", 11)) {
+		if (STARTSWITH(envp[i], "LD_PRELOAD=")) {
 			char *new_val = without_libpseudo(envp[i]);
 			if (!new_val) {
 				pseudo_diag("fatal: can't allocate new environment variable.\n");
@@ -632,7 +632,7 @@ pseudo_dropenvp(char * const *envp) {
 			} else {
 				/* don't keep an empty value; if the whole string is
 				 * LD_PRELOAD=, we just drop it. */
-				if (memcmp(new_val, "LD_PRELOAD=", 12)) {
+				if (strcmp(new_val, "LD_PRELOAD=")) {
 					new_envp[j++] = new_val;
 				}
 			}
@@ -725,10 +725,10 @@ pseudo_setupenvp(char * const *envp) {
 	free(pseudo_get_localstatedir());
 
 	for (i = 0; envp[i]; ++i) {
-		if (!memcmp(envp[i], "LD_PRELOAD=", 11)) {
+		if (STARTSWITH(envp[i], "LD_PRELOAD=")) {
 			ld_preload = envp[i];
 		}
-		if (!memcmp(envp[i], "LD_LIBRARY_PATH=", 11)) {
+		if (STARTSWITH(envp[i], "LD_LIBRARY_PATH=")) {
 			ld_library_path = envp[i];
 		}
 		++env_count;
@@ -784,8 +784,8 @@ pseudo_setupenvp(char * const *envp) {
 	free(libdir_path);
 
 	for (i = 0; envp[i]; ++i) {
-		if (!memcmp(envp[i], "LD_PRELOAD=", 11)) continue;
-		if (!memcmp(envp[i], "LD_LIBRARY_PATH=", 16)) continue;
+		if (STARTSWITH(envp[i], "LD_PRELOAD=")) continue;
+		if (STARTSWITH(envp[i], "LD_LIBRARY_PATH=")) continue;
 		new_envp[j++] = envp[i];
 	}
 

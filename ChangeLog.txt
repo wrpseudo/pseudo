@@ -1,3 +1,7 @@
+2010-08-27:
+	* (seebs) fix a bug caused by memcmp with wrong length
+	* (seebs) stop hand-coding lengths of memcmp (torek was right...)
+
 2010-08-26:
 	* (seebs) make offsets.c slightly less useless
 	* (seebs) don't overwrite LD_LIBRARY_PATH values that include us
