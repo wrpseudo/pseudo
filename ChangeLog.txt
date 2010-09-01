@@ -1,3 +1,6 @@
+2010-09-01:
+	* (seebs) add missing casts to even more printf arguments
+
 2010-08-31:
 	* (seebs) add missing casts to printf arguments, after being warned
 	  about them a mere twenty or thirty thousand times.

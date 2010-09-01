@@ -843,7 +843,7 @@ pseudo_client_op(op_id_t op, int access, int fd, int dirfd, const char *path, co
 				return 0;
 			}
 			snprintf(both_paths, full_len, "%.*s%c%s",
-				pathlen - 1 - strip_slash,
+				(int) (pathlen - 1 - strip_slash),
 				path, 0, oldpath);
 			pseudo_debug(2, "rename: %s -> %s [%d]\n",
 				both_paths + pathlen, both_paths, (int) full_len);

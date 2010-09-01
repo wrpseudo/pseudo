@@ -681,7 +681,7 @@ format_one(log_entry *e, char *format) {
 		pseudo_diag("invalid log entry or format specifier.\n");
 		return 0;
 	}
-	real_len = snprintf(fmtbuf, sizeof(fmtbuf), "%.*s", len + 1, format);
+	real_len = snprintf(fmtbuf, sizeof(fmtbuf), "%.*s", (int) len + 1, format);
 	if (real_len >= sizeof(fmtbuf) - 1) {
 		pseudo_diag("Format string way too long starting at %.10s",
 			format - 1);

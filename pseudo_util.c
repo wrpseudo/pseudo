@@ -73,18 +73,20 @@ int _in_init = -1;  /* Not yet run */
 
 static void _libpseudo_init(void) __attribute__ ((constructor));
 
+#if 0
 static void dump_env(char **envp) {
 	size_t i = 0;
 	for (i = 0; envp[i]; i++) {
-		pseudo_debug(0,"dump_envp: [%d]%s\n", i,envp[i]);
+		pseudo_debug(0,"dump_envp: [%d]%s\n", (int) i, envp[i]);
 	}
 
 	for (i = 0; pseudo_env[i].key; i++) {
-		pseudo_debug(0,"dump_envp: {%d}%s=%s\n", i, pseudo_env[i].key, pseudo_env[i].value);
+		pseudo_debug(0,"dump_envp: {%d}%s=%s\n", (int) i, pseudo_env[i].key, pseudo_env[i].value);
 	}
 
 	pseudo_debug(0, "dump_envp: _in_init %d\n", _in_init);
 }
+#endif
 
 /* Caller must free memory! */
 char * pseudo_get_value(const char * key) {
