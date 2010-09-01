@@ -55,7 +55,7 @@
 	rc = buf;
 	pseudo_debug(3, "getcwd: copying %d (%d + 1 - %d) characters from <%s>.\n",
 		(int) ((pseudo_cwd_len + 1) - pseudo_chroot_len),
-		pseudo_cwd_len, pseudo_chroot_len,
+		(int) pseudo_cwd_len, (int) pseudo_chroot_len,
 		pseudo_cwd_rel);
 	memcpy(buf, pseudo_cwd_rel, (pseudo_cwd_len + 1) - (pseudo_cwd_rel - pseudo_cwd));
 	if (!*buf) {

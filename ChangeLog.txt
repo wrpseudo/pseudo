@@ -1,3 +1,7 @@
+2010-08-31:
+	* (seebs) add missing casts to printf arguments, after being warned
+	  about them a mere twenty or thirty thousand times.
+
 2010-08-27:
 	* (seebs) fix a bug caused by memcmp with wrong length
 	* (seebs) stop hand-coding lengths of memcmp (torek was right...)
