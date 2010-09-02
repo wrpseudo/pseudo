@@ -44,12 +44,12 @@
 		}
 	}
 	if (pseudo_cwd_len - (pseudo_cwd_rel - pseudo_cwd) >= size) {
-		pseudo_diag("only %ld bytes available, need %ld (%ld + 1 - %ld)\n",
+		pseudo_debug(1, "only %ld bytes available, need %ld (%ld + 1 - %ld)\n",
 			(unsigned long) size,
 			(unsigned long) pseudo_cwd_len + 1 - pseudo_chroot_len,
 			(unsigned long) pseudo_cwd_len,
 			(unsigned long) pseudo_chroot_len);
-		errno = ENAMETOOLONG;
+		errno = ERANGE;
 		return NULL;
 	}
 	rc = buf;
