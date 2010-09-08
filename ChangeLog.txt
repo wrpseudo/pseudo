@@ -1,3 +1,6 @@
+2010-09-08:
+	* (seebs) handle mkfifo without guaranteeing an EINVAL response.
+
 2010-09-02:
 	* (seebs) fix errno for getcwd() with insufficient size
 	* (seebs) Add an RPATH entry to the pseudo binary to find the sqlite3
