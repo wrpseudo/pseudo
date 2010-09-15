@@ -1,3 +1,7 @@
+2010-09-15:
+	* (seebs) allow setting default RPATH entry distinct from sqlite3
+	  directory.
+
 2010-09-08:
 	* (seebs) handle mkfifo without guaranteeing an EINVAL response.
 
