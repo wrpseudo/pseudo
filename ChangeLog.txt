@@ -1,3 +1,7 @@
+2010-09-16:
+	* (seebs) change exec*() to use file, rather than path or filename,
+	  also add OP_EXEC where it was missing.
+
 2010-09-15:
 	* (seebs) allow setting default RPATH entry distinct from sqlite3
 	  directory.

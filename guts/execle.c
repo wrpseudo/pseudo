@@ -3,7 +3,7 @@
  * guts/COPYRIGHT for information.
  *
  * static int
- * wrap_execle(const char *path, const char *arg, va_list ap) {
+ * wrap_execle(const char *file, const char *arg, va_list ap) {
  *	int rc = -1;
  */
 
@@ -35,7 +35,7 @@
   }
   envp = va_arg (ap, char *const *);
 
-  rc = wrap_execve (path, (char *const *) argv, envp);
+  rc = wrap_execve (file, (char *const *) argv, envp);
 
   free (argv);
 
