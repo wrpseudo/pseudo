@@ -1,3 +1,7 @@
+2010-10-06:
+	* (mhatle) Add the fsetxattr wrapper to return ENOTSUP
+          (note: workaround gnu coreutils 'cp')
+
 2010-09-16:
 	* (seebs) change exec*() to use file, rather than path or filename,
 	  also add OP_EXEC where it was missing.

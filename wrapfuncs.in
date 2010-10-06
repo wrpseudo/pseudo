@@ -118,3 +118,4 @@ int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
 int getgroups(int size, gid_t *list);
 ssize_t getxattr(const char *path, const char *name, void *value, size_t size);
 ssize_t lgetxattr(const char *path, const char *name, void *value, size_t size); /* flags=AT_SYMLINK_NOFOLLOW */
+int fsetxattr(int filedes, const char *name, const void *value, size_t size, int flags);
