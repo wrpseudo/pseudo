@@ -40,6 +40,7 @@ static int pseudo_mutex_recursion = 0;
 static int pseudo_getlock(void);
 static void pseudo_droplock(void);
 static size_t pseudo_dechroot(char *, size_t);
+static void pseudo_sigblock(sigset_t *);
 
 extern char *program_invocation_short_name;
 static sigset_t pseudo_saved_sigmask;
@@ -47,6 +48,24 @@ static sigset_t pseudo_saved_sigmask;
 /* the generated code goes here */
 #include "pseudo_wrapper_table.c"
 #include "pseudo_wrapfuncs.c"
+
+static void
+pseudo_sigblock(sigset_t *saved) {
+	sigset_t blocked;
+
+	/* these are signals for which the handlers often
+	 * invoke operations, such as close(), which are handled
+	 * by pseudo and could result in a deadlock.
+	 */
+	sigemptyset(&blocked);
+	sigaddset(&blocked, SIGALRM);	/* every-N-seconds tasks */
+	sigaddset(&blocked, SIGCHLD);	/* reaping child processes */
+	sigaddset(&blocked, SIGHUP);	/* idiomatically, reloading config */
+	sigaddset(&blocked, SIGTERM);	/* shutdown/teardown operations */
+	sigaddset(&blocked, SIGUSR1);	/* reopening log files, sometimes */
+	sigaddset(&blocked, SIGUSR2);	/* who knows what people do */
+	sigprocmask(SIG_BLOCK, &blocked, saved);
+}
 
 static int
 pseudo_getlock(void) {
@@ -90,6 +109,7 @@ pseudo_enosys(const char *func) {
 	if (value)
 		abort();
 	free(value);
+	errno = ENOSYS;
 }
 
 /* de-chroot a string.
@@ -132,13 +152,13 @@ pseudo_populate_wrappers(void) {
 	pseudo_getlock();
 	pseudo_antimagic();
 	for (i = 0; pseudo_functions[i].name; ++i) {
-		if (*pseudo_functions[i].real == pseudo_functions[i].dummy) {
+		if (*pseudo_functions[i].real == NULL) {
 			int (*f)(void);
 			char *e;
 			dlerror();
 			f = dlsym(RTLD_NEXT, pseudo_functions[i].name);
 			if ((e = dlerror()) != NULL) {
-				/* leave it pointed to dummy */
+				/* leave it NULL, which our implementation checks for */
 				pseudo_diag("No wrapper for %s: %s\n", pseudo_functions[i].name, e);
 			} else {
 				if (f)

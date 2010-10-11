@@ -1,463 +1,451 @@
-#!/bin/sh
-#
-# makewrappers, script to auto-generate wrapper functions
-#
-# Copyright (c) 2008-2010 Wind River Systems, Inc.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the Lesser GNU General Public License version 2.1 as
-# published by the Free Software Foundation.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the Lesser GNU General Public License for more details.
-#
-# You should have received a copy of the Lesser GNU General Public License
-# version 2.1 along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
-#
+#!/usr/bin/env python
+'convert wrapfuncs.in to wrapper function stubs and tables'
 
-case $# in
-0)	echo >&2 "Usage: makewrappers file [...]"
-	exit 1
-	;;
-esac
+import glob
+import sys
+import re
+import os
+import string
+import datetime
+import time
+from string import Template
 
-# save old versions
-test -f "pseudo_wrapfuncs.c" && mv pseudo_wrapfuncs.c pseudo_wrapfuncs.c.old
-test -f "pseudo_wrapfuncs.h" && mv pseudo_wrapfuncs.h pseudo_wrapfuncs.h.old
+class SourceFile(object):
+    "A template for creating a source file"
 
-# create files
-exec 5>pseudo_wrapfuncs.c
-exec 6>pseudo_wrapfuncs.h
-exec 7>pseudo_wrapper_table.c
+    def __init__(self, path):
+	# default values...
+	# no name or file yet
+	self.name = ''
+	self.sections = {}
+	self.file = None
+	self.path = None
+	# open a new file for each function
+	self.file_per_func = False
 
-# "cat >&N <<EOF" populates the file on &N with the here-document.
+	# empty footer if none specified:
+	self.sections['footer'] = []
 
-# pseudo_wrapfuncs.c has to have all the hunks used by the wrapper functions,
-# including guts/*.c.
-cat >&5 <<EOF
-`cat guts/COPYRIGHT`
-/* wrapper functions. generated automatically. */
+	# lines appended to body by default
+	self.sections['body'] = []
+	current = self.sections['body']
 
-/* This file is generated and should not be modified.  See the makewrappers
- * script if you want to modify this. */
-EOF
+        self.f = file(path, 'r')
+	if not self.f:
+	    return None
+	for line in self.f:
+	    line = line.rstrip()
+	    if line.startswith('@'):
+	        if ' ' in line:
+	             leading, trailing = line.split(' ', 1)
+	        else:
+	             leading, trailing = line, None
 
-cat >&6 <<EOF
-`cat guts/COPYRIGHT`
-EOF
+	        if leading == '@name':
+		    if not trailing:
+		        raise Exception("@name requires a file name.")
+	            self.path = trailing
+		    if '$' in self.path:
+		        self.file_per_func = True
+	        else:
+		    section = leading[1:]
+		    if not section in self.sections:
+		        self.sections[section] = []
+		    current = self.sections[section]
+	    else:
+	        current.append(line)
+	for section, data in self.sections.items():
+	    self.sections[section] = Template("\n".join(data))
 
-# the wrapper function table is also #included, it is a separate file so it
-# can be written as we go, but still be a single table.
-cat >&7 <<EOF
-`cat guts/COPYRIGHT`
-/* The table of wrapper functions to populate */
+        # You need a file if this isn't a file-per-func
+	if not self.file_per_func:
+	    self.file = file(self.path, 'w')
+	    if not self.file:
+	        raise IOError("Couldn't open %s to read a template." % self.path)
 
-/* This file is generated and should not be modified.  See the makewrappers
- * script if you want to modify this. */
-static struct {
-	char *name;		/* the name */
-	int (**real)(void);	/* the underlying syscall */
-	int (*dummy)(void);	/* the always-fails form */
-	int (*wrapper)(void);	/* the wrapper from guts/name.c */
-} pseudo_functions[] = {
-EOF
+    def __del__(self):
+        if self.file:
+	    self.file.close()
 
-printf >&2 'Reading signatures...\n'
-for file in "$@"
-do
-	# read lines containing wrappable functions, write wrapper
-	# declarations, definitions, and so on.
-	printf >&2 '[%s]' "$file"
-	while read signature
-	do
-		# skip comments
-		case $signature in
-		\#*)	continue;;
-		esac
-		# obtain return type, name, and arguments
-		args=`expr "$signature" : '[^(]*(\(.*\));'`
-		modifiers=`expr "$signature" : '.*; /\* \(.*\) \*/'`
-		return_and_name=`expr "$signature" : '\([^(]*\)('`
-		name=`expr "$return_and_name" : '.*[^a-zA-Z0-9_]\([a-zA-Z0-9_]*\)$'`
-		type=`expr "$return_and_name" : '\(.*[^ ]\) *'"$name"'$'`
-		printf >&2 ' %s' "$name"
-		wrapargnames=''
-		argnames=''
-		# for handling path canonicalization
-		pathnames=''
-		flags='0'
-		dirfd='AT_FDCWD'
+    def __repr__(self):
+	strings = []
+	if self.file_per_func:
+            strings.append("path: %s (per func)" % self.path)
+	else:
+            strings.append("path: %s" % self.path)
+	for name, data in self.sections.items():
+	    strings.append("%s:" % name)
+	    strings.append(data.safe_substitute({}))
+	return "\n".join(strings)
 
-		save_IFS=$IFS
-		IFS=,
-		set -- $args
-		IFS=$save_IFS
-		args=''
-		dummy_args=''
-		wrap_args=''
-		va_list_abort_on_real=''
-		optional_arg=false
-		make_va_list=false
-		maybe_va_end=''
-		prepend=''
-		depth=0
-		for arg
-		do
+    def emit(self, template, func = None):
+	if self.file_per_func:
+	    if not func:
+	        # print "Must have a function to emit any part of a file-per-func template."
+		return
+	    path = Template(self.path).safe_substitute(func)
+	    if os.path.exists(path):
+	        # print "We don't overwrite existing files."
+	        return
+	    self.file = file(path, 'w')
+	    if not self.file:
+		print "Couldn't open '%s' (expanded from %s), not emitting '%s'." % (path, self.path, template)
+	        return
 
-			# handle optional arguments, like the third arg
-			# to open()
-			if [ $depth -gt 0 ]; then
-				case $arg in
-				*\)*)
-					lcount=`echo $arg | tr -cd '(' | wc -c`
-					rcount=`echo $arg | tr -cd ')' | wc -c`
-					depth=`expr $depth + $lcount - $rcount`
-					prepend="${prepend:+$prepend,}$arg"
-					arg=""
-					;;
-				*)	prepend="${prepend:+$prepend,}$arg"
-					arg=""
-					;;
-				esac
-			else
-				case $arg in
-				*\(*)	lcount=`echo $arg | tr -cd '(' | wc -c`
-					rcount=`echo $arg | tr -cd ')' | wc -c`
-					depth=`expr $depth + $lcount - $rcount`
-					prepend="${prepend:+$prepend,}$arg"
-					arg=""
-					;;
-				esac
-			fi
-			# we're inside nested ()s
-			if [ $depth -gt 0 ]; then
-				continue
-			fi
-			arg="$prepend$arg"
-			# strip whitespace
-			arg=${arg# }
-			arg=${arg% }
-			prepend=''
-			case $arg in
-			...)
-				make_va_list=true
-				maybe_va_end='va_end(ap);'
-				va_list_abort_on_real='assert(!"cannot chain to real versions of variadic functions");'
-				args="$args${args+, }..."
-				dummy_args="$dummy_args${dummy_args:+, }..."
-				wrap_args="$wrap_args${wrap_args:+, }va_list ap"
-				arg="..."
-				argname="ap"
-				argnames="$argnames${argnames:+, }ap"
-				wrapargnames="$wrapargnames${wrapargnames:+, }ap"
-				# used for creating a va_list
-				optional_prev=$prev_argname
-				;;
-			...*)
-				optional_arg=true
-				args="$args${args:+, }..."
-				wrap_args="$wrap_args${wrap_args:+, }..."
-				dummy_args="$dummy_args${dummy_args:+, }..."
-				arg=`expr "$arg" : '\.\.\.{\(.*\)}'`
-				argname=`expr "$arg" : '.*[^a-zA-Z0-9_]\([a-zA-Z0-9_]*\)$'`
-				argnames="$argnames${argnames:+, }$argname"
-				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
+	if template == "copyright":
+	    # hey, at least it's not a global variable, amirite?
+	    self.file.write(SourceFile.copyright)
+	elif template in self.sections:
+	    templ = self.sections[template]
+	    self.file.write(templ.safe_substitute(func))
+	    self.file.write("\n")
+	else:
+	    print "Warning: Unknown template '%s'." % template
 
-				# we need this to extract and pass the argument
-				optional_decl=$arg
-				optional_prev=$prev_argname
-				optional_name=$argname
-				optional_type=`expr "$arg" : '\(.*[^ ]\) *'"$argname"'$'`
-				;;
-			*\(*)	# function pointer
-				argname=`expr "$arg" : '[^(]*(\*\([a-zA-Z0-9_]*\).*'`
-				args="$args${args:+, }$arg"
-				wrap_args="$wrap_args${wrap_args:+, }$arg"
-				dummy_args="$dummy_args${dummy_args:+, }$arg __attribute__((unused))"
-				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
-				argnames="$argnames${argnames:+, }$argname"
-				prev_argname=$argname
-				;;
-			*)
-				argname=`expr "$arg" : '.*[^a-zA-Z0-9_](*\([a-zA-Z0-9_]*\))*(*)*$'`
-				args="$args${args:+, }$arg"
-				wrap_args="$wrap_args${wrap_args:+, }$arg"
-				dummy_args="$dummy_args${dummy_args:+, }$arg __attribute__((unused))"
-				# special handling for canonicalization
-				# set this before changing path -> rpath, for guts files
-				wrapargnames="$wrapargnames${wrapargnames:+, }$argname"
-				case $argname in
-				*path)	pathnames="${pathnames+${pathnames} }$argname"
-					argname="r$argname"
-					;;
-				dirfd)	dirfd='dirfd';;
-				flags)	flags='flags';;
-				esac
-				argnames="$argnames${argnames:+, }$argname"
-				prev_argname=$argname
-				;;
-			esac
-		done
-		# see whether flags was overridden
-		flags_tmp=`expr "$modifiers" : 'flags=\([^ ]*\)'`
-		if [ -n "$flags_tmp" ]; then
-			flags=$flags_tmp
-		fi
-		decl_paths=''
-		alloc_paths=''
-		free_paths=''
-		# any argument ending in "path" is presumed to need to be
-		# converted to a chroot path.  To avoid this, name the
-		# argument something else (e.g. "template" for mkstemp)
-		for p in $pathnames; do
-			decl_paths="${decl_paths}
-	char *r$p = (char *) $p;"
-			alloc_paths="${alloc_paths}
-			r$p = pseudo_root_path(__func__, __LINE__, $dirfd, $p, $flags);"
-			free_paths="${free_paths}
-			free(r$p);"
-		done
+	if self.file_per_func:
+	    self.file.close()
+	    self.file = None
 
-		# determine default return value.
-		is_void=false
-		case $type in
-		int|ssize_t|long)
-			default_value=-1;;
-		uid_t|gid_t)
-			default_value=0;;
-		*'*')
-			default_value=NULL;;
-		void)	
-			is_void=true
-			default_value=''
-			;;
-		*)	echo >&2 "
-Unknown type '$type'." ; exit 1 ;;
-		esac
-		if $is_void; then
-			write_return() {
-				printf "return"
-			}
-			write_assign() {
-				printf "(void)"
-			}
-			write_decl() {
-				: # do nothing
-			}
-		else
-			write_return() {
-				printf "return %s" "$1"
-			}
-			write_assign() {
-				printf "%s =" "$1"
-			}
-			write_decl() {
-				printf "%s %s = %s;" "$1" "$2" "$3"
-			}
-		fi
-		# create the wrappers
-		# first the dummy, and the function pointer:
-		cat >&5 <<EOF
-static $type
-dummy_$name($dummy_args) {
-	pseudo_enosys("$name");
-	errno = ENOSYS;
-	$(write_return $default_value);
-}
+class ArgumentList:
+    "A (possibly empty) list of arguments"
 
-static $type (*real_$name)($args) = dummy_$name;
+    def __init__(self, text):
+        "parse a comma-separated argument list (may contain function prototypes)"
+        self.args = []
+	self.variadic = False
+	self.variadic_decl = ""
+	self.variadic_start = ""
+	self.variadic_end = ""
+	self.prologue_call_real = "/* pass the call on to the underlying syscall */"
+	# (void) is an empty list, not a list of a single argument which is void
+	if text == "void":
+	    return
 
-EOF
-		# then the wrapper signature and args:
-		if $optional_arg; then
-			cat >&5 <<EOF
-$type
-$name($args) {
-	$optional_decl;
-	va_list ap;
-	va_start(ap, $optional_prev);
-	$optional_name = va_arg(ap, $optional_type);
-	va_end(ap);
+        depth = 0
+        accum = ''
+        comma_sep = text.split(', ')
+        # now, what if there was a comma embedded in an argument?
+        for arg in comma_sep:
+            lcount = arg.count('(')
+            rcount = arg.count(')')
+            depth = depth + lcount - rcount
+            if (depth > 0):
+                accum += arg + ', '
+            else:
+                self.args.append(C_Argument(accum + arg))
+                accum = ''
+        if depth != 0:
+	    raise Exception("mismatched ()s while parsing '%s'" % text)
+        if self.args[-1].vararg:
+	    self.variadic = True
+	    self.variadic_arg = self.args[-1]
+	    self.last_fixed_arg = self.args[-2].name
+	    self.variadic_decl = "va_list ap;\n"
+	    self.variadic_start = "va_start(ap, %s);\n" % self.last_fixed_arg
+	    if self.variadic_arg.vararg_wraps:
+	        self.variadic_decl += "\t%s;\n" % self.variadic_arg.vararg_wraps.decl()
+		self.variadic_start += "\t%s = va_arg(ap, %s);\n\tva_end(ap);\n" % (self.variadic_arg.name, self.variadic_arg.type)
+	    else:
+	        self.variadic_end = "va_end(ap);\n"
+                self.prologue_call_real = '/* no way to pass a ... */\n\t\t\t\tassert(!"cannot chain to real versions of variadic functions");'
 
-EOF
-		else
-			cat >&5 <<EOF
-$type
-$name($args) {
-EOF
-		fi
-		if $make_va_list; then
-			cat >&5 <<EOF
-	va_list ap;
-	va_start(ap, $optional_prev);
-EOF
-		fi
-		# and now the body of the wrapper:
-		cat >&5 <<EOF
-	sigset_t blocked, saved;
-	$(write_decl "$type" "rc" "$default_value")
+    def decl(self, **kw):
+	if not self.args:
+	    return "void"
 
-	pseudo_debug(4, "called: $name\n");
-	/* these are signals for which the handlers often
-	 * invoke operations, such as close(), which are handled
-	 * by pseudo and could result in a deadlock.
-	 */
-	sigemptyset(&blocked);
-	sigaddset(&blocked, SIGALRM);	/* every-N-seconds tasks */
-	sigaddset(&blocked, SIGCHLD);	/* reaping child processes */
-	sigaddset(&blocked, SIGHUP);	/* idiomatically, reloading config */
-	sigaddset(&blocked, SIGTERM);	/* shutdown/teardown operations */
-	sigaddset(&blocked, SIGUSR1);	/* reopening log files, sometimes */
-	sigaddset(&blocked, SIGUSR2);	/* who knows what people do */
-	sigprocmask(SIG_BLOCK, &blocked, &saved);
-	if (pseudo_getlock()) {
-		errno = EBUSY;
-		sigprocmask(SIG_SETMASK, &saved, NULL);
-		$(write_return $default_value);
-	}
-	$decl_paths
-	if (pseudo_populate_wrappers()) {
-		int save_errno;
-		if (antimagic > 0) {
-			if (real_$name) {
-				/* if this function takes ..., there is
-				 * no way to pass the real argument list
-				 * to it...
-				 */
-				$va_list_abort_on_real
-				$(write_assign rc) (*real_$name)($argnames);
-			} else {
-				$(write_assign rc) dummy_$name($argnames);
-			}
-		} else {
-$alloc_paths
-			/* exec*() use this to restore the sig mask */
-			pseudo_saved_sigmask = saved;
-			$(write_assign rc) wrap_$name($argnames);
-$free_paths
-		}
-		$maybe_va_end
-		save_errno = errno;
-		pseudo_droplock();
-		sigprocmask(SIG_SETMASK, &saved, NULL);
-		pseudo_debug(4, "completed: $name\n");
-		errno = save_errno;
-		$(write_return rc);
-	} else {
-		pseudo_droplock();
-		sigprocmask(SIG_SETMASK, &saved, NULL);
-		pseudo_debug(4, "completed: $name\n");
-		$(write_assign rc) dummy_$name($argnames);
-		$maybe_va_end
-		$(write_return rc);
-	}
-}
+	list = map(lambda x: x.decl(**kw), self.args)
+        return ', '.join(list)
 
-EOF
-		# and now the signature part for the actual implementation:
-		# and the guts include file.
+    def call(self):
+        if not self.args:
+	    return ""
+	list = map(lambda x: x.call(), self.args)
+	return ', '.join(list)
 
-		# the wrapper function is actually declared in
-		# pseudo_wrapper.c, with guts implemented in a separate
-		# file with comments indicating the signature.
-		guts="guts/$name.c"
+    def __repr__(self):
+        if not self.args:
+	    return "no arguments"
+        else:
+	    return '::'.join(map(lambda x:x.decl(), self.args))
 
-		# the actual wrapper function, including argument setup
-		if $optional_arg; then
-			cat >&5 << EOF
-static $type
-wrap_$name($wrap_args) {
-	$(write_decl "$type" "rc" "$default_value")
-	$optional_decl;
+    
+class C_Argument:
+    "A function argument such as 'char *path' or 'char (*foo)(void)'"
+    def __init__(self, text):
+        "get the type and name of a trivial C declaration"
+	self.vararg = False
+	self.function_pointer = False
+	self.spacer = ''
+	
+	if text == 'void':
+	    raise Exception("Tried to declare a nameless object of type void.")
 
-	va_list ap;
-	va_start(ap, $optional_prev);
-	$optional_name = va_arg(ap, $optional_type);
-	va_end(ap);
+	if text.startswith('...'):
+	    self.vararg = True
+	    if len(text) > 3:
+		# we're a wrapper for something else, declared as
+		# ...{real_decl}, as in the third argument to open(2)
+		text = text[4:-1]
+		# stash a copy of these values without the vararg flag, so we can
+		# declare them prettily later
+		self.vararg_wraps = C_Argument(text)
+	    else:
+		# nothing to do.
+		self.vararg_wraps = None
+	        self.type, self.name = None, None
+		return
+	else:
+	    self.vararg = False
 
-#include "$guts"
+        # try for a function pointer
+        match = re.match('(.*)\(\*([a-zA-Z0-9_]*)\)\((.*)\)', text)
+        if match:
+	    self.function_pointer = True
+	    self.args = match.group(3)
+            ret_type = match.group(1)
+            args = match.group(3)
+	    self.fulltype = "$ret_type(*)($args)"
+	    self.name = match.group(2).rstrip(' ')
+	    self.type = ret_type
+	else:
+            # plain declaration
+            match = re.match('(.*[ *])\(?\*?([a-zA-Z0-9_]*)\)?', text)
+            # there may not be a match, say in the special case where an arg is '...'
+            if match:
+	        self.type, self.name = match.group(1).rstrip(' '), match.group(2)
+            else:
+                self.type, self.name = None, None
 
-	$(write_return rc);
-}
-EOF
-		else
-			cat >&5 << EOF
-static $type
-wrap_$name($wrap_args) {
-	$(write_decl "$type" "rc" "$default_value")
+	# spacing between type and name, needed if type ends with a character
+	# which could be part of an identifier
+	if re.match('[_a-zA-Z0-9]', self.type[-1]):
+	    self.spacer = ' '
 
-#include "$guts"
+    def decl(self, **kw):
+	comment = kw.get('comment', False)
+	if self.function_pointer:
+	    decl = "%s%s(*%s)(%s)" % (self.type, self.spacer, self.name, self.args)
+	else:
+            decl = "%s%s%s" % (self.type, self.spacer, self.name)
 
-	$(write_return rc);
-}
-EOF
-		fi
+        if self.vararg:
+	    if self.vararg_wraps:
+	        if comment:
+	            decl = "... { %s }" % decl
+		else:
+	            decl = "... /* %s */" % decl
+	    else:
+	        decl = "..."
+	return decl
 
-		# if the guts file didn't already exist, create a default.
-		if test ! -f "$guts"; then
-			if $optional_arg; then
-				cat > "$guts" <<EOF
-/* 
- * Copyright (c) `date +%Y` Wind River Systems; see
- * guts/COPYRIGHT for information.
- *
- * static $type
- * wrap_$name($args$optional_decl) {
- *	$(write_decl "$type" "rc" "$default_value")
- */
+    def call(self):
+	if self.type == 'void':
+	    return ''
 
-	$(write_assign rc) real_$name($wrapargnames);
+        if self.vararg and not self.vararg_wraps:
+	    return "ap"
 
-/*	$(write_return rc);
- * }
- */
-EOF
-			else
-				cat > "$guts" <<EOF
-/* 
- * Copyright (c) `date +%Y` Wind River Systems; see
- * guts/COPYRIGHT for information.
- *
- * static $type
- * wrap_$name($wrap_args) {
- *	$(write_decl "$type" "rc" "$default_value")
- */
+	return self.name
 
-	$(write_assign rc) real_$name($wrapargnames);
+    def str(self):
+        return self.decl()
 
-/*	$(write_return rc);
- * }
- */
-EOF
-			fi
-		fi
-		# prototypes for pseudo_wrapfuncs.h
-		cat >&6 <<EOF
-/* $type $name($args); */
-static $type dummy_$name($args);
-static $type wrap_$name($wrap_args);
-static $type (*real_$name)($args);
+    def __repr__(self):
+        return self.decl()
 
-EOF
+class C_Function:
+    "A function signature and additional data about how the function works"
+    def __init__(self, line):
+        # table of known default values:
+        default_values = { 'gid_t': '0', 'uid_t': '0', 'int': '-1', 'long': '-1', 'ssize_t': '-1' }
+    
+        self.dirfd = 'AT_FDCWD'
+        self.flags = '0'
+        self.paths_to_munge = []
+        # used for the copyright date when creating stub functions
+        self.date = datetime.date.today().year
+    
+        function, comments = line.split(';')
+        comment = re.search('/\* *(.*) *\*/', comments)
+        if comment:
+            self.comments = comment.group(1)
+        else:
+            self.comments = None
+    
+        bits = re.match('([^(]*)\((.*)\)', function)
+	x = C_Argument(bits.group(1))
+        self.type, self.name = x.type, x.name
+	# it's convenient to have this declared here so we can use its .decl later
+	if self.type != 'void':
+	    self.rc = C_Argument("%s rc" % x.type)
+    
+        # Some args get special treatment:
+        # * If the arg has a name ending in 'path', we will canonicalize it.
+        # * If the arg is named 'dirfd' or 'flags', it becomes the default
+        #   values for the dirfd and flags arguments when canonicalizing.
+        # * Note that the "comments" field (/* ... */ after the decl) can
+        #   override the dirfd/flags values.
+        self.args = ArgumentList(bits.group(2))
+        for arg in self.args.args:
+	    # ignore varargs, they never get these special treatments
+	    if arg.vararg:
+	        pass
+            elif arg.name == 'dirfd':
+                self.dirfd = 'dirfd'
+            elif arg.name == 'flags':
+                self.flags = 'flags'
+            elif arg.name[-4:] == 'path':
+                self.paths_to_munge.append(arg.name)
+    
+	# pick default values
+	if self.type == 'void':
+	    self.default_value = ''
+        elif self.type[-1:] == '*':
+	    self.default_value = 'NULL'
+	else:
+	    try:
+	        self.default_value = default_values[self.type]
+            except KeyError:
+	        raise Exception("Function %s has return type %s, for which there is no default value." % (self.name, self.type))
 
-		# and entries in the Big Table
-		cat >&7 <<EOF
-	{ /* $type $name($args); */
-		"$name",
-		(int (**)(void)) &real_$name,
-		(int (*)(void)) dummy_$name,
-		(int (*)(void)) wrap_$name
-	},
-EOF
-	done < $file
-done
-printf >&2 '.\n'
+        # handle special comments, such as flags=AT_SYMLINK_NOFOLLOW
+        if self.comments:
+            modifiers = self.comments.split(', ')
+            for mod in modifiers:
+                key, value = mod.split('=')
+                value = value.rstrip(' ')
+                setattr(self, key, value)
+    
+    def comment(self):
+        return self.decl(comment = True)
+        
+    def decl(self, **kw):
+        if self.type[-1:] == '*':
+	    spacer = ''
+	else:
+	    spacer = ' '
+	return "%s%s%s(%s)" % (self.type, spacer, self.name, self.args.decl(**kw))
 
-# sentinel values
-cat >&7 <<EOF
-	{ NULL, NULL, NULL, NULL },
-};
-EOF
+    def decl_args(self):
+        return self.args.decl()
+
+    def wrap_args(self):
+        return self.args.decl(wrap = True)
+
+    def call_args(self):
+        return self.args.call()
+
+    def alloc_paths(self):
+        alloc_paths = []
+	for p in self.paths_to_munge:
+            alloc_paths.append("%s = pseudo_root_path(__func__, __LINE__, %s, %s, %s);" % (p, self.dirfd, p, self.flags))
+	return "\n\t\t\t".join(alloc_paths);
+
+    def free_paths(self):
+        free_paths = []
+	# the cast is here because free's argument isn't const qualified, but
+	# the original path may have been -- but we only GET here if the path has
+	# been overwritten.
+	for p in self.paths_to_munge:
+            free_paths.append("free((void *) %s);" % p)
+	return "\n\t\t\t".join(free_paths);
+
+    def rc_return(self):
+        if self.type == 'void':
+	    return "return;"
+        else:
+	    return "return rc;"
+
+    def rc_decl(self):
+        if self.type == 'void':
+	    return ""
+	else:
+	    return "%s = %s;" % (self.rc.decl(), self.default_value)
+
+    def rc_assign(self):
+        if self.type == 'void':
+	    return "(void)"
+	else:
+	    return "rc ="
+
+    def def_return(self):
+        if self.type == 'void':
+	    return "return;"
+	else:
+	    return "return %s;" % self.default_value
+
+    def __getitem__(self, key):
+	"Make this object look like a dict for Templates to use"
+	try:
+            attr = getattr(self, key)
+	except AttributeError:
+	    # There's a few attributes that are handled inside the args object, so check there
+	    # too...
+	    attr = getattr(self.args, key)
+
+	if callable(attr):
+	    return attr()
+	else:
+	    return attr
+
+    def __repr__(self):
+        pretty = "%(name)s returns %(type)s and takes " % self
+	pretty += repr(self.args)
+        if self.comments:
+            pretty += ' (%s)' % self.comments
+	return pretty
+
+files = {}
+
+def main():
+    funcs = []
+    sources = []
+
+    # error checking helpfully provided by the exception handler
+    copyright_file = file('guts/COPYRIGHT', 'r')
+    SourceFile.copyright = copyright_file.read()
+    copyright_file.close()
+
+    for path in glob.glob('templates/*'):
+        try:
+	    source = SourceFile(path)
+	    source.emit('copyright')
+	    source.emit('header')
+	    sources.append(source)
+	except IOError:
+	    print "Invalid or malformed template %s.  Aborting." % path
+	    exit(1)
+
+    for filename in sys.argv[1:]:
+        "parse the list of functions"
+        sys.stdout.write("%s: " % filename)
+        f = file(filename, 'r')
+        for line in f:
+            line = line.rstrip(" \r\n")
+            if line.startswith('#') or line == "":
+                continue
+	    try:
+                func = C_Function(line)
+		funcs.append(func)
+		sys.stdout.write(".")
+	    except Exception as e:
+		print "Parsing failed:", e
+	    	exit(1)
+        f.close()
+	print ""
+
+    # the per-function stuff
+    print "Writing functions...",
+    for func in funcs:
+        "populate various tables and files with each function"
+	for source in sources:
+	    source.emit('body', func)
+    print "done.  Cleaning up."
+    
+    for source in sources:
+        "clean up files"
+	source.emit('footer')
+        del source
+
+if __name__ == '__main__':
+    main()

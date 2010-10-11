@@ -1,0 +1,15 @@
+@name guts/${name}.c
+@body
+/* 
+ * Copyright (c) ${date} Wind River Systems; see
+ * guts/COPYRIGHT for information.
+ *
+ * ${comment}
+ *	${rc_decl}
+ */
+
+	${rc_assign} real_${name}(${call_args});
+
+/*	${rc_return}
+ * }
+ */

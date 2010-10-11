@@ -56,6 +56,7 @@ PSEUDODB=$(BIN)/pseudodb
 PSEUDOLOG=$(BIN)/pseudolog
 LIBPSEUDO=$(LIB)/libpseudo.so
 
+TEMPLATES=templates/guts templates/wrapfuncs.c templates/wrapfuncs.h templates/wrapper_table
 
 all: $(LIBPSEUDO) $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
 
@@ -114,7 +115,7 @@ pseudo_client.o: pseudo_client.h
 
 pseudo_server.o: pseudo_server.h
 
-wrappers: wrapfuncs.in $(USE_64) makewrappers
+wrappers: wrapfuncs.in $(USE_64) makewrappers $(TEMPLATES)
 	./makewrappers wrapfuncs.in $(USE_64)
 
 .SECONDARY: wrappers

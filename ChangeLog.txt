@@ -1,5 +1,7 @@
 2010-10-11:
 	* (seebs) do the other *xattr() wrappers.
+	* (seebs) Replace makewrappers with Python implementation and some
+	  template files.
 
 2010-10-06:
 	* (mhatle) Add the fsetxattr wrapper to return ENOTSUP
