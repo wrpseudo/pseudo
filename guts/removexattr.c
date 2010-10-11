@@ -2,8 +2,8 @@
  * Copyright (c) 2010 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size)
- *	ssize_t rc = -1;
+ * int removexattr(const char *pathname, const char *name)
+ *	int rc = -1;
  */
 
 	errno = ENOTSUP;

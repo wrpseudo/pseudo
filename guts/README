@@ -200,3 +200,9 @@ the group file when called, rather than checking the group file once
 "at login" (whatever that means in our context) and returning that saved
 status.  We don't think this matters.  setgroups() just fails; this will
 be corrected if we come up with a compelling reason to do so.
+
+The following functions set errnot to ENOTSUP and return -1; this is
+needed because we don't actually track or manage extended attributes, but
+a few programs attempt to use *setxattr() to set regular permissions,
+and only use a regular chmod if the *setxattr() call returns -1 and
+sets errno to ENOTSUP.

@@ -116,6 +116,17 @@ void setgrent(void);
 void endgrent(void);
 int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
 int getgroups(int size, gid_t *list);
-ssize_t getxattr(const char *path, const char *name, void *value, size_t size);
-ssize_t lgetxattr(const char *path, const char *name, void *value, size_t size); /* flags=AT_SYMLINK_NOFOLLOW */
+# we use "pathname" to avoid canonicalizing paths, because these functions are
+# unimplemented
+ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size);
+ssize_t lgetxattr(const char *pathname, const char *name, void *value, size_t size);
+ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size);
+ssize_t listxattr(const char *pathname, char *list, size_t size);
+ssize_t llistxattr(const char *pathname, char *list, size_t size);
+ssize_t flistxattr(int filedes, char *list, size_t size);
+int setxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
+int lsetxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
 int fsetxattr(int filedes, const char *name, const void *value, size_t size, int flags);
+int removexattr(const char *pathname, const char *name);
+int lremovexattr(const char *pathname, const char *name);
+int fremovexattr(int filedes, const char *name);

@@ -1,3 +1,6 @@
+2010-10-11:
+	* (seebs) do the other *xattr() wrappers.
+
 2010-10-06:
 	* (mhatle) Add the fsetxattr wrapper to return ENOTSUP
           (note: workaround gnu coreutils 'cp')
