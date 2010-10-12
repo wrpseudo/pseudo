@@ -1,5 +1,6 @@
 2010-10-12:
 	* (seebs) add missing copyright to Python makewrappers.
+	* (seebs) detab makewrappers
 
 2010-10-11:
 	* (seebs) do the other *xattr() wrappers.

@@ -30,97 +30,97 @@ class SourceFile(object):
     "A template for creating a source file"
 
     def __init__(self, path):
-	# default values...
-	# no name or file yet
-	self.name = ''
-	self.sections = {}
-	self.file = None
-	self.path = None
-	# open a new file for each function
-	self.file_per_func = False
+        # default values...
+        # no name or file yet
+        self.name = ''
+        self.sections = {}
+        self.file = None
+        self.path = None
+        # open a new file for each function
+        self.file_per_func = False
 
-	# empty footer if none specified:
-	self.sections['footer'] = []
+        # empty footer if none specified:
+        self.sections['footer'] = []
 
-	# lines appended to body by default
-	self.sections['body'] = []
-	current = self.sections['body']
+        # lines appended to body by default
+        self.sections['body'] = []
+        current = self.sections['body']
 
         self.f = file(path, 'r')
-	if not self.f:
-	    return None
-	for line in self.f:
-	    line = line.rstrip()
-	    if line.startswith('@'):
-	        if ' ' in line:
-	             leading, trailing = line.split(' ', 1)
-	        else:
-	             leading, trailing = line, None
+        if not self.f:
+            return None
+        for line in self.f:
+            line = line.rstrip()
+            if line.startswith('@'):
+                if ' ' in line:
+                     leading, trailing = line.split(' ', 1)
+                else:
+                     leading, trailing = line, None
 
-	        if leading == '@name':
-		    if not trailing:
-		        raise Exception("@name requires a file name.")
-	            self.path = trailing
-		    if '$' in self.path:
-		        self.file_per_func = True
-	        else:
-		    section = leading[1:]
-		    if not section in self.sections:
-		        self.sections[section] = []
-		    current = self.sections[section]
-	    else:
-	        current.append(line)
-	for section, data in self.sections.items():
-	    self.sections[section] = Template("\n".join(data))
+                if leading == '@name':
+                    if not trailing:
+                        raise Exception("@name requires a file name.")
+                    self.path = trailing
+                    if '$' in self.path:
+                        self.file_per_func = True
+                else:
+                    section = leading[1:]
+                    if not section in self.sections:
+                        self.sections[section] = []
+                    current = self.sections[section]
+            else:
+                current.append(line)
+        for section, data in self.sections.items():
+            self.sections[section] = Template("\n".join(data))
 
         # You need a file if this isn't a file-per-func
-	if not self.file_per_func:
-	    self.file = file(self.path, 'w')
-	    if not self.file:
-	        raise IOError("Couldn't open %s to read a template." % self.path)
+        if not self.file_per_func:
+            self.file = file(self.path, 'w')
+            if not self.file:
+                raise IOError("Couldn't open %s to read a template." % self.path)
 
     def __del__(self):
         if self.file:
-	    self.file.close()
+            self.file.close()
 
     def __repr__(self):
-	strings = []
-	if self.file_per_func:
+        strings = []
+        if self.file_per_func:
             strings.append("path: %s (per func)" % self.path)
-	else:
+        else:
             strings.append("path: %s" % self.path)
-	for name, data in self.sections.items():
-	    strings.append("%s:" % name)
-	    strings.append(data.safe_substitute({}))
-	return "\n".join(strings)
+        for name, data in self.sections.items():
+            strings.append("%s:" % name)
+            strings.append(data.safe_substitute({}))
+        return "\n".join(strings)
 
     def emit(self, template, func = None):
-	if self.file_per_func:
-	    if not func:
-	        # print "Must have a function to emit any part of a file-per-func template."
-		return
-	    path = Template(self.path).safe_substitute(func)
-	    if os.path.exists(path):
-	        # print "We don't overwrite existing files."
-	        return
-	    self.file = file(path, 'w')
-	    if not self.file:
-		print "Couldn't open '%s' (expanded from %s), not emitting '%s'." % (path, self.path, template)
-	        return
+        if self.file_per_func:
+            if not func:
+                # print "Must have a function to emit any part of a file-per-func template."
+                return
+            path = Template(self.path).safe_substitute(func)
+            if os.path.exists(path):
+                # print "We don't overwrite existing files."
+                return
+            self.file = file(path, 'w')
+            if not self.file:
+                print "Couldn't open '%s' (expanded from %s), not emitting '%s'." % (path, self.path, template)
+                return
 
-	if template == "copyright":
-	    # hey, at least it's not a global variable, amirite?
-	    self.file.write(SourceFile.copyright)
-	elif template in self.sections:
-	    templ = self.sections[template]
-	    self.file.write(templ.safe_substitute(func))
-	    self.file.write("\n")
-	else:
-	    print "Warning: Unknown template '%s'." % template
+        if template == "copyright":
+            # hey, at least it's not a global variable, amirite?
+            self.file.write(SourceFile.copyright)
+        elif template in self.sections:
+            templ = self.sections[template]
+            self.file.write(templ.safe_substitute(func))
+            self.file.write("\n")
+        else:
+            print "Warning: Unknown template '%s'." % template
 
-	if self.file_per_func:
-	    self.file.close()
-	    self.file = None
+        if self.file_per_func:
+            self.file.close()
+            self.file = None
 
 class ArgumentList:
     "A (possibly empty) list of arguments"
@@ -128,14 +128,14 @@ class ArgumentList:
     def __init__(self, text):
         "parse a comma-separated argument list (may contain function prototypes)"
         self.args = []
-	self.variadic = False
-	self.variadic_decl = ""
-	self.variadic_start = ""
-	self.variadic_end = ""
-	self.prologue_call_real = "/* pass the call on to the underlying syscall */"
-	# (void) is an empty list, not a list of a single argument which is void
-	if text == "void":
-	    return
+        self.variadic = False
+        self.variadic_decl = ""
+        self.variadic_start = ""
+        self.variadic_end = ""
+        self.prologue_call_real = "/* pass the call on to the underlying syscall */"
+        # (void) is an empty list, not a list of a single argument which is void
+        if text == "void":
+            return
 
         depth = 0
         accum = ''
@@ -151,117 +151,117 @@ class ArgumentList:
                 self.args.append(C_Argument(accum + arg))
                 accum = ''
         if depth != 0:
-	    raise Exception("mismatched ()s while parsing '%s'" % text)
+            raise Exception("mismatched ()s while parsing '%s'" % text)
         if self.args[-1].vararg:
-	    self.variadic = True
-	    self.variadic_arg = self.args[-1]
-	    self.last_fixed_arg = self.args[-2].name
-	    self.variadic_decl = "va_list ap;\n"
-	    self.variadic_start = "va_start(ap, %s);\n" % self.last_fixed_arg
-	    if self.variadic_arg.vararg_wraps:
-	        self.variadic_decl += "\t%s;\n" % self.variadic_arg.vararg_wraps.decl()
-		self.variadic_start += "\t%s = va_arg(ap, %s);\n\tva_end(ap);\n" % (self.variadic_arg.name, self.variadic_arg.type)
-	    else:
-	        self.variadic_end = "va_end(ap);\n"
+            self.variadic = True
+            self.variadic_arg = self.args[-1]
+            self.last_fixed_arg = self.args[-2].name
+            self.variadic_decl = "va_list ap;\n"
+            self.variadic_start = "va_start(ap, %s);\n" % self.last_fixed_arg
+            if self.variadic_arg.vararg_wraps:
+                self.variadic_decl += "\t%s;\n" % self.variadic_arg.vararg_wraps.decl()
+                self.variadic_start += "\t%s = va_arg(ap, %s);\n\tva_end(ap);\n" % (self.variadic_arg.name, self.variadic_arg.type)
+            else:
+                self.variadic_end = "va_end(ap);\n"
                 self.prologue_call_real = '/* no way to pass a ... */\n\t\t\t\tassert(!"cannot chain to real versions of variadic functions");'
 
     def decl(self, **kw):
-	if not self.args:
-	    return "void"
+        if not self.args:
+            return "void"
 
-	list = map(lambda x: x.decl(**kw), self.args)
+        list = map(lambda x: x.decl(**kw), self.args)
         return ', '.join(list)
 
     def call(self):
         if not self.args:
-	    return ""
-	list = map(lambda x: x.call(), self.args)
-	return ', '.join(list)
+            return ""
+        list = map(lambda x: x.call(), self.args)
+        return ', '.join(list)
 
     def __repr__(self):
         if not self.args:
-	    return "no arguments"
+            return "no arguments"
         else:
-	    return '::'.join(map(lambda x:x.decl(), self.args))
+            return '::'.join(map(lambda x:x.decl(), self.args))
 
     
 class C_Argument:
     "A function argument such as 'char *path' or 'char (*foo)(void)'"
     def __init__(self, text):
         "get the type and name of a trivial C declaration"
-	self.vararg = False
-	self.function_pointer = False
-	self.spacer = ''
-	
-	if text == 'void':
-	    raise Exception("Tried to declare a nameless object of type void.")
+        self.vararg = False
+        self.function_pointer = False
+        self.spacer = ''
+        
+        if text == 'void':
+            raise Exception("Tried to declare a nameless object of type void.")
 
-	if text.startswith('...'):
-	    self.vararg = True
-	    if len(text) > 3:
-		# we're a wrapper for something else, declared as
-		# ...{real_decl}, as in the third argument to open(2)
-		text = text[4:-1]
-		# stash a copy of these values without the vararg flag, so we can
-		# declare them prettily later
-		self.vararg_wraps = C_Argument(text)
-	    else:
-		# nothing to do.
-		self.vararg_wraps = None
-	        self.type, self.name = None, None
-		return
-	else:
-	    self.vararg = False
+        if text.startswith('...'):
+            self.vararg = True
+            if len(text) > 3:
+                # we're a wrapper for something else, declared as
+                # ...{real_decl}, as in the third argument to open(2)
+                text = text[4:-1]
+                # stash a copy of these values without the vararg flag, so we can
+                # declare them prettily later
+                self.vararg_wraps = C_Argument(text)
+            else:
+                # nothing to do.
+                self.vararg_wraps = None
+                self.type, self.name = None, None
+                return
+        else:
+            self.vararg = False
 
         # try for a function pointer
         match = re.match('(.*)\(\*([a-zA-Z0-9_]*)\)\((.*)\)', text)
         if match:
-	    self.function_pointer = True
-	    self.args = match.group(3)
+            self.function_pointer = True
+            self.args = match.group(3)
             ret_type = match.group(1)
             args = match.group(3)
-	    self.fulltype = "$ret_type(*)($args)"
-	    self.name = match.group(2).rstrip(' ')
-	    self.type = ret_type
-	else:
+            self.fulltype = "$ret_type(*)($args)"
+            self.name = match.group(2).rstrip(' ')
+            self.type = ret_type
+        else:
             # plain declaration
             match = re.match('(.*[ *])\(?\*?([a-zA-Z0-9_]*)\)?', text)
             # there may not be a match, say in the special case where an arg is '...'
             if match:
-	        self.type, self.name = match.group(1).rstrip(' '), match.group(2)
+                self.type, self.name = match.group(1).rstrip(' '), match.group(2)
             else:
                 self.type, self.name = None, None
 
-	# spacing between type and name, needed if type ends with a character
-	# which could be part of an identifier
-	if re.match('[_a-zA-Z0-9]', self.type[-1]):
-	    self.spacer = ' '
+        # spacing between type and name, needed if type ends with a character
+        # which could be part of an identifier
+        if re.match('[_a-zA-Z0-9]', self.type[-1]):
+            self.spacer = ' '
 
     def decl(self, **kw):
-	comment = kw.get('comment', False)
-	if self.function_pointer:
-	    decl = "%s%s(*%s)(%s)" % (self.type, self.spacer, self.name, self.args)
-	else:
+        comment = kw.get('comment', False)
+        if self.function_pointer:
+            decl = "%s%s(*%s)(%s)" % (self.type, self.spacer, self.name, self.args)
+        else:
             decl = "%s%s%s" % (self.type, self.spacer, self.name)
 
         if self.vararg:
-	    if self.vararg_wraps:
-	        if comment:
-	            decl = "... { %s }" % decl
-		else:
-	            decl = "... /* %s */" % decl
-	    else:
-	        decl = "..."
-	return decl
+            if self.vararg_wraps:
+                if comment:
+                    decl = "... { %s }" % decl
+                else:
+                    decl = "... /* %s */" % decl
+            else:
+                decl = "..."
+        return decl
 
     def call(self):
-	if self.type == 'void':
-	    return ''
+        if self.type == 'void':
+            return ''
 
         if self.vararg and not self.vararg_wraps:
-	    return "ap"
+            return "ap"
 
-	return self.name
+        return self.name
 
     def str(self):
         return self.decl()
@@ -289,11 +289,11 @@ class C_Function:
             self.comments = None
     
         bits = re.match('([^(]*)\((.*)\)', function)
-	x = C_Argument(bits.group(1))
+        x = C_Argument(bits.group(1))
         self.type, self.name = x.type, x.name
-	# it's convenient to have this declared here so we can use its .decl later
-	if self.type != 'void':
-	    self.rc = C_Argument("%s rc" % x.type)
+        # it's convenient to have this declared here so we can use its .decl later
+        if self.type != 'void':
+            self.rc = C_Argument("%s rc" % x.type)
     
         # Some args get special treatment:
         # * If the arg has a name ending in 'path', we will canonicalize it.
@@ -303,9 +303,9 @@ class C_Function:
         #   override the dirfd/flags values.
         self.args = ArgumentList(bits.group(2))
         for arg in self.args.args:
-	    # ignore varargs, they never get these special treatments
-	    if arg.vararg:
-	        pass
+            # ignore varargs, they never get these special treatments
+            if arg.vararg:
+                pass
             elif arg.name == 'dirfd':
                 self.dirfd = 'dirfd'
             elif arg.name == 'flags':
@@ -313,16 +313,16 @@ class C_Function:
             elif arg.name[-4:] == 'path':
                 self.paths_to_munge.append(arg.name)
     
-	# pick default values
-	if self.type == 'void':
-	    self.default_value = ''
+        # pick default values
+        if self.type == 'void':
+            self.default_value = ''
         elif self.type[-1:] == '*':
-	    self.default_value = 'NULL'
-	else:
-	    try:
-	        self.default_value = default_values[self.type]
+            self.default_value = 'NULL'
+        else:
+            try:
+                self.default_value = default_values[self.type]
             except KeyError:
-	        raise Exception("Function %s has return type %s, for which there is no default value." % (self.name, self.type))
+                raise Exception("Function %s has return type %s, for which there is no default value." % (self.name, self.type))
 
         # handle special comments, such as flags=AT_SYMLINK_NOFOLLOW
         if self.comments:
@@ -337,10 +337,10 @@ class C_Function:
         
     def decl(self, **kw):
         if self.type[-1:] == '*':
-	    spacer = ''
-	else:
-	    spacer = ' '
-	return "%s%s%s(%s)" % (self.type, spacer, self.name, self.args.decl(**kw))
+            spacer = ''
+        else:
+            spacer = ' '
+        return "%s%s%s(%s)" % (self.type, spacer, self.name, self.args.decl(**kw))
 
     def decl_args(self):
         return self.args.decl()
@@ -353,63 +353,63 @@ class C_Function:
 
     def alloc_paths(self):
         alloc_paths = []
-	for p in self.paths_to_munge:
+        for p in self.paths_to_munge:
             alloc_paths.append("%s = pseudo_root_path(__func__, __LINE__, %s, %s, %s);" % (p, self.dirfd, p, self.flags))
-	return "\n\t\t\t".join(alloc_paths);
+        return "\n\t\t\t".join(alloc_paths);
 
     def free_paths(self):
         free_paths = []
-	# the cast is here because free's argument isn't const qualified, but
-	# the original path may have been -- but we only GET here if the path has
-	# been overwritten.
-	for p in self.paths_to_munge:
+        # the cast is here because free's argument isn't const qualified, but
+        # the original path may have been -- but we only GET here if the path has
+        # been overwritten.
+        for p in self.paths_to_munge:
             free_paths.append("free((void *) %s);" % p)
-	return "\n\t\t\t".join(free_paths);
+        return "\n\t\t\t".join(free_paths);
 
     def rc_return(self):
         if self.type == 'void':
-	    return "return;"
+            return "return;"
         else:
-	    return "return rc;"
+            return "return rc;"
 
     def rc_decl(self):
         if self.type == 'void':
-	    return ""
-	else:
-	    return "%s = %s;" % (self.rc.decl(), self.default_value)
+            return ""
+        else:
+            return "%s = %s;" % (self.rc.decl(), self.default_value)
 
     def rc_assign(self):
         if self.type == 'void':
-	    return "(void)"
-	else:
-	    return "rc ="
+            return "(void)"
+        else:
+            return "rc ="
 
     def def_return(self):
         if self.type == 'void':
-	    return "return;"
-	else:
-	    return "return %s;" % self.default_value
+            return "return;"
+        else:
+            return "return %s;" % self.default_value
 
     def __getitem__(self, key):
-	"Make this object look like a dict for Templates to use"
-	try:
+        "Make this object look like a dict for Templates to use"
+        try:
             attr = getattr(self, key)
-	except AttributeError:
-	    # There's a few attributes that are handled inside the args object, so check there
-	    # too...
-	    attr = getattr(self.args, key)
+        except AttributeError:
+            # There's a few attributes that are handled inside the args object, so check there
+            # too...
+            attr = getattr(self.args, key)
 
-	if callable(attr):
-	    return attr()
-	else:
-	    return attr
+        if callable(attr):
+            return attr()
+        else:
+            return attr
 
     def __repr__(self):
         pretty = "%(name)s returns %(type)s and takes " % self
-	pretty += repr(self.args)
+        pretty += repr(self.args)
         if self.comments:
             pretty += ' (%s)' % self.comments
-	return pretty
+        return pretty
 
 files = {}
 
@@ -424,13 +424,13 @@ def main():
 
     for path in glob.glob('templates/*'):
         try:
-	    source = SourceFile(path)
-	    source.emit('copyright')
-	    source.emit('header')
-	    sources.append(source)
-	except IOError:
-	    print "Invalid or malformed template %s.  Aborting." % path
-	    exit(1)
+            source = SourceFile(path)
+            source.emit('copyright')
+            source.emit('header')
+            sources.append(source)
+        except IOError:
+            print "Invalid or malformed template %s.  Aborting." % path
+            exit(1)
 
     for filename in sys.argv[1:]:
         "parse the list of functions"
@@ -440,27 +440,27 @@ def main():
             line = line.rstrip(" \r\n")
             if line.startswith('#') or line == "":
                 continue
-	    try:
+            try:
                 func = C_Function(line)
-		funcs.append(func)
-		sys.stdout.write(".")
-	    except Exception as e:
-		print "Parsing failed:", e
-	    	exit(1)
+                funcs.append(func)
+                sys.stdout.write(".")
+            except Exception as e:
+                print "Parsing failed:", e
+                exit(1)
         f.close()
-	print ""
+        print ""
 
     # the per-function stuff
     print "Writing functions...",
     for func in funcs:
         "populate various tables and files with each function"
-	for source in sources:
-	    source.emit('body', func)
+        for source in sources:
+            source.emit('body', func)
     print "done.  Cleaning up."
     
     for source in sources:
         "clean up files"
-	source.emit('footer')
+        source.emit('footer')
         del source
 
 if __name__ == '__main__':
