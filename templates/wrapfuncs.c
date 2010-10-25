@@ -68,8 +68,8 @@ ${name}(${decl_args}) {
 static ${type}
 wrap_${name}(${wrap_args}) {
 	$rc_decl
-	${variadic_decl}
-	${variadic_start}
+	${maybe_variadic_decl}
+	${maybe_variadic_start}
 
 #include "guts/${name}.c"
 
