@@ -1392,12 +1392,12 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 	return rc != SQLITE_DONE;
 }
 
-/* mark a file for pending deletion */
+/* mark a file for pending deletion by a given client */
 int
-pdb_may_unlink_file(pseudo_msg_t *msg) {
+pdb_may_unlink_file(pseudo_msg_t *msg, int deleting) {
 	static sqlite3_stmt *mark_file;
 	int rc, exact;
-	char *sql_mark_file = "UPDATE files SET deleting = 1 WHERE path = ?;";
+	char *sql_mark_file = "UPDATE files SET deleting = ? WHERE path = ?;";
 
 	if (!file_db && get_db(&file_db)) {
 		pseudo_diag("database error.\n");
@@ -1414,7 +1414,8 @@ pdb_may_unlink_file(pseudo_msg_t *msg) {
 		return 1;
 	}
 	if (msg->pathlen) {
-		sqlite3_bind_text(mark_file, 1, msg->path, -1, SQLITE_STATIC);
+		sqlite3_bind_int(mark_file, 1, deleting);
+		sqlite3_bind_text(mark_file, 2, msg->path, -1, SQLITE_STATIC);
 	} else {
 		pseudo_debug(1, "cannot mark a file for pending deletion without a path.");
 		return 1;
@@ -1473,11 +1474,48 @@ pdb_cancel_unlink_file(pseudo_msg_t *msg) {
 	return rc != SQLITE_DONE;
 }
 
+/* delete all files attached to a given cookie;
+ * used for database fixup passes.
+ */
 int
-pdb_did_unlink_file(char *path) {
+pdb_did_unlink_files(int deleting) {
 	static sqlite3_stmt *delete_exact;
 	int rc, exact;
-	char *sql_delete_exact = "DELETE FROM files WHERE path = ? AND deleting = 1;";
+	char *sql_delete_exact = "DELETE FROM files WHERE deleting = ?;";
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
+	if (!delete_exact) {
+		rc = sqlite3_prepare_v2(file_db, sql_delete_exact, strlen(sql_delete_exact), &delete_exact, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare DELETE statement");
+			return 1;
+		}
+	}
+	if (deleting == 0) {
+		pseudo_diag("did_unlink_files: deleting must be non-zero.\n");
+		return 0;
+	}
+	sqlite3_bind_int(delete_exact, 1, deleting);
+	rc = sqlite3_step(delete_exact);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "cleanup of files marked for deletion may have failed");
+	}
+	exact = sqlite3_changes(file_db);
+	pseudo_debug(3, "(exact %d)\n", exact);
+	sqlite3_reset(delete_exact);
+	sqlite3_clear_bindings(delete_exact);
+	return rc != SQLITE_DONE;
+}
+
+/* confirm deletion of a specific file by a given client */
+int
+pdb_did_unlink_file(char *path, int deleting) {
+	static sqlite3_stmt *delete_exact;
+	int rc, exact;
+	char *sql_delete_exact = "DELETE FROM files WHERE path = ? AND deleting = ?;";
 
 	if (!file_db && get_db(&file_db)) {
 		pseudo_diag("database error.\n");
@@ -1495,6 +1533,7 @@ pdb_did_unlink_file(char *path) {
 		return 1;
 	}
 	sqlite3_bind_text(delete_exact, 1, path, -1, SQLITE_STATIC);
+	sqlite3_bind_int(delete_exact, 2, deleting);
 	rc = sqlite3_step(delete_exact);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "cleanup of file marked for deletion may have failed");
@@ -1656,6 +1695,49 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 	sqlite3_reset(update_sub);
 	sqlite3_clear_bindings(update_exact);
 	sqlite3_clear_bindings(update_sub);
+	return rc != SQLITE_DONE;
+}
+
+/* renumber device only.
+ * this is used if the filesystem moves to a new device, without changing
+ * inode allocations.
+ */
+int
+pdb_renumber_all(dev_t from, dev_t to) {
+	static sqlite3_stmt *update;
+	int rc;
+	char *sql = "UPDATE files "
+		    " SET dev = ? "
+		    " WHERE dev = ?;";
+
+	if (!file_db && get_db(&file_db)) {
+		pseudo_diag("database error.\n");
+		return 0;
+	}
+	if (!update) {
+		rc = sqlite3_prepare_v2(file_db, sql, strlen(sql), &update, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare UPDATE statement");
+			return 1;
+		}
+	}
+	rc = sqlite3_bind_int(update, 1, to);
+	if (rc) {
+		dberr(file_db, "error binding device numbers to update");
+	}
+	rc = sqlite3_bind_int(update, 2, from);
+	if (rc) {
+		dberr(file_db, "error binding device numbers to update");
+	}
+
+	rc = sqlite3_step(update);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "update may have failed: rc %d", rc);
+	}
+	sqlite3_reset(update);
+	sqlite3_clear_bindings(update);
+	pseudo_debug(2, "updating device dev %llu to %llu\n",
+		(unsigned long long) from, (unsigned long long) to);
 	return rc != SQLITE_DONE;
 }
 

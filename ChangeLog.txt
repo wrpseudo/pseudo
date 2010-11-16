@@ -1,3 +1,6 @@
+2010-11-16:
+	* (seebs) database move functionality (first pass)
+
 2010-10-25:
 	* (seebs) various makewrappers cleanups (pylint, mostly)
 

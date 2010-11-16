@@ -28,7 +28,13 @@
 .PP
 .B pseudo
 .RB [ \-P\ prefix ]
-.B \-C
+.RB [ \-BC ]
+.BR \-i\  path
+.PP
+.B pseudo
+.RB [ \-P\ prefix ]
+.RB [ \-BC ]
+.BR \-m\  from\  \-M\  to
 .PP
 .B pseudo
 .RB [ \-P\ prefix ]
@@ -74,6 +80,19 @@ The
 command can be invoked in one of several possible modes:
 
 .TP 8
+.B \-B
+The
+.B \-B
+option causes
+.I pseudo
+to scan its database, as with the
+.B \-C
+option, but instead of reporting mismatches,
+.I pseudo
+attempts to repair them.  Specifically, device and inode number mismatches
+are corrected, and symlink or directory mismatches result in deletion of
+database entries.
+.TP 8
 .B \-C
 The
 .B \-C
@@ -88,6 +107,46 @@ The
 option causes
 .I pseudo
 to print a usage message and exit.
+.TP 8
+.B \-i
+The
+.B \-i
+option causes
+.I pseudo
+to attempt to correct device number mismatches by
+checking inodes; if
+.I path
+has the same inode number as recorded in the database, but a different
+device number, all instances of the device number recorded in the database
+are updated to the device number in the live filesystem for
+.IR path .
+This is intended to handle the mismatches that can occur when remounting
+an NFS filesystem.  The
+.B \-i
+option implies the
+.B \-C
+option.  You can also specify the
+.B \-B
+option to request that the database be rebuilt.
+.TP 8
+.B \-m
+The
+.B \-m
+and
+.B \-M
+options cause
+.I pseudo
+to rename files, replacing the string
+.I from
+with the string
+.I to.
+The
+.B \-m
+option pair implies the
+.B \-C
+option.  You can also specify the
+.B \-B
+option to request that the database be rebuilt.
 .TP 8
 .B \-V
 The
@@ -233,6 +292,30 @@ environment variables, then run programs normally.  You do not need to
 separately invoke the
 .I pseudo
 daemon; the client library starts it as needed.
+
+If you have moved a directory which
+.I pseudo
+was tracking, you may be able to get the database reattached using the
+.B \-m
+option.  A typical usage might be:
+
+.sp
+$
+.I /path/to/pseudo
+.B \-B \-m
+.I oldpath
+.B \-M
+.I newpath
+.br
+
+This requests that
+.I pseudo
+replace the string
+.I oldpath
+with the string
+.I newpath
+at the beginnings of filenames, then regenerate the database, correcting any
+device/inode numbers.
 
 .SH DIAGNOSTICS
 Depending on invocation, diagnostic messages usually go either to standard

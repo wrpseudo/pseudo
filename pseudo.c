@@ -38,22 +38,28 @@
 #include "pseudo_server.h"
 #include "pseudo_db.h"
 
+int opt_B = 0;
 int opt_C = 0;
 int opt_d = 0;
 int opt_f = 0;
+char *opt_i = NULL;
 int opt_l = 0;
+char *opt_m = NULL;
+char *opt_M = NULL;
 long opt_p = 0;
 char *opt_r = NULL;
 int opt_S = 0;
 
 static int pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag);
-static int pseudo_db_check(void);
+static int pseudo_db_check(int fix);
 
 void
 usage(int status) {
 	FILE *f = status ? stderr : stdout;
 	fputs("Usage: pseudo [-dflv] [-P prefix] [-rR root] [-t timeout] [command]\n", f);
 	fputs("       pseudo -h\n", f);
+	fputs("       pseudo [-dflv] [-P prefix] [-BC] -i path\n", f);
+	fputs("       pseudo [-dflv] [-P prefix] [-BC] -m from -M to\n", f);
 	fputs("       pseudo [-dflv] [-P prefix] -C\n", f);
 	fputs("       pseudo [-dflv] [-P prefix] -S\n", f);
 	fputs("       pseudo [-dflv] [-P prefix] -V\n", f);
@@ -107,53 +113,84 @@ main(int argc, char *argv[]) {
 	 * wrong.  The + suppresses this annoying behavior, but may not
 	 * be compatible with sane option libraries.
 	 */
-	while ((o = getopt(argc, argv, "+Cdfhlp:P:r:R:St:vV")) != -1) {
+	while ((o = getopt(argc, argv, "+BCdfhi:lm:M:p:P:r:R:St:vV")) != -1) {
 		switch (o) {
-		case 'C':
-			/* check database */
+		case 'B': /* rebuild database */
+			opt_B = 1;
 			opt_C = 1;
 			break;
-		case 'd':
-			/* run as daemon */
+		case 'C': /* check database */
+			opt_C = 1;
+			break;
+		case 'd': /* run as daemon */
 			opt_d = 1;
 			break;
-		case 'f':
-			/* run foregrounded */
+		case 'f': /* run foregrounded */
 			opt_f = 1;
 			break;
-		case 'h':
+		case 'h': /* help */
 			usage(0);
 			break;
-		case 'l':
+		case 'i': /* renumber devices, assuming stable inodes */
+			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, 0);
+			if (!s) {
+				pseudo_diag("Can't resolve path '%s'\n", optarg);
+				usage(EXIT_FAILURE);
+			}
+			opt_i = s;
+			break;
+		case 'l': /* log */
 			optptr += snprintf(optptr, pseudo_path_max() - (optptr - opts),
 					"%s-l", optptr > opts ? " " : "");
 			opt_l = 1;
 			break;
-		case 'p':
+		case 'm': /* move from... (see also 'M') */
+			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, 0);
+			if (!s) {
+				pseudo_diag("Can't resolve move-from path '%s'\n", optarg);
+				usage(EXIT_FAILURE);
+			}
+			opt_m = s;
+			break;
+		case 'M': /* move to... (see also 'm') */
+			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, 0);
+			if (!s) {
+				pseudo_diag("Can't resolve move-to path '%s'\n", optarg);
+				usage(EXIT_FAILURE);
+			}
+			opt_M = s;
+			break;
+		case 'p': /* passwd file path */
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
-			if (!s)
+			if (!s) {
 				pseudo_diag("Can't resolve passwd path '%s'\n", optarg);
+				usage(EXIT_FAILURE);
+			}
 			pseudo_set_value("PSEUDO_PASSWD", s);
 			break;
-		case 'P':
+		case 'P': /* prefix */
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
-			if (!s)
+			if (!s) {
 				pseudo_diag("Can't resolve prefix path '%s'\n", optarg);
+				usage(EXIT_FAILURE);
+			}
 			pseudo_set_value("PSEUDO_PREFIX", s);
 			break;
-		case 'r':	/* FALLTHROUGH */
-		case 'R':
+		case 'r':	/* chroot to... (fallthrough) */
+		case 'R':	/* pseudo root path */
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
-			if (!s)
+			if (!s) {
 				pseudo_diag("Can't resolve root path '%s'\n", optarg);
+				usage(EXIT_FAILURE);
+			}
 			pseudo_set_value("PSEUDO_CHROOT", s);
 			if (o == 'r')
 				opt_r = s;
 			break;
-		case 'S':
+		case 'S': /* stop */
 			opt_S = 1;
 			break;
-		case 't':
+		case 't': /* timeout */
 			pseudo_server_timeout = strtol(optarg, &s, 10);
 			if (*s && !isspace(*s)) {
 				pseudo_diag("Timeout must be an integer value.\n");
@@ -163,10 +200,10 @@ main(int argc, char *argv[]) {
 					"%s-t %d", optptr > opts ? " " : "",
 					pseudo_server_timeout);
 			break;
-		case 'v':
+		case 'v': /* verbosity */
 			pseudo_debug_verbose();
 			break;
-		case 'V':
+		case 'V': /* version info */
 			printf("pseudo version %s\n", pseudo_version ? pseudo_version : "<undefined>");
 			printf("pseudo configuration:\n  prefix: %s\n",
 				PSEUDO_PREFIX);
@@ -188,8 +225,75 @@ main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
+	/* move database */
+	if (opt_m || opt_M) {
+		struct stat buf;
+		pseudo_msg_t *msg;
+		int rc;
+		if (!(opt_m && opt_M)) {
+			pseudo_diag("You cannot move the database without specifying from and to.\n");
+			exit(EXIT_FAILURE);
+		}
+		if (stat(opt_M, &buf) < 0) {
+			pseudo_diag("stat of '%s' failed: %s\n",
+				opt_M, strerror(errno));
+			pseudo_diag("The directory the database is being moved to must exist.\n");
+			exit(EXIT_FAILURE);
+		}
+		msg = pseudo_msg_new(0, opt_M);
+		if (!msg) {
+			pseudo_diag("Can't allocate message structure.\n");
+			exit(EXIT_FAILURE);
+		}
+		rc = pdb_rename_file(opt_m, msg);
+		free(msg);
+		if (rc < 0) {
+			pseudo_diag("Warning: Database move may have failed.\n");
+			pseudo_diag("To try to restore, you can reverse the move.\n");
+			pseudo_diag("To commit to this anyway, run pseudo -C to check the database.\n");
+			exit(EXIT_FAILURE);
+		}
+		pseudo_diag("Rename looked okay, running database sanity check.\n");
+		opt_C = 1;
+	}
+
+	if (opt_i) {
+		int rc;
+		struct stat buf;
+		pseudo_msg_t *msg;
+		if (stat(opt_i, &buf) < 0) {
+			pseudo_diag("stat of '%s' failed: %s\n",
+				opt_i, strerror(errno));
+			pseudo_diag("The file used to renumber the database must exist.\n");
+			exit(EXIT_FAILURE);
+		}
+		msg = pseudo_msg_new(0, opt_i);
+		if (!msg) {
+			pseudo_diag("Couldn't allocate data structure for path.\n");
+			exit(EXIT_FAILURE);
+		}
+		if (pdb_find_file_path(msg)) {
+			pseudo_diag("Couldn't find a database entry for '%s'.\n", opt_i);
+			exit(EXIT_FAILURE);
+		}
+		if (buf.st_ino != msg->ino) {
+			pseudo_diag("The database inode entry for '%s' doesn't match; you must use -b.\n",
+				opt_i);
+			exit(EXIT_FAILURE);
+		}
+		rc = pdb_renumber_all(msg->dev, buf.st_dev);
+		free(msg);
+		if (rc < 0) {
+			pseudo_diag("Warning: Database renumber failed.\n");
+			exit(EXIT_FAILURE);
+		}
+		pseudo_diag("Renumber looked okay, running database sanity check.\n");
+		opt_C = 1;
+	}
+
 	if (opt_C) {
-		return pseudo_db_check();
+		/*  if opt_B is set, try to fix database */
+		return pseudo_db_check(opt_B);
 	}
 
 	if (opt_S) {
@@ -414,7 +518,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				if (by_path.deleting != 0) {
 					pseudo_debug(1, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
 						msg->path);
-					pdb_did_unlink_file(msg->path);
+					pdb_did_unlink_file(msg->path, by_path.deleting);
 				} else {
 					pseudo_diag("inode mismatch: '%s' ino %llu in db, %llu in request.\n",
 						msg->path,
@@ -503,7 +607,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				if (by_ino.deleting != 0) {
 					pseudo_debug(1, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
 						msg->path);
-					pdb_did_unlink_file(path_by_ino);
+					pdb_did_unlink_file(path_by_ino, by_ino.deleting);
 				} else {
 					pseudo_diag("path mismatch [%d link%s]: ino %llu db '%s' req '%s'.\n",
 						msg->nlink,
@@ -700,14 +804,14 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		pdb_update_inode(msg);
 		break;
 	case OP_MAY_UNLINK:
-		if (pdb_may_unlink_file(msg)) {
+		if (pdb_may_unlink_file(msg, msg->client)) {
 			/* harmless, but client wants to know so it knows
 			 * whether to follow up... */
 			msg->result = RESULT_FAIL;
 		}
 		break;
 	case OP_DID_UNLINK:
-		pdb_did_unlink_file(msg->path);
+		pdb_did_unlink_file(msg->path, msg->client);
 		break;
 	case OP_CANCEL_UNLINK:
 		pdb_cancel_unlink_file(msg);
@@ -793,11 +897,15 @@ pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag) 
 }
 
 int
-pseudo_db_check(void) {
+pseudo_db_check(int fix) {
 	struct stat64 buf;
 	pseudo_msg_t *m;
 	pdb_file_list l;
 	int errors = 0;
+	int delete_some = 0;
+	/* magic cookie used to show who's deleting the files */
+	int magic_cookie = (int) getpid();
+	int rc;
 
 	l = pdb_files();
 	if (!l) {
@@ -810,46 +918,79 @@ pseudo_db_check(void) {
 			m ? (int) m->pathlen : -1,
 			m ? m->path : "<n/a>");
 		if (m->pathlen > 0) {
+			int fixup_needed = 0;
 			pseudo_debug(1, "Checking <%s>\n", m->path);
 			if (lstat64(m->path, &buf)) {
 				errors = EXIT_FAILURE;
 				pseudo_diag("can't stat <%s>\n", m->path);
 				continue;
 			}
-			if (buf.st_ino != m->ino) {
-				pseudo_diag("ino mismatch <%s>: ino %llu, db %llu\n",
-					m->path,
-					(unsigned long long) buf.st_ino,
-					(unsigned long long) m->ino);
-				errors = EXIT_FAILURE;
-			}
-			if (buf.st_dev != m->dev) {
-				pseudo_diag("dev mismatch <%s>: dev %llu, db %llu\n",
-					m->path,
-					(unsigned long long) buf.st_dev,
-					(unsigned long long) m->dev);
-				errors = EXIT_FAILURE;
-			}
-			if (S_ISLNK(buf.st_mode) != S_ISLNK(m->mode)) {
-				pseudo_diag("symlink mismatch <%s>: file %d, db %d\n",
-					m->path,
-					S_ISLNK(buf.st_mode),
-					S_ISLNK(m->mode));
-				errors = EXIT_FAILURE;
-			}
-			if (S_ISDIR(buf.st_mode) != S_ISDIR(m->mode)) {
-				pseudo_diag("symlink mismatch <%s>: file %d, db %d\n",
-					m->path,
-					S_ISDIR(buf.st_mode),
-					S_ISDIR(m->mode));
-				errors = EXIT_FAILURE;
-			}
 			/* can't check for device type mismatches, uid/gid, or
 			 * permissions, because those are the very things we
 			 * can't really set.
 			 */
+			if (buf.st_ino != m->ino) {
+				pseudo_debug(fix, "ino mismatch <%s>: ino %llu, db %llu\n",
+					m->path,
+					(unsigned long long) buf.st_ino,
+					(unsigned long long) m->ino);
+				m->ino = buf.st_ino;
+				fixup_needed = 1;
+			}
+			if (buf.st_dev != m->dev) {
+				pseudo_debug(fix, "dev mismatch <%s>: dev %llu, db %llu\n",
+					m->path,
+					(unsigned long long) buf.st_dev,
+					(unsigned long long) m->dev);
+				m->dev = buf.st_dev;
+				fixup_needed = 1;
+			}
+			if (S_ISLNK(buf.st_mode) != S_ISLNK(m->mode)) {
+				pseudo_debug(fix, "symlink mismatch <%s>: file %d, db %d\n",
+					m->path,
+					S_ISLNK(buf.st_mode),
+					S_ISLNK(m->mode));
+				fixup_needed = 2;
+			}
+			if (S_ISDIR(buf.st_mode) != S_ISDIR(m->mode)) {
+				pseudo_debug(fix, "symlink mismatch <%s>: file %d, db %d\n",
+					m->path,
+					S_ISDIR(buf.st_mode),
+					S_ISDIR(m->mode));
+				fixup_needed = 2;
+			}
+			if (fixup_needed) {
+				/* in fixup mode, either delete (mismatches) or
+				 * correct (dev/ino).
+				 */
+				if (fix) {
+					if (fixup_needed == 1) {
+						rc = pdb_update_inode(m);
+					} else if (fixup_needed == 2) {
+						/* mark for deletion */
+						delete_some = 1;
+						rc = pdb_may_unlink_file(m, magic_cookie);
+					}
+					if (rc) {
+						pseudo_diag("error updating file %s\n",
+							m->path);
+						errors = EXIT_FAILURE;
+					}
+				} else {
+					errors = EXIT_FAILURE;
+				}
+			}
 		}
 	}
 	pdb_files_done(l);
+	/* and now delete files marked for deletion */
+	if (delete_some) {
+		rc = pdb_did_unlink_files(magic_cookie);
+		if (rc) {
+			pseudo_diag("error nuking mismatched files.\n");
+			pseudo_diag("database may not be fixed.\n");
+			errors = EXIT_FAILURE;
+		}
+	}
 	return errors;
 }
