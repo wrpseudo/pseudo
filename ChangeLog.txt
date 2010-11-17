@@ -1,3 +1,6 @@
+2010-11-17:
+	* (seebs) add "Futures.txt" notes about future development plans
+
 2010-11-16:
 	* (seebs) database move functionality (first pass)
 

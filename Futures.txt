@@ -1,0 +1,35 @@
+Some notes on features under discussion or consideration, and some
+vague implementation thoughts:
+
+* Add some kind of filter for "the directory we care about"
+  - pseudo operations would only go to the server for items
+    in this directory
+  - optionally, logging could be generated for accesses
+    *outside* this directory
+  - intent is to reduce server load dramatically, and improve
+    and/or streamline the logging path when, e.g., doing
+    host contamination checking
+  - probably implies a new message type, MSG_LOG.
+
+* Database recovery/reconstruction
+  - capability for failing harder in the event of apparent
+    corruption
+
+* Log database performance improvements
+  - some way to do "live" queries against the log database
+    while the server is running
+  - some way to flush unwanted data
+  - possibly a way to separate logging into multiple files
+    or otherwise restrict the amount of stuff produced
+  - logging filters of some sort
+
+* Canonicalization speedups
+  - possibly implement some kind of cache of directory names
+    and known canonicalizations
+
+* Possibly limited handling for extended attributes
+  - specifically, the case where they're used to manpulate or
+    query the plain old modes ala chmod/stat.
+
+* Test cases
+  - boy, do we need test cases!
