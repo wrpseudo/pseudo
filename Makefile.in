@@ -115,7 +115,7 @@ pseudo_client.o: pseudo_client.h
 
 pseudo_server.o: pseudo_server.h
 
-wrappers: wrapfuncs.in $(USE_64) makewrappers $(TEMPLATES)
+wrappers: wrapfuncs.in $(USE_64) makewrappers templatefile.py $(TEMPLATES)
 	./makewrappers wrapfuncs.in $(USE_64)
 
 .SECONDARY: wrappers

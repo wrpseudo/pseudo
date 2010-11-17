@@ -1,5 +1,6 @@
 2010-11-17:
 	* (seebs) add "Futures.txt" notes about future development plans
+	* (seebs) split some of the templating code out of makewrappers
 
 2010-11-16:
 	* (seebs) database move functionality (first pass)
