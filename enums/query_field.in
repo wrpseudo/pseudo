@@ -1,0 +1,28 @@
+query_field: PSQF
+# Note:  These are later used as bitwise masks into a value,
+# currently an unsigned long; if the number of these gets up
+# near 32, that may take rethinking.  The first thing to
+# go would probably be something special to do for FTYPE and
+# PERM because they aren't "real" database fields -- both
+# of them actually imply MODE.
+access
+client
+dev
+fd
+ftype
+gid
+id
+inode
+mode
+op
+order
+path
+perm
+program
+result
+severity
+stamp
+tag
+text
+type
+uid

@@ -17,26 +17,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
-typedef enum {
-	PSEUDO_MSG_UNKNOWN = -1,
-	PSEUDO_MSG_NONE,
-	PSEUDO_MSG_PING,
-	PSEUDO_MSG_SHUTDOWN,
-	PSEUDO_MSG_OP,
-	PSEUDO_MSG_ACK,
-	PSEUDO_MSG_NAK,
-	PSEUDO_MSG_MAX
-} pseudo_msg_type_t;
-extern char *pseudo_msg_type_name(pseudo_msg_type_t id);
-extern pseudo_msg_type_t pseudo_msg_type_id(char *name);
 
 /* The [] item at the end of the struct is a C99 feature, replacing the
  * old (and unportable) "struct hack".
  */
 typedef struct {
 	pseudo_msg_type_t type;
-	op_id_t	op;
-	res_id_t result;
+	pseudo_op_t op;
+	pseudo_res_t result;
 	int access;
 	int client;
 	int fd;

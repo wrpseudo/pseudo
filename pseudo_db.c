@@ -747,7 +747,7 @@ pdb_log_entry(log_entry *e) {
 }
 /* create a log from a given message, with tag and text */
 int
-pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...) {
+pdb_log_msg(pseudo_sev_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...) {
 	char *sql = "INSERT INTO logs "
 		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, uid, severity, text, program, tag, type)"
 		    " VALUES "
@@ -893,7 +893,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 	sqlite3_stmt *stmt;
 	int done_any = 0;
 	int field = 0;
-	char *order_by = "id";
+	const char *order_by = "id";
 	char *order_dir = "ASC";
 	int rc;
 	pseudo_query_field_t f;

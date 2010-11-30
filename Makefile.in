@@ -47,7 +47,7 @@ GUTS=$(filter-out "$(GLOB_PATTERN)",$(wildcard $(GLOB_PATTERN)))
 DBLDFLAGS=-lsqlite3
 USE_64=wrapfuncs64.in
 
-SHOBJS=pseudo_table.o pseudo_util.o
+SHOBJS=pseudo_tables.o pseudo_util.o
 DBOBJS=pseudo_db.o -ldl -lpthread
 WRAPOBJS=pseudo_wrappers.o
 
@@ -57,6 +57,7 @@ PSEUDOLOG=$(BIN)/pseudolog
 LIBPSEUDO=$(LIB)/libpseudo.so
 
 TEMPLATES=templates/guts templates/wrapfuncs.c templates/wrapfuncs.h templates/wrapper_table
+TABLES=table_templates/pseudo_tables.c table_templates/pseudo_tables.h
 
 all: $(LIBPSEUDO) $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG)
 
@@ -115,15 +116,23 @@ pseudo_client.o: pseudo_client.h
 
 pseudo_server.o: pseudo_server.h
 
+tables: enums/*.in maketables templatefile.py $(TABLES)
+	./maketables enums/*.in
+
 wrappers: wrapfuncs.in $(USE_64) makewrappers templatefile.py $(TEMPLATES)
 	./makewrappers wrapfuncs.in $(USE_64)
 
-.SECONDARY: wrappers
+.SECONDARY: tables wrappers
 
 pseudo_wrapfuncs.c pseudo_wrapfuncs.h: wrappers
 
+pseudo_tables.c pseudo_tables.h: tables
+
+pseudo_tables.o: pseudo_tables.c
+	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -c -o pseudo_tables.o pseudo_tables.c
+
 # no-strict-aliasing is needed for the function pointer trickery.
-pseudo_wrappers.o: $(GUTS) pseudo_wrappers.c pseudo_wrapfuncs.c pseudo_wrapfuncs.h
+pseudo_wrappers.o: $(GUTS) pseudo_wrappers.c pseudo_wrapfuncs.c pseudo_wrapfuncs.h pseudo_tables.h
 	$(CC) -fno-strict-aliasing $(CFLAGS) $(CFLAGS_PSEUDO) -D_GNU_SOURCE -c -o pseudo_wrappers.o pseudo_wrappers.c
 
 offsets32:
@@ -136,7 +145,7 @@ clean:
 	rm -f *.o *.so $(PSEUDO) $(PSEUDODB) $(PSEUDOLOG) \
 		pseudo_wrapfuncs.h pseudo_wrapfuncs.c \
 		pseudo_wrapper_table.c \
-		pseudo_wrapfuncs.c.old pseudo_wrapfuncs.h.old \
+		pseudo_tables.c pseudo_tables.h \
 		offsets32 offsets64
 
 distclean: clean

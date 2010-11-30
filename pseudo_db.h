@@ -20,7 +20,7 @@
 typedef struct {
 	time_t stamp;
 	pseudo_msg_type_t type;
-	op_id_t op;
+	pseudo_op_t op;
 	int access;
 	unsigned long client;
 	unsigned long fd;
@@ -30,8 +30,8 @@ typedef struct {
 	unsigned long gid;
 	unsigned long uid;
 	char *path;
-	res_id_t result;
-	sev_id_t severity;
+	pseudo_res_t result;
+	pseudo_sev_t severity;
 	char *text;
 	char *tag;
 	char *program;
@@ -65,14 +65,14 @@ union pseudo_query_data {
 };
 
 typedef struct pseudo_query {
-	enum pseudo_query_type type;
-	enum pseudo_query_field field;
+	pseudo_query_type_t type;
+	pseudo_query_field_t field;
 	union pseudo_query_data data;
 	struct pseudo_query *next;
 } pseudo_query_t;
 
 extern int pdb_log_entry(log_entry *e);
-extern int pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...);
+extern int pdb_log_msg(pseudo_sev_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...);
 extern int pdb_log_traits(pseudo_query_t *traits);
 
 struct pdb_file_list;
