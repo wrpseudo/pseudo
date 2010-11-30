@@ -1,0 +1,6 @@
+sev: SEVERITY
+debug
+info
+warn
+error
+critical

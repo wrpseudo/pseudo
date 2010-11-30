@@ -1,0 +1,23 @@
+op: OP
+chdir
+chmod
+chown
+chroot
+close
+creat
+dup
+fchmod
+fchown
+fstat
+link
+mkdir
+mknod
+open
+rename
+stat
+unlink
+symlink
+exec
+may-unlink
+did-unlink
+cancel-unlink

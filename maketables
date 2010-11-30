@@ -1,0 +1,210 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2008-2010 Wind River Systems, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the Lesser GNU General Public License version 2.1 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the Lesser GNU General Public License for more details.
+#
+# You should have received a copy of the Lesser GNU General Public License
+# version 2.1 along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+#
+"""convert tables.in files to enums, tables, and support code.
+
+Inputs are a type name, prefix, and a list of columns, followed by a list of
+names with optional "= value" suffixes, plus optional additional columns.
+The names are used to create enums and a table of strings, as well as
+to/from lookups between the ids and names.  If additional columns are
+defined, each column (separated by ", ") is used to create an additional
+table of the given name, and a lookup function from ids.  Example:
+        foo: FFF; bar = GOZINTA
+        hello, yah
+        world, nope
+produces:
+        typedef enum {
+                FFF_UNKNOWN = -1,
+                FFF_MIN = 0,
+                FFF_NONE = 0,
+                FFF_HELLO,
+                FFF_WORLD,
+                FFF_MAX
+        } foo_id_t;
+        extern const char *foo_name(foo_id_t id);
+        extern foo_id_t foo_id(const char *name);
+        extern const char *foo_bar(foo_id_t id);
+
+such that foo_name(1) => "hello" and foo_bar(1) => "yah".  If there
+is an assigned value for a column description, missing column values
+yield that value, otherwise they yield "unknown".
+
+Values out of range yield "unknown", and unrecognized names yield the
+value -1.  Note that the "MAX" value is one more than the highest defined
+value.  (This is for consistency with C array bounds.)
+"""
+
+import glob
+import sys
+import re
+import datetime
+import string
+from templatefile import TemplateFile
+
+class DataType:
+    """a set of related DataItem objects"""
+
+    def __init__(self, path):
+        """read the first line of path, then make tuples of the rest"""
+        source = file(path)
+        definition = source.readline().rstrip()
+        self.name, qualifiers = string.split(definition, ': ', 2)
+	if '; ' in qualifiers:
+            self.prefix, columns = string.split(qualifiers, '; ')
+	else:
+	    self.prefix = qualifiers
+	    columns = []
+        if len(columns):
+            self.columns = []
+            columns = string.split(columns, ', ')
+            for col in columns:
+                if "=" in col:
+                    name, default = string.split(col, ' = ')
+                else:
+                    name, default = col, ""
+                self.columns.append({"name":name, "value":default})
+        else:
+            self.columns = []
+        self.data = []
+	self.comments = []
+        for line in source.readlines():
+            item = {}
+	    if line.startswith('#'):
+		self.comments.append(line.rstrip().replace('#', ''))
+		continue
+            # first entry on the line is the "real" name/id, following hunks
+            # are additional columns
+            cols = string.split(line.rstrip(), ', ')
+            item["name"] = cols.pop(0)
+	    item["upper"] = item["name"].replace('-', '_').upper()
+            column_list = []
+            for col in self.columns:
+                if len(cols) > 0:
+                   column_list.append({"name":col["name"], "value":cols.pop(0)})
+                else:
+                   column_list.append({"name":col["name"], "value":col["default"]})
+            item["cols"] = column_list
+            self.data.append(item)
+
+    def __getitem__(self, key):
+        """Make this object look like a dict for Templates to use"""
+        attr = getattr(self, key)
+
+        if callable(attr):
+            return attr()
+        else:
+            return attr
+
+    def __repr__(self):
+        str = ""
+        str += "type: %s_t" % self.name
+        str += " %s_ENUM\n" % self.prefix
+        for col in self.columns:
+            str += "\tcol: %s (%s)\n" % (col["name"], col["value"])
+        for item in self.data:
+            str += "item: %s\n" % item["name"]
+            for col in item["cols"]:
+                str += "\t%s(%s)\n" % (col["name"], col["value"])
+        return str
+
+    def comment(self):
+	if len(self.comments):
+	    return '/*' + '\n *'.join(self.comments) + ' */\n'
+	else:
+	    return ''
+
+    def names(self):
+        return ',\n\t'.join('"%s"' % x["name"] for x in self.data)
+
+    def enums(self):
+        return ',\n\t'.join('%s_%s' % (self.prefix, x["upper"]) for x in self.data)
+
+    def column_names(self):
+        decl_lines = []
+        column = 0
+        for col in self.columns:
+            decl_lines.append("static const char *%s_id_to_%s[] = {" % (self.name, col["name"]))
+            decl_lines.append('\t"%s",' % col["value"])
+            for item in self.data:
+                decl_lines.append('\t"%s",' % item["cols"][column]["value"])
+	    decl_lines.append('\tNULL')
+            decl_lines.append("};")
+            column = column + 1
+        return '\n'.join(decl_lines)
+
+    def column_funcs(self):
+        decl_lines = []
+        for col in self.columns:
+             decl_lines.append('extern const char *')
+             decl_lines.append('pseudo_%s_%s(pseudo_%s_t id) {' %
+		 (self.name, col["name"], self.name))
+             decl_lines.append('\tif (id < 0 || id >= %s_MAX)' % (self.prefix))
+             decl_lines.append('\t\treturn "%s";' % col["value"])
+             decl_lines.append('\treturn %s_id_to_%s[id];' %
+		 (self.name, col["name"]))
+             decl_lines.append('}')
+        return '\n'.join(decl_lines)
+
+    def column_protos(self):
+        decl_lines = []
+        for col in self.columns:
+             decl_lines.append('extern const char *pseudo_%s_%s(pseudo_%s_t id);' %
+		 (self.name, col["name"], self.name))
+        return '\n'.join(decl_lines)
+
+def main():
+    """Read in function defintions, write out files based on templates."""
+    datatypes = []
+    templates = []
+
+    # error checking helpfully provided by the exception handler
+    copyright_file = open('guts/COPYRIGHT')
+    TemplateFile.copyright = copyright_file.read()
+    copyright_file.close()
+
+    for path in glob.glob('table_templates/*'):
+        try:
+            template_file = TemplateFile(path)
+            template_file.emit('copyright')
+            template_file.emit('header')
+            templates.append(template_file)
+        except IOError:
+            print "Invalid or malformed template %s.  Aborting." % path
+            exit(1)
+
+    for filename in sys.argv[1:]:
+        # read in the datatype
+        sys.stdout.write("%s: " % filename)
+        datatype = DataType(filename)
+        datatypes.append(datatype)
+        print datatype.__repr__()
+        print ""
+
+    print "Writing datatypes...",
+    for datatype in datatypes:
+        # populate various tables and files with each datatype
+        for template_file in templates:
+            template_file.emit('body', datatype)
+    print "done.  Cleaning up."
+    
+    for template_file in templates:
+        # clean up files
+        template_file.emit('footer')
+        template_file.close()
+
+if __name__ == '__main__':
+    main()

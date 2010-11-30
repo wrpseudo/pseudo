@@ -747,7 +747,7 @@ pdb_log_entry(log_entry *e) {
 }
 /* create a log from a given message, with tag and text */
 int
-pdb_log_msg(sev_id_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...) {
+pdb_log_msg(pseudo_sev_t severity, pseudo_msg_t *msg, const char *program, const char *tag, const char *text, ...) {
 	char *sql = "INSERT INTO logs "
 		    "(stamp, op, access, client, dev, gid, ino, mode, path, result, uid, severity, text, program, tag, type)"
 		    " VALUES "

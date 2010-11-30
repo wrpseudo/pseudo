@@ -1,0 +1,6 @@
+msg_type: PSEUDO_MSG
+ping
+shutdown
+op
+ack
+nak
