@@ -51,67 +51,6 @@ static sqlite3 *log_db = 0;
  */
 typedef struct { char *fmt; int arg; } id_row;
 
-/* op_columns and op_rows are used to initialize the table of operations,
- * which exists so that the databases are self-consistent even if somehow
- * someone else's version of pseudo is out of sync.
- * The same applies to other tables like this.
- */
-#define OP_ROW(id, name) { "%d, '" name "'", id }
-char *op_columns = "id, name";
-id_row op_rows[] = {
-	OP_ROW(OP_UNKNOWN, "unknown"),
-	OP_ROW(OP_NONE, "none"),
-	OP_ROW(OP_CHDIR, "chdir"),
-	OP_ROW(OP_CHMOD, "chmod"),
-	OP_ROW(OP_CHOWN, "chown"),
-	OP_ROW(OP_CHROOT, "chroot"),
-	OP_ROW(OP_CLOSE, "close"),
-	OP_ROW(OP_CREAT, "creat"),
-	OP_ROW(OP_DUP, "dup"),
-	OP_ROW(OP_EXEC, "exec"),
-	OP_ROW(OP_FCHMOD, "fchmod"),
-	OP_ROW(OP_FCHOWN, "fchown"),
-	OP_ROW(OP_FSTAT, "fstat"),
-	OP_ROW(OP_LINK, "link"),
-	OP_ROW(OP_MKDIR, "mkdir"),
-	OP_ROW(OP_MKNOD, "mknod"),
-	OP_ROW(OP_OPEN, "open"),
-	OP_ROW(OP_RENAME, "rename"),
-	OP_ROW(OP_STAT, "stat"),
-	OP_ROW(OP_UNLINK, "unlink"),
-	OP_ROW(OP_SYMLINK, "symlink"),
-	OP_ROW(OP_MAX, "max"),
-	{ NULL, 0 }
-};
-
-/* same as for ops; defined so the values in the database are consistent */
-#define SEV_ROW(id, name) { "%d, '" name "'", id }
-char *sev_columns = "id, name";
-id_row sev_rows[] = {
-	SEV_ROW(SEVERITY_UNKNOWN, "unknown"),
-	SEV_ROW(SEVERITY_NONE, "none"),
-	SEV_ROW(SEVERITY_DEBUG, "debug"),
-	SEV_ROW(SEVERITY_INFO, "info"),
-	SEV_ROW(SEVERITY_WARN, "warn"),
-	SEV_ROW(SEVERITY_ERROR, "error"),
-	SEV_ROW(SEVERITY_CRITICAL, "critical"),
-	SEV_ROW(SEVERITY_MAX, "max"),
-	{ NULL, 0 }
-};
-
-/* same as for ops; defined so the values in the database are consistent */
-#define RES_ROW(id, name, ok) { "%d, '" name "' , " #ok, id }
-char *res_columns = "id, name, ok";
-id_row res_rows[] = {
-	RES_ROW(RESULT_UNKNOWN, "unknown", 0),
-	RES_ROW(RESULT_NONE, "none", 0),
-	RES_ROW(RESULT_SUCCEED, "succeed", 1),
-	RES_ROW(RESULT_FAIL, "fail", 1),
-	RES_ROW(RESULT_ERROR, "error", 0),
-	RES_ROW(RESULT_MAX, "max", 0),
-	{ NULL, 0 }
-};
-
 /* This seemed like a really good idea at the time.  The idea is that these
  * structures let me write semi-abstract code to "create a database" without
  * duplicating as much of the code.
@@ -135,18 +74,6 @@ static struct sql_table {
 	  NULL },
 	{ NULL, NULL, NULL, NULL },
 }, log_tables[] = {
-	{ "operations",
-	  "id INTEGER PRIMARY KEY, name VARCHAR",
-	  &op_columns,
-	  op_rows }, 
-	{ "results",
-	  "id INTEGER PRIMARY KEY, name VARCHAR, ok INTEGER",
-	  &res_columns,
-	  res_rows }, 
-	{ "severities",
-	  "id INTEGER PRIMARY KEY, name VARCHAR",
-	  &sev_columns,
-	  sev_rows }, 
 	{ "logs",
 	  "id INTEGER PRIMARY KEY, "
 	    "stamp INTEGER, "

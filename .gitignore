@@ -6,4 +6,6 @@ pseudo_wrapper_table.c
 pseudo
 pseudodb
 pseudolog
-
+pseudo_tables.c
+pseudo_tables.h
+templatefile.pyc
