@@ -58,6 +58,8 @@ char *pseudo_chroot = NULL;
 char *pseudo_passwd = NULL;
 size_t pseudo_chroot_len = 0;
 char *pseudo_cwd_rel = NULL;
+/* used for PSEUDO_DISABLED */
+int pseudo_disabled = 0;
 
 static char **fd_paths = NULL;
 static int nfds = 0;
@@ -317,6 +319,24 @@ pseudo_client_reset() {
 		close(connect_fd);
 		connect_fd = -1;
 	}
+
+	/* in child processes, PSEUDO_DISABLED may have come
+	 * into existence, in which case we'd disable pseudo,
+	 * or it may have gone away, in which case we'd enable
+	 * pseudo.
+	 */
+	if (getenv("PSEUDO_DISABLED")) {
+		if (!pseudo_disabled) {
+			pseudo_antimagic();
+			pseudo_disabled = 1;
+		}
+	} else {
+		if (pseudo_disabled) {
+			pseudo_magic();
+			pseudo_disabled = 0;
+		}
+	}
+
 	if (!pseudo_inited) {
 		char *env;
 		

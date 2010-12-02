@@ -83,7 +83,7 @@ wrappers:
 	close
 	dup
 	dup2
-	excl* (all redirect through execve)
+	execl* (no guts implementations; see pseudo_wrappers.c)
 	execv
 	execve
 	execvp
@@ -97,7 +97,6 @@ wrappers:
 	fcntl
 	fork
 	link
-	vfork
 
 The following functions don't have any direct database interactions,
 but are used to simulate the permissions system:
@@ -206,3 +205,16 @@ needed because we don't actually track or manage extended attributes, but
 a few programs attempt to use *setxattr() to set regular permissions,
 and only use a regular chmod if the *setxattr() call returns -1 and
 sets errno to ENOTSUP.
+
+	fgetxattr
+	flistxattr
+	fremovexattr
+	fsetxattr
+	getxattr
+	lgetxattr
+	listxattr
+	llistxattr
+	lremovexattr
+	lsetxattr
+	removexattr
+	setxattr
