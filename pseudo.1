@@ -400,6 +400,15 @@ in the
 .I var/pseudo
 directory, while clients log to standard error.
 .TP 8
+.B PSEUDO_DISABLE
+If this variable is set, the
+.I pseudo
+client library does not modify the behavior of called functions, though it
+continues to intercept them and block signals while processing them.  This
+variable is reevaluated on every call to
+.I fork()
+or related functions.
+.TP 8
 .B PSEUDO_ENOSYS_ABORT
 If this variable is set, the
 .I pseudo

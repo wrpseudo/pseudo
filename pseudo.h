@@ -31,6 +31,7 @@ char * pseudo_get_value(const char * key);
 extern void pseudo_debug_verbose(void);
 extern void pseudo_debug_terse(void);
 extern int pseudo_util_debug_fd;
+extern int pseudo_disabled;
 #ifndef NDEBUG
 extern int pseudo_debug_real(int, char *, ...) __attribute__ ((format (printf, 2, 3)));
 #define pseudo_debug pseudo_debug_real

@@ -32,8 +32,6 @@ int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
 int chdir(const char *path);
 int fchdir(int dirfd);
 int fcntl(int fd, int cmd, ...{struct flock *lock});
-int fork(void);
-int vfork(void);
 # just so we know the inums of symlinks
 int symlink(const char *oldname, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
 int symlinkat(const char *oldname, int dirfd, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
@@ -88,9 +86,6 @@ char *tmpnam(char *s);
 int truncate(const char *path, off_t length);
 int utime(const char *path, const struct utimbuf *buf);
 int utimes(const char *path, const struct timeval *times);
-int execl(const char *file, const char *arg, ...);
-int execlp(const char *file, const char *arg, ...);
-int execle(const char *file, const char *arg, ...);
 int execv(const char *file, char *const *argv);
 int execve(const char *file, char *const *argv, char *const *envp);
 int execvp(const char *file, char *const *argv);

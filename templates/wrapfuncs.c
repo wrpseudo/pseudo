@@ -34,7 +34,7 @@ ${name}(${decl_args}) {
 		int save_errno;
 		if (antimagic > 0) {
 			if (real_$name) {
-				${prologue_call_real}
+				/* call the real syscall */
 				${rc_assign} (*real_${name})(${call_args});
 			} else {
 				/* rc was initialized to the "failure" value */

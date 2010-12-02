@@ -16,5 +16,11 @@ static struct {
 		(int (*)(void)) wrap_${name}
 	},
 @footer
+	/* special cases: Functions which need manually-coded wrappers */
+	{ /* int fork(void); */
+		"fork",
+		(int (**)(void)) &real_fork,
+		(int (*)(void)) wrap_fork
+	},
 	{ NULL, NULL, NULL },
 };
