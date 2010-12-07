@@ -516,10 +516,94 @@ vfork(void) {
 	return fork();
 }
 
+int
+wrap_clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
+	/* unused */
+	return 0;
+}
+
+int
+clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
+	sigset_t saved;
+	va_list ap;
+	pid_t *pid;
+	struct user_desc *tls;
+	pid_t *ctid;
+
+	int rc = -1;
+
+	va_start(ap, arg);
+	pid = va_arg(ap, pid_t *);
+	tls = va_arg(ap, struct user_desc *);
+	ctid = va_arg(ap, pid_t *);
+	va_end(ap);
+
+
+	pseudo_debug(4, "called: clone\n");
+	pseudo_sigblock(&saved);
+	if (pseudo_getlock()) {
+		errno = EBUSY;
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		return -1;
+	}
+	if (pseudo_populate_wrappers()) {
+		int save_errno;
+		int save_disabled;
+		/* because clone() doesn't actually continue in this function, we
+		 * can't check the return and fix up environment variables in the
+		 * child.  Instead, we have to temporarily do any fixup, then possibly
+		 * undo it later.  UGH!
+		 */
+		pseudo_debug(1, "client resetting for clone(2) call\n");
+		pseudo_client_reset();
+		if (real_clone) {
+			/* exec*() use this to restore the sig mask */
+			pseudo_saved_sigmask = saved;
+			/* call the real syscall */
+			rc = (*real_clone)(fn, child_stack, flags, arg, pid, tls, ctid);
+		} else {
+			/* rc was initialized to the "failure" value */
+			pseudo_enosys("clone");
+		}
+		/* if we got here, we're the parent process.  And if we changed
+		 * pseudo_disabled because of the environment, now we want to
+		 * bring it back.  We can't use the normal path for this in
+		 * pseudo_client_reset() because that would trust the environment
+		 * variable, which was intended only to modify the behavior of
+		 * the child process.
+		 */
+		if (save_disabled != pseudo_disabled) {
+			if (pseudo_disabled) {
+				pseudo_disabled = 0;
+				pseudo_magic();
+			} else {
+				pseudo_disabled = 1;
+				pseudo_antimagic();
+			}
+		}
+		
+		save_errno = errno;
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: clone\n");
+		errno = save_errno;
+		return rc;
+	} else {
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: clone\n");
+		/* rc was initialized to the "failure" value */
+		pseudo_enosys("clone");
+		
+		return rc;
+	}
+}
+
 static int (*real_fork)(void) = NULL;
 static int (*real_execlp)(const char *file, const char *arg, ...) = NULL;
 static int (*real_execl)(const char *file, const char *arg, ...) = NULL;
 static int (*real_execle)(const char *file, const char *arg, ...) = NULL;
+static int (*real_clone)(int (*)(void *), void *, int, void *, ...) = NULL;
 
 static int
 wrap_fork(void) {

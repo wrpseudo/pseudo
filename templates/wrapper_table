@@ -22,5 +22,10 @@ static struct {
 		(int (**)(void)) &real_fork,
 		(int (*)(void)) wrap_fork
 	},
+	{ /* int clone(int (*fn)(void *), void *, int, void, ...); */
+		"clone",
+		(int (**)(void)) &real_clone,
+		(int (*)(void)) wrap_clone
+	},
 	{ NULL, NULL, NULL },
 };
