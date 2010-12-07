@@ -20,11 +20,9 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
-struct pseudo_variables { char * key; size_t key_len; char * value; };
-
 void pseudo_dump_env(char **envp);
-int pseudo_set_value(const char * key, const char * value);
-char * pseudo_get_value(const char * key);
+int pseudo_set_value(const char *key, const char *value);
+char *pseudo_get_value(const char *key);
 
 #include "pseudo_tables.h"
 
