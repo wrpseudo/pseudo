@@ -64,6 +64,7 @@ static struct pseudo_variables pseudo_env[] = {
 	{ "PSEUDO_ENOSYS_ABORT", 19, NULL },
 	{ "PSEUDO_NOSYMLINKEXP", 19, NULL },
 	{ "PSEUDO_RELOADED", 15, NULL },
+	{ "PSEUDO_DISABLED", 15, NULL },
 	{ NULL, 0, NULL } /* Magic terminator */
 };
 
@@ -75,7 +76,7 @@ static struct pseudo_variables pseudo_env[] = {
  * program starts playing with things, so we need to do our
  * best to handle that case.
  */
-int _in_init = -1;  /* Not yet run */
+static int _pseudo_in_init = -1;  /* Not yet run */
 
 static void _libpseudo_init(void) __attribute__ ((constructor));
 
@@ -91,9 +92,15 @@ dump_env(char **envp) {
 		pseudo_debug(0,"dump_envp: {%d}%s=%s\n", (int) i, pseudo_env[i].key, pseudo_env[i].value);
 	}
 
-	pseudo_debug(0, "dump_envp: _in_init %d\n", _in_init);
+	pseudo_debug(0, "dump_envp: _in_init %d\n", _pseudo_in_init);
 }
 #endif
+
+void
+pseudo_reinit_environment(void) {
+	_pseudo_in_init = 0;
+	_libpseudo_init();
+}
 
 /* Caller must free memory! */
 char *
@@ -101,7 +108,7 @@ pseudo_get_value(const char *key) {
 	size_t i = 0;
 	char * value;
 
-	if (_in_init == -1)
+	if (_pseudo_in_init == -1)
 		_libpseudo_init();
 
 	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++)
@@ -130,7 +137,7 @@ pseudo_set_value(const char *key, const char *value) {
 	int rc = 0;
 	size_t i = 0;
 
-	if (_in_init == -1)
+	if (_pseudo_in_init == -1)
 		_libpseudo_init();
 
 	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++)
@@ -149,7 +156,7 @@ pseudo_set_value(const char *key, const char *value) {
 		} else
 			pseudo_env[i].value = NULL;
 	} else {
-		if (!_in_init) pseudo_diag("Unknown variable %s.\n", key);
+		if (!_pseudo_in_init) pseudo_diag("Unknown variable %s.\n", key);
 		rc = -EINVAL;
 	}
 
@@ -160,14 +167,14 @@ static void
 _libpseudo_init(void) {
 	size_t i = 0;
 
-	_in_init = 1;
+	_pseudo_in_init = 1;
 
 	for (i = 0; pseudo_env[i].key; i++) {
 		if (getenv(pseudo_env[i].key))
 			pseudo_set_value(pseudo_env[i].key, getenv(pseudo_env[i].key));
 	}
 
-	_in_init = 0;
+	_pseudo_in_init = 0;
 }
 
 /* 5 = ridiculous levels of duplication

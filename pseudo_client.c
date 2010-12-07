@@ -313,6 +313,8 @@ pseudo_client_close(int fd) {
 
 void
 pseudo_client_reset() {
+	char *env_disabled = NULL;
+
 	pseudo_antimagic();
 	pseudo_new_pid();
 	if (connect_fd != -1) {
@@ -320,21 +322,39 @@ pseudo_client_reset() {
 		connect_fd = -1;
 	}
 
-	/* in child processes, PSEUDO_DISABLED may have come
-	 * into existence, in which case we'd disable pseudo,
+	/* in child processes, PSEUDO_DISABLED may have become set to
+	 * some truthy value, in which case we'd disable pseudo,
 	 * or it may have gone away, in which case we'd enable
 	 * pseudo.
 	 */
-	if (getenv("PSEUDO_DISABLED")) {
-		if (!pseudo_disabled) {
-			pseudo_antimagic();
-			pseudo_disabled = 1;
+	env_disabled = getenv("PSEUDO_DISABLED");
+	if (env_disabled) {
+		int actually_disabled = 1;
+		switch (*env_disabled) {
+		case 'f':
+		case 'F':
+		case 'n':
+		case 'N':
+			actually_disabled = 0;
+			break;
+		case '0':
+			actually_disabled = atoi(env_disabled);
+			break;
 		}
-	} else {
-		if (pseudo_disabled) {
-			pseudo_magic();
-			pseudo_disabled = 0;
+		if (actually_disabled) {
+			if (!pseudo_disabled) {
+				pseudo_antimagic();
+				pseudo_disabled = 1;
+			}
+			env_disabled = "1";
+		} else {
+			if (pseudo_disabled) {
+				pseudo_magic();
+				pseudo_disabled = 0;
+			}
+			env_disabled = "0";
 		}
+		pseudo_set_value("PSEUDO_DISABLED", env_disabled);
 	}
 
 	if (!pseudo_inited) {
@@ -374,6 +394,8 @@ pseudo_client_reset() {
 		pseudo_inited = 1;
 	}
 	pseudo_client_getcwd();
+	/* make sure environment variables are back in sync */
+	pseudo_reinit_environment();
 	pseudo_magic();
 }
 
