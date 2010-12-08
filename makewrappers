@@ -33,8 +33,6 @@ class ArgumentList:
         self.variadic_decl = ""
         self.variadic_start = ""
         self.variadic_end = ""
-        self.prologue_call_real = \
-            "/* pass the call on to the underlying syscall */"
         # (void) is an empty list, not a list of a single argument which is void
         if text == "void":
             return
@@ -68,11 +66,8 @@ class ArgumentList:
                                        (self.variadic_arg.name,
                                         self.variadic_arg.type)
             else:
-                self.variadic_end = "va_end(ap);\n"
-                self.prologue_call_real = ('/* no way to pass a ... */'
-                                           '\n\t\t\t\tassert(!"cannot chain '
-                                           'to real versions of variadic'
-                                           'functions");')
+                # lie blatantly; we don't handle this case
+                self.variadic = False
 
     # for a wrap function, the outer foo() wrapper will convert to a va_list,
     # but the inner wrap_foo() just passes the va_list through.
@@ -212,6 +207,7 @@ class Function:
         self.dirfd = 'AT_FDCWD'
         self.flags = '0'
         self.paths_to_munge = []
+        self.nowrappers = None
         # used for the copyright date when creating stub functions
         self.date = datetime.date.today().year
     

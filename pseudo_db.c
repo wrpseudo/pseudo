@@ -820,7 +820,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 	sqlite3_stmt *stmt;
 	int done_any = 0;
 	int field = 0;
-	char *order_by = "id";
+	const char *order_by = "id";
 	char *order_dir = "ASC";
 	int rc;
 	pseudo_query_field_t f;

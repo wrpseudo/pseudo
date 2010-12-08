@@ -1,3 +1,18 @@
+2010-12-07:
+	* (seebs) whitespace fixes
+	* (seebs) improve fork and PSEUDO_DISABLED
+	* (seebs) add support for clone(2)
+	* (mhatle) rework/improve clone(2) support
+	* (mhatle) add test code for PSEUDO_DISABLED
+
+2010-12-02:
+	* (seebs) rework of fork/exec, add PSEUDO_DISABLED
+
+2010-11-30:
+	* (seebs) move *_t types to a separate file.
+	* (seebs) remove unused tables from pseudo_db.c
+	* (seebs) cleanup .gitignore
+
 2010-11-17:
 	* (seebs) add "Futures.txt" notes about future development plans
 	* (seebs) split some of the templating code out of makewrappers

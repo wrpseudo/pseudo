@@ -20,17 +20,16 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
-struct pseudo_variables { char * key; size_t key_len; char * value; };
-
 void pseudo_dump_env(char **envp);
-int pseudo_set_value(const char * key, const char * value);
-char * pseudo_get_value(const char * key);
+int pseudo_set_value(const char *key, const char *value);
+char *pseudo_get_value(const char *key);
 
 #include "pseudo_tables.h"
 
 extern void pseudo_debug_verbose(void);
 extern void pseudo_debug_terse(void);
 extern int pseudo_util_debug_fd;
+extern int pseudo_disabled;
 #ifndef NDEBUG
 extern int pseudo_debug_real(int, char *, ...) __attribute__ ((format (printf, 2, 3)));
 #define pseudo_debug pseudo_debug_real
@@ -61,6 +60,9 @@ extern ssize_t pseudo_path_max(void);
 #define PSEUDO_PWD_MAX 4096
 extern int pseudo_etc_file(const char *filename, char *realname, int flags, char **search, int dircount);
 #define PSEUDO_ETC_FILE(name, realname, flags) pseudo_etc_file((name), (realname), (flags), (char *[]) { pseudo_chroot, pseudo_passwd }, 2)
+
+/* refresh environment variables from internals */
+extern void pseudo_reinit_environment(void);
 
 extern char *pseudo_version;
 

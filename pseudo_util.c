@@ -39,6 +39,12 @@
 #include "pseudo_ipc.h"
 #include "pseudo_db.h"
 
+struct pseudo_variables {
+	char *key;
+	size_t key_len;
+	char *value;
+};
+
 /* The order below is not arbitrary, but based on an assumption
  * of how often things will be used.
  */
@@ -58,6 +64,7 @@ static struct pseudo_variables pseudo_env[] = {
 	{ "PSEUDO_ENOSYS_ABORT", 19, NULL },
 	{ "PSEUDO_NOSYMLINKEXP", 19, NULL },
 	{ "PSEUDO_RELOADED", 15, NULL },
+	{ "PSEUDO_DISABLED", 15, NULL },
 	{ NULL, 0, NULL } /* Magic terminator */
 };
 
@@ -69,12 +76,13 @@ static struct pseudo_variables pseudo_env[] = {
  * program starts playing with things, so we need to do our
  * best to handle that case.
  */
-int _in_init = -1;  /* Not yet run */
+static int _pseudo_in_init = -1;  /* Not yet run */
 
 static void _libpseudo_init(void) __attribute__ ((constructor));
 
 #if 0
-static void dump_env(char **envp) {
+static void
+dump_env(char **envp) {
 	size_t i = 0;
 	for (i = 0; envp[i]; i++) {
 		pseudo_debug(0,"dump_envp: [%d]%s\n", (int) i, envp[i]);
@@ -84,18 +92,27 @@ static void dump_env(char **envp) {
 		pseudo_debug(0,"dump_envp: {%d}%s=%s\n", (int) i, pseudo_env[i].key, pseudo_env[i].value);
 	}
 
-	pseudo_debug(0, "dump_envp: _in_init %d\n", _in_init);
+	pseudo_debug(0, "dump_envp: _in_init %d\n", _pseudo_in_init);
 }
 #endif
 
+void
+pseudo_reinit_environment(void) {
+	_pseudo_in_init = 0;
+	_libpseudo_init();
+}
+
 /* Caller must free memory! */
-char * pseudo_get_value(const char * key) {
+char *
+pseudo_get_value(const char *key) {
 	size_t i = 0;
 	char * value;
 
-	if (_in_init == -1) _libpseudo_init();
+	if (_pseudo_in_init == -1)
+		_libpseudo_init();
 
-	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++) ;
+	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++)
+		;
 
 	/* Check if the environment has it and we don't ...
 	 * if so, something went wrong... so we'll attempt to recover
@@ -103,8 +120,10 @@ char * pseudo_get_value(const char * key) {
 	if (pseudo_env[i].key && !pseudo_env[i].value && getenv(pseudo_env[i].key))
 		_libpseudo_init();
 
-	if (pseudo_env[i].value) value = strdup(pseudo_env[i].value);
-	else value = NULL;
+	if (pseudo_env[i].value)
+		value = strdup(pseudo_env[i].value);
+	else
+		value = NULL;
 
 	if (!pseudo_env[i].key) 
 		pseudo_diag("Unknown variable %s.\n", key);
@@ -113,17 +132,20 @@ char * pseudo_get_value(const char * key) {
 }
 
 /* We make a copy, so the original values should be freed. */
-int pseudo_set_value(const char * key, const char * value) {
+int
+pseudo_set_value(const char *key, const char *value) {
 	int rc = 0;
 	size_t i = 0;
 
-	if (_in_init == -1) _libpseudo_init();
+	if (_pseudo_in_init == -1)
+		_libpseudo_init();
 
 	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++)
 		;
 
 	if (pseudo_env[i].key) {
-		if (pseudo_env[i].value) free(pseudo_env[i].value);
+		if (pseudo_env[i].value)
+			free(pseudo_env[i].value);
 		if (value) {
 			char *new = strdup(value);
 			if (new)
@@ -134,25 +156,25 @@ int pseudo_set_value(const char * key, const char * value) {
 		} else
 			pseudo_env[i].value = NULL;
 	} else {
-		if (!_in_init) pseudo_diag("Unknown variable %s.\n", key);
+		if (!_pseudo_in_init) pseudo_diag("Unknown variable %s.\n", key);
 		rc = -EINVAL;
 	}
 
 	return rc;
 }
 
-static void _libpseudo_init(void) {
+static void
+_libpseudo_init(void) {
 	size_t i = 0;
 
-	_in_init = 1;
+	_pseudo_in_init = 1;
 
 	for (i = 0; pseudo_env[i].key; i++) {
-		if (pseudo_env[i].key)
-			if (getenv(pseudo_env[i].key))
-				pseudo_set_value(pseudo_env[i].key, getenv(pseudo_env[i].key));
+		if (getenv(pseudo_env[i].key))
+			pseudo_set_value(pseudo_env[i].key, getenv(pseudo_env[i].key));
 	}
 
-	_in_init = 0;
+	_pseudo_in_init = 0;
 }
 
 /* 5 = ridiculous levels of duplication

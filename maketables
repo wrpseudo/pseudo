@@ -50,8 +50,6 @@ value.  (This is for consistency with C array bounds.)
 
 import glob
 import sys
-import re
-import datetime
 import string
 from templatefile import TemplateFile
 
@@ -63,11 +61,11 @@ class DataType:
         source = file(path)
         definition = source.readline().rstrip()
         self.name, qualifiers = string.split(definition, ': ', 2)
-	if '; ' in qualifiers:
+        if '; ' in qualifiers:
             self.prefix, columns = string.split(qualifiers, '; ')
-	else:
-	    self.prefix = qualifiers
-	    columns = []
+        else:
+            self.prefix = qualifiers
+            columns = []
         if len(columns):
             self.columns = []
             columns = string.split(columns, ', ')
@@ -80,23 +78,23 @@ class DataType:
         else:
             self.columns = []
         self.data = []
-	self.comments = []
+        self.comments = []
         for line in source.readlines():
             item = {}
-	    if line.startswith('#'):
-		self.comments.append(line.rstrip().replace('#', ''))
-		continue
+            if line.startswith('#'):
+                self.comments.append(line.rstrip().replace('#', ''))
+                continue
             # first entry on the line is the "real" name/id, following hunks
             # are additional columns
             cols = string.split(line.rstrip(), ', ')
             item["name"] = cols.pop(0)
-	    item["upper"] = item["name"].replace('-', '_').upper()
+            item["upper"] = item["name"].replace('-', '_').upper()
             column_list = []
             for col in self.columns:
                 if len(cols) > 0:
-                   column_list.append({"name":col["name"], "value":cols.pop(0)})
+                    column_list.append({"name":col["name"], "value":cols.pop(0)})
                 else:
-                   column_list.append({"name":col["name"], "value":col["default"]})
+                    column_list.append({"name":col["name"], "value":col["default"]})
             item["cols"] = column_list
             self.data.append(item)
 
@@ -110,22 +108,22 @@ class DataType:
             return attr
 
     def __repr__(self):
-        str = ""
-        str += "type: %s_t" % self.name
-        str += " %s_ENUM\n" % self.prefix
+        out = ""
+        out += "type: %s_t" % self.name
+        out += " %s_ENUM\n" % self.prefix
         for col in self.columns:
-            str += "\tcol: %s (%s)\n" % (col["name"], col["value"])
+            out += "\tcol: %s (%s)\n" % (col["name"], col["value"])
         for item in self.data:
-            str += "item: %s\n" % item["name"]
+            out += "item: %s\n" % item["name"]
             for col in item["cols"]:
-                str += "\t%s(%s)\n" % (col["name"], col["value"])
-        return str
+                out += "\t%s(%s)\n" % (col["name"], col["value"])
+        return out
 
     def comment(self):
-	if len(self.comments):
-	    return '/*' + '\n *'.join(self.comments) + ' */\n'
-	else:
-	    return ''
+        if len(self.comments):
+            return '/*' + '\n *'.join(self.comments) + ' */\n'
+        else:
+            return ''
 
     def names(self):
         return ',\n\t'.join('"%s"' % x["name"] for x in self.data)
@@ -141,7 +139,7 @@ class DataType:
             decl_lines.append('\t"%s",' % col["value"])
             for item in self.data:
                 decl_lines.append('\t"%s",' % item["cols"][column]["value"])
-	    decl_lines.append('\tNULL')
+            decl_lines.append('\tNULL')
             decl_lines.append("};")
             column = column + 1
         return '\n'.join(decl_lines)
@@ -149,21 +147,21 @@ class DataType:
     def column_funcs(self):
         decl_lines = []
         for col in self.columns:
-             decl_lines.append('extern const char *')
-             decl_lines.append('pseudo_%s_%s(pseudo_%s_t id) {' %
-		 (self.name, col["name"], self.name))
-             decl_lines.append('\tif (id < 0 || id >= %s_MAX)' % (self.prefix))
-             decl_lines.append('\t\treturn "%s";' % col["value"])
-             decl_lines.append('\treturn %s_id_to_%s[id];' %
-		 (self.name, col["name"]))
-             decl_lines.append('}')
+            decl_lines.append('extern const char *')
+            decl_lines.append('pseudo_%s_%s(pseudo_%s_t id) {' %
+                (self.name, col["name"], self.name))
+            decl_lines.append('\tif (id < 0 || id >= %s_MAX)' % (self.prefix))
+            decl_lines.append('\t\treturn "%s";' % col["value"])
+            decl_lines.append('\treturn %s_id_to_%s[id];' %
+                (self.name, col["name"]))
+            decl_lines.append('}')
         return '\n'.join(decl_lines)
 
     def column_protos(self):
         decl_lines = []
         for col in self.columns:
-             decl_lines.append('extern const char *pseudo_%s_%s(pseudo_%s_t id);' %
-		 (self.name, col["name"], self.name))
+            decl_lines.append('extern const char *pseudo_%s_%s(pseudo_%s_t id);' %
+                (self.name, col["name"], self.name))
         return '\n'.join(decl_lines)
 
 def main():
