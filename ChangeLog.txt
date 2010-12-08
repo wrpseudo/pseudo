@@ -1,3 +1,13 @@
+2010-12-08:
+	* (mhatle) Add guts/clone.c to cleanup the clone support
+	* (mhatle) guts/clone.c only run setupenv and reinit when NOT PSEUDO_RELOADED
+	* (mhatle) guts/execve.c whitespace fixe
+	* (mhatle) guts/fork.c similar to guts/clone.c change
+	* (mhatle) pseudo_client.c add reinit function
+	* (mhatle) pseudo_client.c revise client reset, include code from pseudo_wrappers.c
+	* (mhatle) pseudo_server.c move the pid writing to the parent
+	* (mhatle) pseudo_wrappers.c clone cleanup and populate cleanup
+
 2010-12-07:
 	* (seebs) whitespace fixes
 	* (seebs) improve fork and PSEUDO_DISABLED

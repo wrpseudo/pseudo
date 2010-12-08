@@ -12,8 +12,13 @@
 		 * pseudo in the child process
 		 */
 		if (rc == 0) {
-			pseudo_setupenv();
-			pseudo_client_reset();
+			if (!pseudo_get_value("PSEUDO_RELOADED")) {
+                		pseudo_setupenv();
+				pseudo_client_reinit();
+ 			} else {
+				pseudo_setupenv();
+				pseudo_dropenv();
+			}
 		}
 	} else {
 		/* rc was initialized to the "failure" value */

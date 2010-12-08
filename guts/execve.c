@@ -14,6 +14,7 @@
 	 * design will likely be revisited.
 	 */
 	pseudo_client_op(OP_EXEC, PSA_EXEC, -1, -1, file, 0);
+
 	if (!pseudo_get_value("PSEUDO_RELOADED"))
 		new_environ = pseudo_setupenvp(envp);
 	else {

@@ -144,7 +144,6 @@ pseudo_populate_wrappers(void) {
 	int i;
 	char *debug;
 	static int done = 0;
-	char *pseudo_path = 0;
 	char *no_symlink_exp;
 
 	if (done)
@@ -206,40 +205,6 @@ pseudo_populate_wrappers(void) {
 	 * value for cwd.
 	 */
 	pseudo_client_reset();
-	pseudo_path = pseudo_prefix_path(NULL);
-	if (pseudo_prefix_dir_fd == -1) {
-		if (pseudo_path) {
-			pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
-			pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, MOVE_FD);
-		} else {
-			pseudo_diag("No prefix available to to find server.\n");
-			exit(1);
-		}
-		if (pseudo_prefix_dir_fd == -1) {
-			pseudo_diag("Can't open prefix path (%s) for server: %s\n",
-				pseudo_path,
-				strerror(errno));
-			exit(1);
-		}
-	}
-	free(pseudo_path);
-	pseudo_path = pseudo_localstatedir_path(NULL);
-	if (pseudo_localstate_dir_fd == -1) {
-		if (pseudo_path) {
-			pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
-			pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
-		} else {
-			pseudo_diag("No prefix available to to find server.\n");
-			exit(1);
-		}
-		if (pseudo_localstate_dir_fd == -1) {
-			pseudo_diag("Can't open prefix path (%s) for server: %s\n",
-				pseudo_path,
-				strerror(errno));
-			exit(1);
-		}
-	}
-	free(pseudo_path);
 	pseudo_debug(2, "(%s) set up wrappers\n", program_invocation_short_name);
 	pseudo_magic();
 	pseudo_droplock();
@@ -537,32 +502,17 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
 		 * child.  Instead, we have to temporarily do any fixup, then possibly
 		 * undo it later.  UGH!
 		 */
-		pseudo_debug(1, "client resetting for clone(2) call\n");
-		if (real_clone) {
-			pseudo_setupenv();
-			pseudo_client_reset();
-			/* call the real syscall */
-			rc = (*real_clone)(fn, child_stack, flags, arg, pid, tls, ctid);
 
-			/* if we got here, we're the parent process.  And if we changed
-			 * pseudo_disabled because of the environment, now we want to
-			 * bring it back.  We can't use the normal path for this in
-			 * pseudo_client_reset() because that would trust the environment
-			 * variable, which was intended only to modify the behavior of
-			 * the child process.
-			 */
-			if (save_disabled != pseudo_disabled) {
-				if (pseudo_disabled) {
-					pseudo_disabled = 0;
-					pseudo_magic();
-				} else {
-					pseudo_disabled = 1;
-					pseudo_antimagic();
-				}
+#include "guts/clone.c"
+
+		if (save_disabled != pseudo_disabled) {
+			if (pseudo_disabled) {
+				pseudo_disabled = 0;
+				pseudo_magic();
+			} else {
+				pseudo_disabled = 1;
+				pseudo_antimagic();
 			}
-		} else {
-			/* rc was initialized to the "failure" value */
-			pseudo_enosys("clone");
 		}
 		
 		save_errno = errno;
@@ -583,9 +533,11 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
 }
 
 static int (*real_fork)(void) = NULL;
+#if 0
 static int (*real_execlp)(const char *file, const char *arg, ...) = NULL;
 static int (*real_execl)(const char *file, const char *arg, ...) = NULL;
 static int (*real_execle)(const char *file, const char *arg, ...) = NULL;
+#endif
 static int (*real_clone)(int (*)(void *), void *, int, void *, ...) = NULL;
 
 static int

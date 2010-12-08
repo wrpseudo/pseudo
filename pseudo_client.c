@@ -311,10 +311,16 @@ pseudo_client_close(int fd) {
 	fd_paths[fd] = 0;
 }
 
+ void
+pseudo_client_reinit() {
+       pseudo_debug(1, "called: pseudo_client_reinit\n");
+       pseudo_inited = 0;
+       pseudo_reinit_environment();
+       pseudo_client_reset();
+}
+
 void
 pseudo_client_reset() {
-	char *env_disabled = NULL;
-
 	pseudo_antimagic();
 	pseudo_new_pid();
 	if (connect_fd != -1) {
@@ -322,43 +328,94 @@ pseudo_client_reset() {
 		connect_fd = -1;
 	}
 
-	/* in child processes, PSEUDO_DISABLED may have become set to
-	 * some truthy value, in which case we'd disable pseudo,
-	 * or it may have gone away, in which case we'd enable
-	 * pseudo.
-	 */
-	env_disabled = getenv("PSEUDO_DISABLED");
-	if (env_disabled) {
-		int actually_disabled = 1;
-		switch (*env_disabled) {
-		case 'f':
-		case 'F':
-		case 'n':
-		case 'N':
-			actually_disabled = 0;
-			break;
-		case '0':
-			actually_disabled = atoi(env_disabled);
-			break;
-		}
-		if (actually_disabled) {
-			if (!pseudo_disabled) {
-				pseudo_antimagic();
-				pseudo_disabled = 1;
-			}
-			env_disabled = "1";
-		} else {
-			if (pseudo_disabled) {
-				pseudo_magic();
-				pseudo_disabled = 0;
-			}
-			env_disabled = "0";
-		}
-		pseudo_set_value("PSEUDO_DISABLED", env_disabled);
-	}
-
 	if (!pseudo_inited) {
+		char *pseudo_path = 0;
 		char *env;
+
+		/* Ensure that all of the values are reset */
+		server_pid = 0;
+		pseudo_prefix_dir_fd = -1;
+		pseudo_localstate_dir_fd = -1;
+		pseudo_pwd_fd = -1;
+		pseudo_pwd_lck_fd = -1;
+		pseudo_pwd_lck_name = NULL;
+		pseudo_pwd = NULL;
+		pseudo_grp_fd = -1;
+		pseudo_grp = NULL;
+		pseudo_cwd = NULL;
+		pseudo_cwd_len = 0;
+		pseudo_chroot = NULL;
+		pseudo_passwd = NULL;
+		pseudo_chroot_len = 0;
+		pseudo_cwd_rel = NULL;
+
+		pseudo_path = pseudo_prefix_path(NULL);
+		if (pseudo_prefix_dir_fd == -1) {
+			if (pseudo_path) {
+				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+				pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, MOVE_FD);
+			} else {
+				pseudo_diag("No prefix available to to find server.\n");
+				exit(1);
+			}
+			if (pseudo_prefix_dir_fd == -1) {
+				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+					pseudo_path,
+					strerror(errno));
+				exit(1);
+			}
+		}
+		free(pseudo_path);
+		pseudo_path = pseudo_localstatedir_path(NULL);
+		if (pseudo_localstate_dir_fd == -1) {
+			if (pseudo_path) {
+				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+				pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
+			} else {
+				pseudo_diag("No prefix available to to find server.\n");
+				exit(1);
+			}
+			if (pseudo_localstate_dir_fd == -1) {
+				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+					pseudo_path,
+					strerror(errno));
+				exit(1);
+			}
+		}
+		free(pseudo_path);
+
+		/* in child processes, PSEUDO_DISABLED may have become set to
+		 * some truthy value, in which case we'd disable pseudo,
+		 * or it may have gone away, in which case we'd enable
+		 * pseudo.
+		 */
+		env = getenv("PSEUDO_DISABLED");
+		if (!env) pseudo_get_value("PSEUDO_DISABLED");
+		if (env) {
+			int actually_disabled = 1;
+			switch (*env) {
+			case '0':
+			case 'f':
+			case 'F':
+			case 'n':
+			case 'N':
+				actually_disabled = 0;
+				break;
+			}
+			if (actually_disabled) {
+				if (!pseudo_disabled) {
+					pseudo_antimagic();
+					pseudo_disabled = 1;
+				}
+				pseudo_set_value("PSEUDO_DISABLED", "1");
+			} else {
+				if (pseudo_disabled) {
+					pseudo_magic();
+					pseudo_disabled = 0;
+				}
+				pseudo_set_value("PSEUDO_DISABLED", "0");
+			}
+		}
 		
 		env = pseudo_get_value("PSEUDO_UIDS");
 		if (env)
@@ -394,8 +451,6 @@ pseudo_client_reset() {
 		pseudo_inited = 1;
 	}
 	pseudo_client_getcwd();
-	/* make sure environment variables are back in sync */
-	pseudo_reinit_environment();
 	pseudo_magic();
 }
 

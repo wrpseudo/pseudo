@@ -81,12 +81,33 @@ static struct timeval message_time = { .tv_sec = 0 };
 
 static void pseudo_server_loop(void);
 
+static int
+pseudo_server_write_pid(pid_t pid) {
+	char *pseudo_path;
+	FILE *fp;
+
+	pseudo_path = pseudo_localstatedir_path(PSEUDO_PIDFILE);
+	if (!pseudo_path) {
+		pseudo_diag("Couldn't get path for prefix/%s\n", PSEUDO_PIDFILE);
+		return 1;
+	}
+	fp = fopen(pseudo_path, "w");
+	if (!fp) {
+		pseudo_diag("Couldn't open %s: %s\n",
+			pseudo_path, strerror(errno));
+		return 1;
+	}
+	fprintf(fp, "%lld\n", (long long) pid);
+	fclose(fp);
+	free(pseudo_path);
+	return 0;
+}
+
 int
 pseudo_server_start(int daemonize) {
 	struct sockaddr_un sun = { AF_UNIX, PSEUDO_SOCKET };
 	char *pseudo_path;
 	int rc, newfd;
-	FILE *fp;
 
 	listen_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (listen_fd < 0) {
@@ -124,37 +145,29 @@ pseudo_server_start(int daemonize) {
 		pseudo_diag("couldn't listen on socket: %s\n", strerror(errno));
 		return 1;
 	}
-	if (daemonize && ((rc = fork()) != 0)) {
-		if (rc == -1) {
-			pseudo_diag("couldn't spawn server: %s\n", strerror(errno));
-			return 0;
-		}
-		pseudo_debug(2, "started server, pid %d\n", rc);
-		close(listen_fd);
-		return 0;
-	}
-	setsid();
-	pseudo_path = pseudo_localstatedir_path(PSEUDO_PIDFILE);
-	if (!pseudo_path) {
-		pseudo_diag("Couldn't get path for prefix/%s\n", PSEUDO_PIDFILE);
-		return 1;
-	}
-	fp = fopen(pseudo_path, "w");
-	if (!fp) {
-		pseudo_diag("Couldn't open %s: %s\n",
-			pseudo_path, strerror(errno));
-		return 1;
-	}
-	fprintf(fp, "%lld\n", (long long) getpid());
-	fclose(fp);
-	free(pseudo_path);
 	if (daemonize) {
+		if ((rc = fork()) != 0) {
+			if (rc == -1) {
+				pseudo_diag("couldn't spawn server: %s\n", strerror(errno));
+				return 0;
+			}
+			pseudo_debug(2, "started server, pid %d\n", rc);
+			close(listen_fd);
+			/* Parent writes pid, that way it's always correct */
+			return pseudo_server_write_pid(rc);
+		}
+		/* In child */
 		pseudo_new_pid();
 		fclose(stdin);
 		fclose(stdout);
 		if (!pseudo_logfile(PSEUDO_LOGFILE))
 			fclose(stderr);
+	} else {
+		/* Write the pid if we don't daemonize */
+		pseudo_server_write_pid(getpid());
 	}
+
+	setsid();
 	signal(SIGHUP, quit_now);
 	signal(SIGINT, quit_now);
 	signal(SIGALRM, quit_now);
