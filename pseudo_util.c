@@ -76,9 +76,7 @@ static struct pseudo_variables pseudo_env[] = {
  * program starts playing with things, so we need to do our
  * best to handle that case.
  */
-static int _pseudo_in_init = -1;  /* Not yet run */
-
-static void _libpseudo_init(void) __attribute__ ((constructor));
+static int pseudo_util_initted = -1;  /* Not yet run */
 
 #if 0
 static void
@@ -92,15 +90,9 @@ dump_env(char **envp) {
 		pseudo_debug(0,"dump_envp: {%d}%s=%s\n", (int) i, pseudo_env[i].key, pseudo_env[i].value);
 	}
 
-	pseudo_debug(0, "dump_envp: _in_init %d\n", _pseudo_in_init);
+	pseudo_debug(0, "dump_envp: _in_init %d\n", pseudo_util_initted);
 }
 #endif
-
-void
-pseudo_reinit_environment(void) {
-	_pseudo_in_init = 0;
-	_libpseudo_init();
-}
 
 /* Caller must free memory! */
 char *
@@ -108,8 +100,8 @@ pseudo_get_value(const char *key) {
 	size_t i = 0;
 	char * value;
 
-	if (_pseudo_in_init == -1)
-		_libpseudo_init();
+	if (pseudo_util_initted == -1)
+		pseudo_init_util();
 
 	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++)
 		;
@@ -118,7 +110,7 @@ pseudo_get_value(const char *key) {
 	 * if so, something went wrong... so we'll attempt to recover
 	 */
 	if (pseudo_env[i].key && !pseudo_env[i].value && getenv(pseudo_env[i].key))
-		_libpseudo_init();
+		pseudo_init_util();
 
 	if (pseudo_env[i].value)
 		value = strdup(pseudo_env[i].value);
@@ -137,8 +129,8 @@ pseudo_set_value(const char *key, const char *value) {
 	int rc = 0;
 	size_t i = 0;
 
-	if (_pseudo_in_init == -1)
-		_libpseudo_init();
+	if (pseudo_util_initted == -1)
+		pseudo_init_util();
 
 	for (i = 0; pseudo_env[i].key && memcmp(pseudo_env[i].key, key, pseudo_env[i].key_len + 1); i++)
 		;
@@ -156,25 +148,37 @@ pseudo_set_value(const char *key, const char *value) {
 		} else
 			pseudo_env[i].value = NULL;
 	} else {
-		if (!_pseudo_in_init) pseudo_diag("Unknown variable %s.\n", key);
+		if (!pseudo_util_initted) pseudo_diag("Unknown variable %s.\n", key);
 		rc = -EINVAL;
 	}
 
 	return rc;
 }
 
-static void
-_libpseudo_init(void) {
+void
+pseudo_init_util(void) {
 	size_t i = 0;
+	char * env;
 
-	_pseudo_in_init = 1;
+	pseudo_util_initted = 1;
 
 	for (i = 0; pseudo_env[i].key; i++) {
 		if (getenv(pseudo_env[i].key))
 			pseudo_set_value(pseudo_env[i].key, getenv(pseudo_env[i].key));
 	}
 
-	_pseudo_in_init = 0;
+	pseudo_util_initted = 0;
+
+	/* Somewhere we have to set the debug level.. */
+	env = pseudo_get_value("PSEUDO_DEBUG");
+        if (env) {
+		int i;
+                int level = atoi(env);
+                for (i = 0; i < level; ++i) {
+                        pseudo_debug_verbose();
+                }
+        }
+        free(env);
 }
 
 /* 5 = ridiculous levels of duplication

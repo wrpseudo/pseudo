@@ -14,7 +14,7 @@
 		if (rc == 0) {
 			if (!pseudo_get_value("PSEUDO_RELOADED")) {
                 		pseudo_setupenv();
-				pseudo_client_reinit();
+				pseudo_reinit_libpseudo();
  			} else {
 				pseudo_setupenv();
 				pseudo_dropenv();

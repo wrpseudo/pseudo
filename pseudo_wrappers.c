@@ -32,7 +32,7 @@
 #include "pseudo_client.h"
 
 static void pseudo_enosys(const char *);
-static int pseudo_populate_wrappers(void);
+static int pseudo_check_wrappers(void);
 static volatile int antimagic = 0;
 static pthread_mutex_t pseudo_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t pseudo_mutex_holder;
@@ -48,6 +48,69 @@ static sigset_t pseudo_saved_sigmask;
 /* the generated code goes here */
 #include "pseudo_wrapper_table.c"
 #include "pseudo_wrapfuncs.c"
+
+/* Constructor only exists in libpseudo */
+static void _libpseudo_init(void) __attribute__ ((constructor));
+
+static int _libpseudo_initted = 0;
+
+static void
+_libpseudo_init(void) {
+	pseudo_getlock();
+	pseudo_antimagic();
+	_libpseudo_initted = 1;
+
+	pseudo_init_util();
+	pseudo_init_wrappers();
+	pseudo_init_client();
+
+	pseudo_magic();
+	pseudo_droplock();
+}
+
+void
+pseudo_reinit_libpseudo(void) {
+	_libpseudo_init();
+}
+
+void
+pseudo_init_wrappers(void) {
+	int i;
+	static int done = 0;
+
+	pseudo_getlock();
+	pseudo_antimagic();
+
+	/* We only ever want to run this once, even though we might want to
+	 * "re-init" at specific times...
+	 */
+	if (!done) {
+		for (i = 0; pseudo_functions[i].name; ++i) {
+			if (*pseudo_functions[i].real == NULL) {
+				int (*f)(void);
+				char *e;
+				dlerror();
+				f = dlsym(RTLD_NEXT, pseudo_functions[i].name);
+				if ((e = dlerror()) != NULL) {
+					/* leave it NULL, which our implementation checks for */
+					pseudo_diag("No wrapper for %s: %s\n", pseudo_functions[i].name, e);
+				} else {
+					if (f)
+						*pseudo_functions[i].real = f;
+				}
+			}
+		}
+		done = 1;
+	}
+
+	/* Once the wrappers are setup, we can now use open... so
+	 * setup the logfile, if necessary...
+	 */
+	pseudo_logfile(NULL);
+
+	pseudo_magic();
+	pseudo_droplock();
+}
 
 static void
 pseudo_sigblock(sigset_t *saved) {
@@ -140,76 +203,12 @@ pseudo_dechroot(char *s, size_t len) {
 }
 
 static int
-pseudo_populate_wrappers(void) {
-	int i;
-	char *debug;
-	static int done = 0;
-	char *no_symlink_exp;
+pseudo_check_wrappers(void) {
+	if (!_libpseudo_initted)
+		pseudo_reinit_libpseudo();
 
-	if (done)
-		return done;
-	pseudo_getlock();
-	pseudo_antimagic();
-	for (i = 0; pseudo_functions[i].name; ++i) {
-		if (*pseudo_functions[i].real == NULL) {
-			int (*f)(void);
-			char *e;
-			dlerror();
-			f = dlsym(RTLD_NEXT, pseudo_functions[i].name);
-			if ((e = dlerror()) != NULL) {
-				/* leave it NULL, which our implementation checks for */
-				pseudo_diag("No wrapper for %s: %s\n", pseudo_functions[i].name, e);
-			} else {
-				if (f)
-					*pseudo_functions[i].real = f;
-			}
-		}
-	}
-	done = 1;
-	debug = pseudo_get_value("PSEUDO_DEBUG");
-	if (debug) {
-		int level = atoi(debug);
-		for (i = 0; i < level; ++i) {
-			pseudo_debug_verbose();
-		}
-	}
-	free(debug);
-	no_symlink_exp = pseudo_get_value("PSEUDO_NOSYMLINKEXP");
-	if (no_symlink_exp) {
-		char *endptr;
-		/* if the environment variable is not an empty string,
-		 * parse it; "0" means turn NOSYMLINKEXP off, "1" means
-		 * turn it on (disabling the feature).  An empty string
-		 * or something we can't parse means to set the flag; this
-		 * is a safe default because if you didn't want the flag
-		 * set, you normally wouldn't set the environment variable
-		 * at all.
-		 */
-		if (*no_symlink_exp) {
-			pseudo_nosymlinkexp = strtol(no_symlink_exp, &endptr, 10);
-			if (*endptr)
-				pseudo_nosymlinkexp = 1;
-		} else {
-			pseudo_nosymlinkexp = 1;
-		}
-	} else {
-		pseudo_nosymlinkexp = 0;
-	}
-	free(no_symlink_exp);
-	/* if PSEUDO_DEBUG_FILE is set up, redirect logging there.
-	 */
-	pseudo_logfile(NULL);
-	/* must happen after wrappers are set up, because it can call
-	 * getcwd(), which needs wrappers, but must happen here so that
-	 * any attempt to use a path in a wrapper function will have a
-	 * value for cwd.
-	 */
-	pseudo_client_reset();
-	pseudo_debug(2, "(%s) set up wrappers\n", program_invocation_short_name);
-	pseudo_magic();
-	pseudo_droplock();
-	return done;
-}
+	return _libpseudo_initted;
+}		
 
 static char **
 execl_to_v(va_list ap, const char *argv0, char *const **envp) {
@@ -268,22 +267,12 @@ execl(const char *file, const char *arg, ...) {
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		return -1;
 	}
-	if (pseudo_populate_wrappers()) {
+	if (pseudo_check_wrappers()) {
 		int save_errno;
-		if (antimagic > 0) {
-			if (real_execv) {
-				/* use execv to emulate */
-				rc = (*real_execv)(file, argv);
-			} else {
-				/* rc was initialized to the "failure" value */
-				pseudo_enosys("execl");
-			}
-		} else {
-			
-			/* exec*() use this to restore the sig mask */
-			pseudo_saved_sigmask = saved;
-			rc = wrap_execv(file, argv);
-		}
+
+		/* exec*() use this to restore the sig mask */
+		pseudo_saved_sigmask = saved;
+		rc = wrap_execv(file, argv);
 
 		save_errno = errno;
 		pseudo_droplock();
@@ -326,22 +315,12 @@ execlp(const char *file, const char *arg, ...) {
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		return -1;
 	}
-	if (pseudo_populate_wrappers()) {
+	if (pseudo_check_wrappers()) {
 		int save_errno;
-		if (antimagic > 0) {
-			if (real_execvp) {
-				/* use execv to emulate */
-				rc = (*real_execvp)(file, argv);
-			} else {
-				/* rc was initialized to the "failure" value */
-				pseudo_enosys("execlp");
-			}
-		} else {
-			
-			/* exec*() use this to restore the sig mask */
-			pseudo_saved_sigmask = saved;
-			rc = wrap_execvp(file, argv);
-		}
+
+		/* exec*() use this to restore the sig mask */
+		pseudo_saved_sigmask = saved;
+		rc = wrap_execvp(file, argv);
 
 		save_errno = errno;
 		pseudo_droplock();
@@ -385,22 +364,12 @@ execle(const char *file, const char *arg, ...) {
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		return -1;
 	}
-	if (pseudo_populate_wrappers()) {
+	if (pseudo_check_wrappers()) {
 		int save_errno;
-		if (antimagic > 0) {
-			if (real_execve) {
-				/* use execve to emulate */
-				rc = (*real_execve)(file, argv, envp);
-			} else {
-				/* rc was initialized to the "failure" value */
-				pseudo_enosys("execl");
-			}
-		} else {
-			
-			/* exec*() use this to restore the sig mask */
-			pseudo_saved_sigmask = saved;
-			rc = wrap_execve(file, argv, envp);
-		}
+
+		/* exec*() use this to restore the sig mask */
+		pseudo_saved_sigmask = saved;
+		rc = wrap_execve(file, argv, envp);
 
 		save_errno = errno;
 		pseudo_droplock();
@@ -421,6 +390,117 @@ execle(const char *file, const char *arg, ...) {
 }
 
 int
+execv(const char *file, char *const *argv) {
+	sigset_t saved;
+	
+	int rc = -1;
+
+	pseudo_debug(4, "called: execv\n");
+	pseudo_sigblock(&saved);
+	if (pseudo_getlock()) {
+		errno = EBUSY;
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		return -1;
+	}
+	if (pseudo_check_wrappers()) {
+		int save_errno;
+			
+		/* exec*() use this to restore the sig mask */
+		pseudo_saved_sigmask = saved;
+		rc = wrap_execv(file, argv);
+		
+		save_errno = errno;
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: execv\n");
+		errno = save_errno;
+		return rc;
+	} else {
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: execv\n");
+		/* rc was initialized to the "failure" value */
+		pseudo_enosys("execv");
+		
+		return rc;
+	}
+}
+
+int
+execve(const char *file, char *const *argv, char *const *envp) {
+	sigset_t saved;
+	
+	int rc = -1;
+
+	pseudo_debug(4, "called: execve\n");
+	pseudo_sigblock(&saved);
+	if (pseudo_getlock()) {
+		errno = EBUSY;
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		return -1;
+	}
+	if (pseudo_check_wrappers()) {
+		int save_errno;
+			
+		/* exec*() use this to restore the sig mask */
+		pseudo_saved_sigmask = saved;
+		rc = wrap_execve(file, argv, envp);
+		
+		save_errno = errno;
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: execve\n");
+		errno = save_errno;
+		return rc;
+	} else {
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: execve\n");
+		/* rc was initialized to the "failure" value */
+		pseudo_enosys("execve");
+		
+		return rc;
+	}
+}
+
+int
+execvp(const char *file, char *const *argv) {
+	sigset_t saved;
+	
+	int rc = -1;
+
+	pseudo_debug(4, "called: execvp\n");
+	pseudo_sigblock(&saved);
+	if (pseudo_getlock()) {
+		errno = EBUSY;
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		return -1;
+	}
+	if (pseudo_check_wrappers()) {
+		int save_errno;
+			
+		/* exec*() use this to restore the sig mask */
+		pseudo_saved_sigmask = saved;
+		rc = wrap_execvp(file, argv);
+		
+		save_errno = errno;
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: execvp\n");
+		errno = save_errno;
+		return rc;
+	} else {
+		pseudo_droplock();
+		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(4, "completed: execvp\n");
+		/* rc was initialized to the "failure" value */
+		pseudo_enosys("execvp");
+		
+		return rc;
+	}
+}
+
+int
 fork(void) {
 	sigset_t saved;
 	
@@ -433,7 +513,7 @@ fork(void) {
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		return -1;
 	}
-	if (pseudo_populate_wrappers()) {
+	if (pseudo_check_wrappers()) {
 		int save_errno;
 			
 		rc = wrap_fork();
@@ -465,12 +545,6 @@ vfork(void) {
 }
 
 int
-wrap_clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
-	/* unused */
-	return 0;
-}
-
-int
 clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
 	sigset_t saved;
 	va_list ap;
@@ -486,7 +560,6 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
 	ctid = va_arg(ap, pid_t *);
 	va_end(ap);
 
-
 	pseudo_debug(4, "called: clone\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
@@ -494,7 +567,7 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		return -1;
 	}
-	if (pseudo_populate_wrappers()) {
+	if (pseudo_check_wrappers()) {
 		int save_errno;
 		int save_disabled = pseudo_disabled;
 		/* because clone() doesn't actually continue in this function, we
@@ -532,13 +605,41 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
 	}
 }
 
-static int (*real_fork)(void) = NULL;
-#if 0
 static int (*real_execlp)(const char *file, const char *arg, ...) = NULL;
 static int (*real_execl)(const char *file, const char *arg, ...) = NULL;
 static int (*real_execle)(const char *file, const char *arg, ...) = NULL;
-#endif
+static int (*real_execv)(const char *file, char *const *argv) = NULL;
+static int (*real_execve)(const char *file, char *const *argv, char *const *envp) = NULL;
+static int (*real_execvp)(const char *file, char *const *argv) = NULL;
+static int (*real_fork)(void) = NULL;
 static int (*real_clone)(int (*)(void *), void *, int, void *, ...) = NULL;
+
+static int
+wrap_execv(const char *file, char *const *argv) {
+	int rc = -1;
+
+#include "guts/execv.c"
+
+	return rc;
+}
+
+static int
+wrap_execve(const char *file, char *const *argv, char *const *envp) {
+	int rc = -1;
+
+#include "guts/execve.c"
+
+	return rc;
+}
+
+static int
+wrap_execvp(const char *file, char *const *argv) {
+	int rc = -1;
+
+#include "guts/execvp.c"
+
+	return rc;
+}
 
 static int
 wrap_fork(void) {
@@ -547,4 +648,10 @@ wrap_fork(void) {
 #include "guts/fork.c"
 
 	return rc;
+}
+
+int
+wrap_clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) {
+	/* unused */
+	return 0;
 }

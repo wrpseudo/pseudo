@@ -13,7 +13,9 @@
 	 * <CHROOT>/bin/sh.  This allows use of basic utilities.  This
 	 * design will likely be revisited.
 	 */
-	pseudo_client_op(OP_EXEC, PSA_EXEC, -1, -1, file, 0);
+        if (antimagic == 0) {
+                pseudo_client_op(OP_EXEC, PSA_EXEC, -1, -1, file, 0);
+        }
 
 	if (!pseudo_get_value("PSEUDO_RELOADED"))
 		pseudo_setupenv();

@@ -30,7 +30,7 @@ ${name}(${decl_args}) {
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		${def_return}
 	}
-	if (pseudo_populate_wrappers()) {
+	if (pseudo_check_wrappers()) {
 		int save_errno;
 		if (antimagic > 0) {
 			if (real_$name) {

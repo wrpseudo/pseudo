@@ -78,6 +78,169 @@ gid_t pseudo_egid;
 gid_t pseudo_sgid;
 gid_t pseudo_fgid;
 
+void
+pseudo_init_client(void) {
+	char *env;
+
+	pseudo_antimagic();
+	pseudo_new_pid();
+	if (connect_fd != -1) {
+		close(connect_fd);
+		connect_fd = -1;
+	}
+
+	/* in child processes, PSEUDO_DISABLED may have become set to
+	 * some truthy value, in which case we'd disable pseudo,
+	 * or it may have gone away, in which case we'd enable
+	 * pseudo (and cause it to reinit the defaults).
+	 */
+	env = getenv("PSEUDO_DISABLED");
+	if (!env) pseudo_get_value("PSEUDO_DISABLED");
+	if (env) {
+		int actually_disabled = 1;
+		switch (*env) {
+		case '0':
+		case 'f':
+		case 'F':
+		case 'n':
+		case 'N':
+			actually_disabled = 0;
+			break;
+		}
+		if (actually_disabled) {
+			if (!pseudo_disabled) {
+				pseudo_antimagic();
+				pseudo_disabled = 1;
+			}
+			pseudo_set_value("PSEUDO_DISABLED", "1");
+		} else {
+			if (pseudo_disabled) {
+				pseudo_magic();
+				pseudo_disabled = 0;
+				pseudo_inited = 0; /* Re-read the initial values! */
+			}
+			pseudo_set_value("PSEUDO_DISABLED", "0");
+		}
+	} else {
+		pseudo_set_value("PSEUDO_DISABLED", "0");
+	}
+
+	/* Setup global items needed for pseudo to function... */
+	if (!pseudo_inited) {
+		char *pseudo_path = 0;
+
+		/* Ensure that all of the values are reset */
+		server_pid = 0;
+		pseudo_prefix_dir_fd = -1;
+		pseudo_localstate_dir_fd = -1;
+		pseudo_pwd_fd = -1;
+		pseudo_pwd_lck_fd = -1;
+		pseudo_pwd_lck_name = NULL;
+		pseudo_pwd = NULL;
+		pseudo_grp_fd = -1;
+		pseudo_grp = NULL;
+		pseudo_cwd = NULL;
+		pseudo_cwd_len = 0;
+		pseudo_chroot = NULL;
+		pseudo_passwd = NULL;
+		pseudo_chroot_len = 0;
+		pseudo_cwd_rel = NULL;
+		pseudo_nosymlinkexp = 0;
+
+		pseudo_path = pseudo_prefix_path(NULL);
+		if (pseudo_prefix_dir_fd == -1) {
+			if (pseudo_path) {
+				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+				pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, MOVE_FD);
+			} else {
+				pseudo_diag("No prefix available to to find server.\n");
+				exit(1);
+			}
+			if (pseudo_prefix_dir_fd == -1) {
+				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+					pseudo_path,
+					strerror(errno));
+				exit(1);
+			}
+		}
+		free(pseudo_path);
+		pseudo_path = pseudo_localstatedir_path(NULL);
+		if (pseudo_localstate_dir_fd == -1) {
+			if (pseudo_path) {
+				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+				pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
+			} else {
+				pseudo_diag("No prefix available to to find server.\n");
+				exit(1);
+			}
+			if (pseudo_localstate_dir_fd == -1) {
+				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+					pseudo_path,
+					strerror(errno));
+				exit(1);
+			}
+		}
+		free(pseudo_path);
+
+		env = pseudo_get_value("PSEUDO_NOSYMLINKEXP");
+		if (env) {
+			char *endptr;
+			/* if the environment variable is not an empty string,
+			 * parse it; "0" means turn NOSYMLINKEXP off, "1" means
+			 * turn it on (disabling the feature).  An empty string
+			 * or something we can't parse means to set the flag; this
+			 * is a safe default because if you didn't want the flag
+			 * set, you normally wouldn't set the environment variable
+			 * at all.
+			 */
+			if (*env) {
+				pseudo_nosymlinkexp = strtol(env, &endptr, 10);
+				if (*endptr)
+					pseudo_nosymlinkexp = 1;
+			} else {
+				pseudo_nosymlinkexp = 1;
+			}
+		} else {
+			pseudo_nosymlinkexp = 0;
+		}
+		free(env);
+		env = pseudo_get_value("PSEUDO_UIDS");
+		if (env)
+			sscanf(env, "%d,%d,%d,%d",
+				&pseudo_ruid, &pseudo_euid,
+				&pseudo_suid, &pseudo_fuid);
+		free(env);
+
+		env = pseudo_get_value("PSEUDO_GIDS");
+		if (env)
+			sscanf(env, "%d,%d,%d,%d",
+				&pseudo_rgid, &pseudo_egid,
+				&pseudo_sgid, &pseudo_fuid);
+		free(env);
+
+		env = pseudo_get_value("PSEUDO_CHROOT");
+		if (env) {
+			pseudo_chroot = strdup(env);
+			if (pseudo_chroot) {
+				pseudo_chroot_len = strlen(pseudo_chroot);
+			} else {
+				pseudo_diag("can't store chroot path (%s)\n", env);
+			}
+		}
+		free(env);
+
+		env = pseudo_get_value("PSEUDO_PASSWD");
+		if (env) {
+			pseudo_passwd = strdup(env);
+		}
+		free(env);
+
+		pseudo_inited = 1;
+	}
+	pseudo_client_getcwd();
+	pseudo_magic();
+}
+
 static void
 pseudo_file_close(int *fd, FILE **fp) {
 	if (!fp || !fd) {
@@ -309,149 +472,6 @@ pseudo_client_close(int fd) {
 
 	free(fd_paths[fd]);
 	fd_paths[fd] = 0;
-}
-
- void
-pseudo_client_reinit() {
-       pseudo_debug(1, "called: pseudo_client_reinit\n");
-       pseudo_inited = 0;
-       pseudo_reinit_environment();
-       pseudo_client_reset();
-}
-
-void
-pseudo_client_reset() {
-	pseudo_antimagic();
-	pseudo_new_pid();
-	if (connect_fd != -1) {
-		close(connect_fd);
-		connect_fd = -1;
-	}
-
-	if (!pseudo_inited) {
-		char *pseudo_path = 0;
-		char *env;
-
-		/* Ensure that all of the values are reset */
-		server_pid = 0;
-		pseudo_prefix_dir_fd = -1;
-		pseudo_localstate_dir_fd = -1;
-		pseudo_pwd_fd = -1;
-		pseudo_pwd_lck_fd = -1;
-		pseudo_pwd_lck_name = NULL;
-		pseudo_pwd = NULL;
-		pseudo_grp_fd = -1;
-		pseudo_grp = NULL;
-		pseudo_cwd = NULL;
-		pseudo_cwd_len = 0;
-		pseudo_chroot = NULL;
-		pseudo_passwd = NULL;
-		pseudo_chroot_len = 0;
-		pseudo_cwd_rel = NULL;
-
-		pseudo_path = pseudo_prefix_path(NULL);
-		if (pseudo_prefix_dir_fd == -1) {
-			if (pseudo_path) {
-				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
-				pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, MOVE_FD);
-			} else {
-				pseudo_diag("No prefix available to to find server.\n");
-				exit(1);
-			}
-			if (pseudo_prefix_dir_fd == -1) {
-				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
-					pseudo_path,
-					strerror(errno));
-				exit(1);
-			}
-		}
-		free(pseudo_path);
-		pseudo_path = pseudo_localstatedir_path(NULL);
-		if (pseudo_localstate_dir_fd == -1) {
-			if (pseudo_path) {
-				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
-				pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
-			} else {
-				pseudo_diag("No prefix available to to find server.\n");
-				exit(1);
-			}
-			if (pseudo_localstate_dir_fd == -1) {
-				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
-					pseudo_path,
-					strerror(errno));
-				exit(1);
-			}
-		}
-		free(pseudo_path);
-
-		/* in child processes, PSEUDO_DISABLED may have become set to
-		 * some truthy value, in which case we'd disable pseudo,
-		 * or it may have gone away, in which case we'd enable
-		 * pseudo.
-		 */
-		env = getenv("PSEUDO_DISABLED");
-		if (!env) pseudo_get_value("PSEUDO_DISABLED");
-		if (env) {
-			int actually_disabled = 1;
-			switch (*env) {
-			case '0':
-			case 'f':
-			case 'F':
-			case 'n':
-			case 'N':
-				actually_disabled = 0;
-				break;
-			}
-			if (actually_disabled) {
-				if (!pseudo_disabled) {
-					pseudo_antimagic();
-					pseudo_disabled = 1;
-				}
-				pseudo_set_value("PSEUDO_DISABLED", "1");
-			} else {
-				if (pseudo_disabled) {
-					pseudo_magic();
-					pseudo_disabled = 0;
-				}
-				pseudo_set_value("PSEUDO_DISABLED", "0");
-			}
-		}
-		
-		env = pseudo_get_value("PSEUDO_UIDS");
-		if (env)
-			sscanf(env, "%d,%d,%d,%d",
-				&pseudo_ruid, &pseudo_euid,
-				&pseudo_suid, &pseudo_fuid);
-		free(env);
-
-		env = pseudo_get_value("PSEUDO_GIDS");
-		if (env)
-			sscanf(env, "%d,%d,%d,%d",
-				&pseudo_rgid, &pseudo_egid,
-				&pseudo_sgid, &pseudo_fuid);
-		free(env);
-
-		env = pseudo_get_value("PSEUDO_CHROOT");
-		if (env) {
-			pseudo_chroot = strdup(env);
-			if (pseudo_chroot) {
-				pseudo_chroot_len = strlen(pseudo_chroot);
-			} else {
-				pseudo_diag("can't store chroot path (%s)\n", env);
-			}
-		}
-		free(env);
-
-		env = pseudo_get_value("PSEUDO_PASSWD");
-		if (env) {
-			pseudo_passwd = strdup(env);
-		}
-		free(env);
-
-		pseudo_inited = 1;
-	}
-	pseudo_client_getcwd();
-	pseudo_magic();
 }
 
 /* spawn server */

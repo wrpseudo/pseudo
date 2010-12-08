@@ -20,8 +20,6 @@
 extern pseudo_msg_t *pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat64 *buf, ...);
 extern void pseudo_antimagic(void);
 extern void pseudo_magic(void);
-extern void pseudo_client_reinit(void);
-extern void pseudo_client_reset(void);
 extern void pseudo_client_touchuid(void);
 extern void pseudo_client_touchgid(void);
 extern char *pseudo_client_fdpath(int fd);

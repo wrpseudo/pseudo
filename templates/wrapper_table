@@ -27,5 +27,20 @@ static struct {
 		(int (**)(void)) &real_clone,
 		(int (*)(void)) wrap_clone
 	},
+	{ /* int execv(const char *file, char *const *argv); */
+		"execv",
+		(int (**)(void)) &real_execv,
+		(int (*)(void)) wrap_execv
+	},
+	{ /* int execve(const char *file, char *const *argv, char *const *envp); */
+		"execve",
+		(int (**)(void)) &real_execve,
+		(int (*)(void)) wrap_execve
+	},
+	{ /* int execvp(const char *file, char *const *argv); */
+		"execvp",
+		(int (**)(void)) &real_execvp,
+		(int (*)(void)) wrap_execvp
+	},
 	{ NULL, NULL, NULL },
 };

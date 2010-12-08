@@ -14,8 +14,8 @@
 	pseudo_debug(1, "client resetting for clone(2) call\n");
 	if (real_clone) {
 		if (!pseudo_get_value("PSEUDO_RELOADED")) {
-               		pseudo_setupenv();
-			pseudo_client_reinit();
+			pseudo_setupenv();
+			pseudo_reinit_libpseudo();
 		} else {
 			pseudo_setupenv();
 			pseudo_dropenv();

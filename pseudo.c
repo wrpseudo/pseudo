@@ -79,14 +79,7 @@ main(int argc, char *argv[]) {
 
 	opts[0] = '\0';
 
-	s = pseudo_get_value("PSEUDO_DEBUG");
-	if (s) {
-		int level = atoi(s);
-		for (o = 0; o < level; ++o) {
-			pseudo_debug_verbose();
-		}
-	}
-	free(s);
+	pseudo_init_util();
 
 	if (ld_env && strstr(ld_env, "libpseudo")) {
 		pseudo_debug(2, "can't run daemon with libpseudo in LD_PRELOAD\n");

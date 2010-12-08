@@ -1,0 +1,63 @@
+This is a quick attempt at documenting the basic program flow for both the main
+pseudo executable and the pseudo wrapper library.  The key thing to note is
+that there are key init functions.  These functions are designed to be
+re-invoked if it becomes necessary to reset the system environment.
+
+libpseudo execution flow:
+	# on startup #
+
+	pseudo_wrappers.c: (constructor) _libpseudo_init()
+		pseudo_util.c: pseudo_init_util()
+			copy environment
+			setup PSEUDO_DEBUG levels
+		pseudo_wrappers.c: pseudo_init_wrappers()
+			setup pseudo_functions
+			setup pseudo_logfile
+		pseudo_client.c: pseudo_init_client()
+			setup PSEUDO_DISBLED
+			setup pseudo_prefix_dir_fd
+			setup pseudo_localstate_dir_fd
+			setup PSEUDO_NOSYMLINKEXP
+			setup PSEUDO_UIDS
+			setup PSEUDO_GIDS
+			setup PSEUDO_CHROOT
+			setup PSEUDO_PASSWD
+
+	# regular program execution #
+	exec*()
+		pseudo_check_wrappers():
+			pseudo_reinit_libpseudo if necessary
+		call wrap_exec*()
+			if !PSEUDO_RELOADED
+				pseudo_setupenv()
+			else
+				pseudo_setupenv()
+				pseudo_dropenv()
+			real_exec*()
+
+	fork()
+	clone()
+		pseudo_populate_wrappers():
+			pseudo_reinit_libpseudo if necessary
+		call wrap_exec*()
+			if !PSEUDO_RELOADED
+				pseudo_setupenv()
+				pseudo_reinit_libpseudo()
+					_libpseudo_init()
+			else
+				pseudo_setupenv()
+				pseudo_dropenv()
+			real_*()
+
+	... normal function wrappers ...
+
+pseudo execution flow:
+	pseudo.c: main()
+		pseudo_util.c: pseudo_init_util()
+			<see above>
+		check LD_PRELOAD
+		process arguments
+		setup PSEUDO_OPTS
+		...
+		startup server
+
