@@ -1,3 +1,6 @@
+2010-12-14:
+	* (mhatle) restructure wrapfuncs.c
+
 2010-12-09:
 	* (mhatle) Add doc/program_flow to attempt to explain startup/running
 	* (mhatle) guts/* minor cleanup

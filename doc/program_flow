@@ -37,7 +37,7 @@ libpseudo execution flow:
 
 	fork()
 	clone()
-		pseudo_populate_wrappers():
+		pseudo_check_wrappers():
 			pseudo_reinit_libpseudo if necessary
 		call wrap_exec*()
 			if !PSEUDO_RELOADED
@@ -49,7 +49,19 @@ libpseudo execution flow:
 				pseudo_dropenv()
 			real_*()
 
-	... normal function wrappers ...
+	... normal function wrappers ... (templates/wrapfuncs.c):
+		pseudo_check_wrappers() || !real_*
+			return enosys
+		variadic setup (if necessary)
+		if pseudo_disabled  return real_*()
+		pseudo_sigblock
+		pseudo_getlock
+		if antimagic  rc = real_*()
+		else rc = wrap_*()
+		variadic end (if necessary)
+		pseudo_droplock
+		unmask signals
+		return rc
 
 pseudo execution flow:
 	pseudo.c: main()

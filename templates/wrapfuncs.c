@@ -21,7 +21,19 @@ ${name}(${decl_args}) {
 	${variadic_decl}
 	${rc_decl}
 
+	if (!pseudo_check_wrappers() || !real_$name) {
+		/* rc was initialized to the "failure" value */
+		pseudo_enosys("${name}");
+		${rc_return}
+	}
+
 	${variadic_start}
+
+	if (pseudo_disabled) {
+		${rc_assign} (*real_${name})(${call_args});
+		${variadic_end}
+		${rc_return}
+	}
 
 	pseudo_debug(4, "called: ${name}\n");
 	pseudo_sigblock(&saved);
@@ -30,39 +42,25 @@ ${name}(${decl_args}) {
 		sigprocmask(SIG_SETMASK, &saved, NULL);
 		${def_return}
 	}
-	if (pseudo_check_wrappers()) {
-		int save_errno;
-		if (antimagic > 0) {
-			if (real_$name) {
-				/* call the real syscall */
-				${rc_assign} (*real_${name})(${call_args});
-			} else {
-				/* rc was initialized to the "failure" value */
-				pseudo_enosys("${name}");
-			}
-		} else {
-			${alloc_paths}
-			/* exec*() use this to restore the sig mask */
-			pseudo_saved_sigmask = saved;
-			${rc_assign} wrap_$name(${call_args});
-			${free_paths}
-		}
-		${variadic_end}
-		save_errno = errno;
-		pseudo_droplock();
-		sigprocmask(SIG_SETMASK, &saved, NULL);
-		pseudo_debug(4, "completed: $name\n");
-		errno = save_errno;
-		${rc_return}
+
+	int save_errno;
+	if (antimagic > 0) {
+		/* call the real syscall */
+		${rc_assign} (*real_${name})(${call_args});
 	} else {
-		pseudo_droplock();
-		sigprocmask(SIG_SETMASK, &saved, NULL);
-		pseudo_debug(4, "completed: $name\n");
-		/* rc was initialized to the "failure" value */
-		pseudo_enosys("${name}");
-		${variadic_end}
-		${rc_return}
+		${alloc_paths}
+		/* exec*() use this to restore the sig mask */
+		pseudo_saved_sigmask = saved;
+		${rc_assign} wrap_$name(${call_args});
+		${free_paths}
 	}
+	${variadic_end}
+	save_errno = errno;
+	pseudo_droplock();
+	sigprocmask(SIG_SETMASK, &saved, NULL);
+	pseudo_debug(4, "completed: $name\n");
+	errno = save_errno;
+	${rc_return}
 }
 
 static ${type}
