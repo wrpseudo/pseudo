@@ -447,43 +447,58 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		break;
 	}
 
+	/* Process rename path seperation, there are two paths old / new
+	 * stuff into a rename, break them apart (null seperated)
+	 */
+
+	if (msg->pathlen && msg->op == OP_RENAME) {
+		/* In a rename there are two paths, null seperate in msg->path */
+		oldpath = msg->path + strlen(msg->path) + 1;
+		pseudo_debug(2, "rename: path %s, oldpath %s\n",
+			msg->path, oldpath);
+	}
+
 	/* stash original header, in case we need it later */
 	msg_header = *msg;
+	by_ino = msg_header;
 
 	/* There should usually be a path.  Even for f* ops, the client
 	 * tries to provide a path from its table of known fd paths.
 	 */
-	if (msg->pathlen) {
-		if (msg->op == OP_RENAME) {
-			oldpath = msg->path + strlen(msg->path) + 1;
-			pseudo_debug(2, "rename: path %s, oldpath %s\n",
-				msg->path, oldpath);
-		}
-		/* for now, don't canonicalize paths anymore */
-		/* used to do it here, but now doing it in client */
-		if (!pdb_find_file_path(msg)) {
-			by_path = *msg;
-			found_path = 1;
-		} else {
-			if (msg->op != OP_RENAME && msg->op != OP_LINK) {
-				pseudo_debug(3, "(new?) ");
-			}
-		}
-	}
 
-	/* search on original inode -- in case of mismatch */
-	by_ino = msg_header;
-	if (msg_header.ino != 0) {
-		if (found_path && msg->pathlen && !pdb_find_file_exact(msg)) {
+	/* Lookup the full path, with inode and dev if available */
+	if (msg->pathlen && msg->dev && msg->ino) {
+		if (!pdb_find_file_exact(msg)) {
 			/* restore header contents */
+			by_path = *msg;
 			by_ino = *msg;
 			*msg = msg_header;
+			found_path = 1;
 			found_ino = 1;
 			/* note:  we have to avoid freeing this later */
 			path_by_ino = msg->path;
-		} else if (!pdb_find_file_dev(&by_ino)) {
-			found_ino = 1;
-			path_by_ino = pdb_get_file_path(&by_ino);
+		}
+	}
+
+	if (!found_path && !found_ino) {
+		if (msg->pathlen) {
+			/* for now, don't canonicalize paths anymore */
+			/* used to do it here, but now doing it in client */
+			if (!pdb_find_file_path(msg)) {
+				by_path = *msg;
+				found_path = 1;
+			} else {
+				if (msg->op != OP_RENAME && msg->op != OP_LINK) {
+					pseudo_debug(3, "(new?) ");
+				}
+			}
+		}
+		/* search on original inode -- in case of mismatch */
+		if (msg->dev && msg->ino) {
+			if (!pdb_find_file_dev(&by_ino)) {
+				found_ino = 1;
+				path_by_ino = pdb_get_file_path(&by_ino);
+			}
 		}
 	}
 
@@ -857,6 +872,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			msg->pathlen ? msg->path : "no path");
 		break;
 	}
+
 	/* in the case of an exact match, we just used the pointer
 	 * rather than allocating space
 	 */

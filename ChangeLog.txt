@@ -1,6 +1,8 @@
 2010-12-15:
 	* (mhatle) add sqlite call profiling, enable with NPROFILE
 	* (mhatle) as a result of profiling, optimize inode search
+	* (mhatle) rearrange the pseudo_op file data operations to reduce
+		   the number of selects.
 
 2010-12-14:
 	* (mhatle) restructure wrapfuncs.c
