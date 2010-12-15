@@ -474,7 +474,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	/* search on original inode -- in case of mismatch */
 	by_ino = msg_header;
 	if (msg_header.ino != 0) {
-		if (msg->pathlen && !pdb_find_file_exact(msg)) {
+		if (found_path && msg->pathlen && !pdb_find_file_exact(msg)) {
 			/* restore header contents */
 			by_ino = *msg;
 			*msg = msg_header;

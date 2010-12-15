@@ -30,6 +30,15 @@
 #include "pseudo_ipc.h"
 #include "pseudo_db.h"
 
+/* #define NPROFILE */
+
+#ifdef NPROFILE
+void xProfile(void * pArg, const char * pQuery, sqlite3_uint64 pTimeTaken)
+{
+       pseudo_diag("profile: %lld %s\n", pTimeTaken, pQuery);
+}
+#endif
+
 struct log_history {
 	int rc;
 	unsigned long fields;
@@ -401,6 +410,9 @@ get_db(sqlite3 **db) {
 	if (db == &file_db) {
 		dbfile = pseudo_localstatedir_path("files.db");
 		rc = sqlite3_open(dbfile, db);
+#ifdef NPROFILE
+		sqlite3_profile(*db, xProfile, NULL);
+#endif
 		free(dbfile);
 	} else {
 		dbfile = pseudo_localstatedir_path("logs.db");
