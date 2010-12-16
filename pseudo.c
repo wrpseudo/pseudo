@@ -425,6 +425,9 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	int found_path = 0, found_ino = 0;
 	int prefer_ino = 0;
 
+	static pseudo_msg_t cache_msg = { .op = 0 };
+	static char * cache_path = NULL;
+
 	if (!msg)
 		return 1;
 	
@@ -468,7 +471,59 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 
 	/* Lookup the full path, with inode and dev if available */
 	if (msg->pathlen && msg->dev && msg->ino) {
-		if (!pdb_find_file_exact(msg)) {
+		if (cache_msg.pathlen == msg->pathlen &&
+		    cache_msg.dev == msg->dev &&
+		    cache_msg.ino == msg->ino &&
+		    !strcmp(cache_path, msg->path)) {
+			/* Found it in the cache! */
+#ifdef NPROFILE
+			pseudo_diag("cache hit -- by_file_exact\n");
+#endif
+			/* Change the cache to match the msg */
+			cache_msg.type = msg->type;
+			cache_msg.op = msg->op;
+			cache_msg.result = msg->result;
+			cache_msg.access = msg->access;
+			cache_msg.fd = msg->fd;
+#ifdef NVALIDATE
+			if (!pdb_find_file_exact(msg)) {
+				if (cache_msg.pathlen != msg->pathlen ||
+				    cache_msg.dev != msg->dev ||
+				    cache_msg.ino != msg->ino ||
+				    cache_msg.uid != msg->uid ||
+				    cache_msg.gid != msg->gid ||
+				    cache_msg.mode != msg->mode ||
+				    cache_msg.rdev != msg->rdev ||
+				    cache_msg.nlink != msg->nlink ||
+				    cache_msg.deleting != msg->deleting) {
+				pseudo_diag("Cache mismatch [%s]: Database differs from cache\n"
+						"     cache vs result:\n"
+						"     dev (%llu,%llu) ino (%llu,%llu)\n"
+						"     uid (%d,%d) gid (%d,%d) mode (0%o,0%o)\n"
+						"     rdev (%llu,%llu) nlink (%d,%d) deleting (%d,%d)\n",
+						msg->pathlen ? msg->path : "no path",
+						(unsigned long long) cache_msg.dev, (unsigned long long) msg->dev,
+						(unsigned long long) cache_msg.ino, (unsigned long long) msg->ino,
+						(unsigned long long) cache_msg.uid, (unsigned int) msg->uid,
+						(unsigned long long) cache_msg.gid, (unsigned int) msg->gid,
+						cache_msg.mode, msg->mode,
+						(unsigned long long) cache_msg.rdev, (unsigned int) msg->rdev,
+						cache_msg.nlink, msg->nlink,
+						cache_msg.deleting, msg->deleting);
+				}
+			} else {
+				pseudo_diag("Cache mismatch [%s]: Not found in DB\n",
+						msg->pathlen ? msg->path : "no path");
+			}
+#endif
+
+			by_path = cache_msg;
+			by_ino = cache_msg;
+			/* no need to restore msg */
+			found_path = 1;
+			found_ino = 1;
+			path_by_ino = msg->path;
+		} else if (!pdb_find_file_exact(msg)) {
 			/* restore header contents */
 			by_path = *msg;
 			by_ino = *msg;
@@ -484,7 +539,51 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		if (msg->pathlen) {
 			/* for now, don't canonicalize paths anymore */
 			/* used to do it here, but now doing it in client */
-			if (!pdb_find_file_path(msg)) {
+			if (cache_msg.pathlen == msg->pathlen &&
+			    !strcmp(cache_path, msg->path)) {
+#ifdef NPROFILE
+				pseudo_diag("cache hit -- by_path\n");
+#endif
+				/* Change the cache to match the msg */
+				cache_msg.type = msg->type;
+				cache_msg.op = msg->op;
+				cache_msg.result = msg->result;
+				cache_msg.access = msg->access;
+				cache_msg.fd = msg->fd;
+#ifdef NVALIDATE
+				if (!pdb_find_file_exact(msg)) {
+					if (cache_msg.pathlen != msg->pathlen ||
+					    cache_msg.dev != msg->dev ||
+					    cache_msg.ino != msg->ino ||
+					    cache_msg.uid != msg->uid ||
+					    cache_msg.gid != msg->gid ||
+					    cache_msg.mode != msg->mode ||
+					    cache_msg.rdev != msg->rdev ||
+					    cache_msg.nlink != msg->nlink ||
+					    cache_msg.deleting != msg->deleting) {
+					pseudo_diag("Cache mismatch [%s]: Database differs from cache\n"
+						"     cache vs result:\n"
+						"     dev (%llu,%llu) ino (%llu,%llu)\n"
+						"     uid (%d,%d) gid (%d,%d) mode (0%o,0%o)\n"
+						"     rdev (%llu,%llu) nlink (%d,%d) deleting (%d,%d)\n",
+						msg->pathlen ? msg->path : "no path",
+						(unsigned long long) cache_msg.dev, (unsigned long long) msg->dev,
+						(unsigned long long) cache_msg.ino, (unsigned long long) msg->ino,
+						(unsigned long long) cache_msg.uid, (unsigned int) msg->uid,
+						(unsigned long long) cache_msg.gid, (unsigned int) msg->gid,
+						cache_msg.mode, msg->mode,
+						(unsigned long long) cache_msg.rdev, (unsigned int) msg->rdev,
+						cache_msg.nlink, msg->nlink,
+						cache_msg.deleting, msg->deleting);
+					}
+				} else {
+					pseudo_diag("Cache mismatch [%s]: Not found in DB\n",
+							msg->pathlen ? msg->path : "no path");
+				}
+#endif
+				by_path = cache_msg;
+				found_path = 1;
+			} else if (!pdb_find_file_path(msg)) {
 				by_path = *msg;
 				found_path = 1;
 			} else {
@@ -495,7 +594,51 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		}
 		/* search on original inode -- in case of mismatch */
 		if (msg->dev && msg->ino) {
-			if (!pdb_find_file_dev(&by_ino)) {
+			if (cache_msg.dev == msg->dev &&
+			    cache_msg.ino == msg->ino) {
+#ifdef NPROFILE
+				pseudo_diag("cache hit -- by_ino\n");
+#endif
+				/* Change the cache to match the msg */
+				cache_msg.type = msg->type;
+				cache_msg.op = msg->op;
+				cache_msg.result = msg->result;
+				cache_msg.access = msg->access;
+				cache_msg.fd = msg->fd;
+#ifdef NVALIDATE
+				if (!pdb_find_file_exact(msg)) {
+					if (cache_msg.pathlen != msg->pathlen ||
+					    cache_msg.dev != msg->dev ||
+					    cache_msg.ino != msg->ino ||
+					    cache_msg.uid != msg->uid ||
+					    cache_msg.gid != msg->gid ||
+					    cache_msg.mode != msg->mode ||
+					    cache_msg.rdev != msg->rdev ||
+					    cache_msg.nlink != msg->nlink ||
+					    cache_msg.deleting != msg->deleting) {
+					pseudo_diag("Cache mismatch [%s]: Database differs from cache\n"
+						"     cache vs result:\n"
+						"     dev (%llu,%llu) ino (%llu,%llu)\n"
+						"     uid (%d,%d) gid (%d,%d) mode (0%o,0%o)\n"
+						"     rdev (%llu,%llu) nlink (%d,%d) deleting (%d,%d)\n",
+						msg->pathlen ? msg->path : "no path",
+						(unsigned long long) cache_msg.dev, (unsigned long long) msg->dev,
+						(unsigned long long) cache_msg.ino, (unsigned long long) msg->ino,
+						(unsigned long long) cache_msg.uid, (unsigned int) msg->uid,
+						(unsigned long long) cache_msg.gid, (unsigned int) msg->gid,
+						cache_msg.mode, msg->mode,
+						(unsigned long long) cache_msg.rdev, (unsigned int) msg->rdev,
+						cache_msg.nlink, msg->nlink,
+						cache_msg.deleting, msg->deleting);
+					}
+				} else {
+					pseudo_diag("Cache mismatch [%s]: Not found in DB\n",
+							msg->pathlen ? msg->path : "no path");
+				}
+#endif
+				found_ino = 1;
+				path_by_ino = cache_path;
+			} else 	if (!pdb_find_file_dev(&by_ino)) {
 				found_ino = 1;
 				path_by_ino = pdb_get_file_path(&by_ino);
 			}
@@ -871,6 +1014,28 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			msg->client, msg->op,
 			msg->pathlen ? msg->path : "no path");
 		break;
+	}
+
+	/* Cache previous values... */
+	if (msg->op != OP_MAY_UNLINK &&
+	    msg->op != OP_DID_UNLINK &&
+	    msg->op != OP_CANCEL_UNLINK &&
+	    msg->op != OP_UNLINK) {
+
+		cache_msg = *msg;
+
+		free(cache_path);
+
+		if (path_by_ino)
+			cache_path = strdup(path_by_ino);
+		else
+			cache_path = strdup(msg->path);
+	} else {
+		cache_msg.pathlen = 0;
+		cache_msg.dev = 0;
+		cache_msg.ino = 0;
+		free(cache_path);
+		cache_path = NULL;
 	}
 
 	/* in the case of an exact match, we just used the pointer

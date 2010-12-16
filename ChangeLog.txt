@@ -3,6 +3,7 @@
 	* (mhatle) as a result of profiling, optimize inode search
 	* (mhatle) rearrange the pseudo_op file data operations to reduce
 		   the number of selects.
+	* (mhatle) add the ability to cache the last select result
 
 2010-12-14:
 	* (mhatle) restructure wrapfuncs.c
