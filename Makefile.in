@@ -44,6 +44,9 @@ CFLAGS_PSEUDO=$(CFLAGS_BASE) $(CFLAGS_CODE) $(CFLAGS_DEFS) \
 GLOB_PATTERN=guts/*.c
 GUTS=$(filter-out "$(GLOB_PATTERN)",$(wildcard $(GLOB_PATTERN)))
 
+SOURCES=$(wildcard *.c)
+OBJS=$(subst .c,.o,$(SOURCES))
+
 DBLDFLAGS=-lsqlite3
 USE_64=wrapfuncs64.in
 
@@ -109,6 +112,8 @@ $(LIBPSEUDO): $(LIB) $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
 
 %.o: %.c
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(CFLAGS_PSEUDO) $<
+
+$(OBJS): pseudo_tables.h
 
 pseudo_client.o pseudo_server.o pseudo_ipc.o: pseudo_ipc.h
 
