@@ -37,7 +37,8 @@ some documentation on internals is provided in the doc/ directory.
 
 FUTURE DIRECTIONS:
 
-* The chroot() functionality is incomplete.
+* The chroot() functionality is incomplete, though now sufficient for
+  the real-world use cases we've tried.
 * We have no immediate plans to make pseudo work on other targets, but
   are not opposed to accepting patches to do so.  (It isn't even CLOSE
   on OS X, largely because of the Linux-specific _STAT_VER stuff.)

@@ -2,9 +2,7 @@ Overview:
 
 The pseudo program and library combine to provide an environment which
 provides the illusion of root permissions with respect to file creation,
-ownership, and related functions.  At this time, this does not extend to
-emulating chroot functions or a virtual password database, but these features
-may be added.
+ownership, and related functions.
 
 The underlying mechanism of pseudo is a library inserted using LD_PRELOAD,
 which provides replacement symbols for core C library functions.  At this
