@@ -1,3 +1,6 @@
+2010-12-16:
+	* (mhatle) change the journal from PERSIST to OFF
+
 2010-12-15:
 	* (mhatle) add sqlite call profiling, enable with NPROFILE
 	* (mhatle) as a result of profiling, optimize inode search

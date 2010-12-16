@@ -435,7 +435,7 @@ get_db(sqlite3 **db) {
 		if (rc) {
 			dberr(*db, "file_db legacy_file_format");
 		}
-		rc = sqlite3_exec(*db, "PRAGMA journal_mode = PERSIST;", NULL, NULL, &errmsg);
+		rc = sqlite3_exec(*db, "PRAGMA journal_mode = OFF;", NULL, NULL, &errmsg);
 		if (rc) {
 			dberr(*db, "file_db journal_mode");
 		}
