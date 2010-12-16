@@ -107,7 +107,8 @@ static struct sql_index {
 	char *table;
 	char *keys;
 } file_indexes[] = {
-	{ "files__path", "files", "path" },
+/*	{ "files__path", "files", "path" }, */
+	{ "files__path_dev_ino", "files", "path, dev, ino" },
 	{ "files__dev_ino", "files", "dev, ino" },
 	{ NULL, NULL, NULL },
 }, log_indexes[] = {
@@ -1302,7 +1303,7 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 	static sqlite3_stmt *update;
 	int rc;
 	char *sql = "UPDATE files SET path = ? "
-		"WHERE dev = ? AND ino = ? AND path = 'NAMELESS FILE';";
+		"WHERE path = 'NAMELESS FILE' and dev = ? AND ino = ?;";
 
 	if (!file_db && get_db(&file_db)) {
 		pseudo_diag("database error.\n");
@@ -1622,6 +1623,9 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 	rc = sqlite3_bind_text(update_sub, 2, msg->path, -1, SQLITE_STATIC);
 	rc = sqlite3_bind_text(update_sub, 3, oldpath, -1, SQLITE_STATIC);
 	rc = sqlite3_bind_text(update_sub, 4, oldpath, -1, SQLITE_STATIC);
+
+	rc = sqlite3_exec(file_db, "BEGIN;", NULL, NULL, NULL);
+
 	rc = sqlite3_step(update_exact);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "update exact may have failed: rc %d", rc);
@@ -1632,6 +1636,9 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 	}
 	sqlite3_reset(update_exact);
 	sqlite3_reset(update_sub);
+
+	rc = sqlite3_exec(file_db, "END;", NULL, NULL, NULL);
+
 	sqlite3_clear_bindings(update_exact);
 	sqlite3_clear_bindings(update_sub);
 	return rc != SQLITE_DONE;
@@ -1780,7 +1787,7 @@ int
 pdb_find_file_exact(pseudo_msg_t *msg) {
 	static sqlite3_stmt *select;
 	int rc;
-	char *sql = "SELECT * FROM files WHERE dev = ? AND ino = ? AND path = ?;";
+	char *sql = "SELECT * FROM files WHERE path = ? AND dev = ? AND ino = ?;";
 
 	if (!file_db && get_db(&file_db)) {
 		pseudo_diag("database error.\n");
@@ -1796,12 +1803,12 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 	if (!msg) {
 		return 1;
 	}
-	sqlite3_bind_int(select, 1, msg->dev);
-	sqlite3_bind_int(select, 2, msg->ino);
-	rc = sqlite3_bind_text(select, 3, msg->path, -1, SQLITE_STATIC);
+	rc = sqlite3_bind_text(select, 1, msg->path, -1, SQLITE_STATIC);
 	if (rc) {
 		dberr(file_db, "error binding %s to select", msg->pathlen ? msg->path : "<nil>");
 	}
+	sqlite3_bind_int(select, 2, msg->dev);
+	sqlite3_bind_int(select, 3, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
