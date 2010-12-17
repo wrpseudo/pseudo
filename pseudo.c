@@ -1030,6 +1030,8 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			cache_path = strdup(path_by_ino);
 		else
 			cache_path = strdup(msg->path);
+
+		cache_msg.pathlen = strlen(cache_path);
 	} else {
 		cache_msg.pathlen = 0;
 		cache_msg.dev = 0;
