@@ -1,3 +1,6 @@
+2010-12-17:
+	* (mhatle) Disabled additional early setup if pseudo is disabled
+
 2010-12-16:
 	* (mhatle) change the journal from PERSIST to OFF
 	* (seebs) update docs now that fakeroot and password support are in,

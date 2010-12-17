@@ -127,8 +127,6 @@ pseudo_init_client(void) {
 
 	/* Setup global items needed for pseudo to function... */
 	if (!pseudo_inited) {
-		char *pseudo_path = 0;
-
 		/* Ensure that all of the values are reset */
 		server_pid = 0;
 		pseudo_prefix_dir_fd = -1;
@@ -146,6 +144,10 @@ pseudo_init_client(void) {
 		pseudo_chroot_len = 0;
 		pseudo_cwd_rel = NULL;
 		pseudo_nosymlinkexp = 0;
+	}
+
+	if (!pseudo_disabled && !pseudo_inited) {
+		char *pseudo_path = 0;
 
 		pseudo_path = pseudo_prefix_path(NULL);
 		if (pseudo_prefix_dir_fd == -1) {
@@ -237,7 +239,9 @@ pseudo_init_client(void) {
 
 		pseudo_inited = 1;
 	}
-	pseudo_client_getcwd();
+	if (!pseudo_disabled)
+		pseudo_client_getcwd();
+
 	pseudo_magic();
 }
 
