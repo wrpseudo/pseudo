@@ -522,6 +522,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			/* no need to restore msg */
 			found_path = 1;
 			found_ino = 1;
+			/* note:  we have to avoid freeing this later */
 			path_by_ino = msg->path;
 		} else if (!pdb_find_file_exact(msg)) {
 			/* restore header contents */
@@ -1021,30 +1022,50 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	    msg->op != OP_DID_UNLINK &&
 	    msg->op != OP_CANCEL_UNLINK &&
 	    msg->op != OP_UNLINK) {
-
 		cache_msg = *msg;
 
-		free(cache_path);
-
-		if (path_by_ino)
-			cache_path = strdup(path_by_ino);
-		else
+		if (path_by_ino) {
+			/* if path_by_ino is already the cache path,
+			 * no need to dup it.
+			 */
+			if (path_by_ino != cache_path) {
+				free(cache_path);
+				cache_path = strdup(path_by_ino);
+			} else {
+				/* don't want to free this */
+				path_by_ino = NULL;
+			}
+		} else {
+			free(cache_path);
 			cache_path = strdup(msg->path);
-
-		cache_msg.pathlen = strlen(cache_path);
+		}
+		if (cache_path) {
+			cache_msg.pathlen = strlen(cache_path) + 1;
+		} else {
+			cache_msg.pathlen = 0;
+		}
 	} else {
 		cache_msg.pathlen = 0;
 		cache_msg.dev = 0;
 		cache_msg.ino = 0;
+		/* if path_by_ino was the same pointer,
+		 * mark it NULL so we don't try to free
+		 * it.
+		 */
+		if (path_by_ino == cache_path)
+			path_by_ino = NULL;
 		free(cache_path);
 		cache_path = NULL;
 	}
 
 	/* in the case of an exact match, we just used the pointer
-	 * rather than allocating space
+	 * rather than allocating space.  If we used the cached path,
+	 * and this pointer has already been invalidated, it'll be
+	 * NULL now.
 	 */
-	if (path_by_ino != msg->path)
+	if (path_by_ino != msg->path) {
 		free(path_by_ino);
+	}
 	pseudo_debug(2, "completed %s.\n", pseudo_op_name(msg->op));
 	if (opt_l)
 		pdb_log_msg(SEVERITY_INFO, msg, program, tag, NULL);
