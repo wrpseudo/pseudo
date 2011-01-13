@@ -1,3 +1,6 @@
+2011-01-13:
+	* (seebs) Subtle cache fixup.
+
 2010-12-17:
 	* (mhatle) Disabled additional early setup if pseudo is disabled
 
