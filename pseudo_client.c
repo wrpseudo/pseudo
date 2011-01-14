@@ -78,6 +78,28 @@ gid_t pseudo_egid;
 gid_t pseudo_sgid;
 gid_t pseudo_fgid;
 
+/* helper function to make a directory, just like mkdir -p.
+ * Can't use system() because the child shell would end up trying
+ * to do the same thing...
+ */
+static void
+mkdir_p(char *path) {
+	size_t len = strlen(path);
+	size_t i;
+
+	for (i = 1; i < len; ++i) {
+		/* try to create all the directories in path, ignoring
+		 * failures
+		 */
+		if (path[i] == '/') {
+			path[i] = '\0';
+			(void) mkdir(path, 0755);
+			path[i] = '/';
+		}
+	}
+	(void) mkdir(path, 0755);
+}
+
 void
 pseudo_init_client(void) {
 	char *env;
@@ -153,6 +175,12 @@ pseudo_init_client(void) {
 		if (pseudo_prefix_dir_fd == -1) {
 			if (pseudo_path) {
 				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+				/* directory is missing? */
+				if (pseudo_prefix_dir_fd == -1 && errno == ENOENT) {
+					pseudo_debug(1, "prefix directory doesn't exist, trying to create\n");
+					mkdir_p(pseudo_path);
+					pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+				}
 				pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, MOVE_FD);
 			} else {
 				pseudo_diag("No prefix available to to find server.\n");
@@ -170,13 +198,19 @@ pseudo_init_client(void) {
 		if (pseudo_localstate_dir_fd == -1) {
 			if (pseudo_path) {
 				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+				/* directory is missing? */
+				if (pseudo_localstate_dir_fd == -1 && errno == ENOENT) {
+					pseudo_debug(1, "local state directory doesn't exist, trying to create\n");
+					mkdir_p(pseudo_path);
+					pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+				}
 				pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
 			} else {
 				pseudo_diag("No prefix available to to find server.\n");
 				exit(1);
 			}
 			if (pseudo_localstate_dir_fd == -1) {
-				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+				pseudo_diag("Can't open local state path (%s) for server: %s\n",
 					pseudo_path,
 					strerror(errno));
 				exit(1);
@@ -806,6 +840,12 @@ pseudo_client_shutdown(void) {
 	if (pseudo_prefix_dir_fd == -1) {
 		if (pseudo_path) {
 			pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+			/* directory is missing? */
+			if (pseudo_prefix_dir_fd == -1 && errno == ENOENT) {
+				pseudo_debug(1, "prefix directory doesn't exist, trying to create\n");
+				mkdir_p(pseudo_path);
+				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
+			}
 			pseudo_prefix_dir_fd = pseudo_fd(pseudo_prefix_dir_fd, COPY_FD);
 			free(pseudo_path);
 		} else {
@@ -823,6 +863,12 @@ pseudo_client_shutdown(void) {
 	if (pseudo_localstate_dir_fd == -1) {
 		if (pseudo_path) {
 			pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+			/* directory is missing? */
+			if (pseudo_localstate_dir_fd == -1 && errno == ENOENT) {
+				pseudo_debug(1, "local state dir doesn't exist, trying to create\n");
+				mkdir_p(pseudo_path);
+				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
+			}
 			pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, COPY_FD);
 			free(pseudo_path);
 		} else {
@@ -830,7 +876,7 @@ pseudo_client_shutdown(void) {
 			exit(1);
 		}
 		if (pseudo_localstate_dir_fd == -1) {
-			pseudo_diag("Can't open prefix path (%s) for server. (%s)\n",
+			pseudo_diag("Can't open local state path (%s) for server. (%s)\n",
 				pseudo_localstatedir_path(NULL),
 				strerror(errno));
 			exit(1);
