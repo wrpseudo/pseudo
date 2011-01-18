@@ -1,6 +1,7 @@
 2011-01-14:
 	* (seebs) Automatically create prefix/state directories.
- 
+	* (mhatle) Avoid caching OP_EXEC calls
+
 2011-01-13:
 	* (seebs) Subtle cache fixup.
 

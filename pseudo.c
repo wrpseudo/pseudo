@@ -1021,7 +1021,8 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	if (msg->op != OP_MAY_UNLINK &&
 	    msg->op != OP_DID_UNLINK &&
 	    msg->op != OP_CANCEL_UNLINK &&
-	    msg->op != OP_UNLINK) {
+	    msg->op != OP_UNLINK &&
+	    msg->op != OP_EXEC ) {
 		cache_msg = *msg;
 
 		if (path_by_ino) {
