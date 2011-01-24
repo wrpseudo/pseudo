@@ -1,3 +1,7 @@
+2011-01-24:
+	* (mhatle) Revert last result cache and related commits.
+	  caching proved to be unreliable.
+
 2011-01-14:
 	* (seebs) Automatically create prefix/state directories.
 	* (mhatle) Avoid caching OP_EXEC calls
