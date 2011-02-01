@@ -104,7 +104,7 @@ pseudodb: $(PSEUDODB)
 
 $(PSEUDODB): $(BIN) pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDODB) pseudodb.o \
-		$(DBOBJS) $(SHOBJS) pseudo_ipc.o $(DB_LDFLAGS)
+		$(DBOBJS) $(SHOBJS) pseudo_ipc.o $(DB_LDFLAGS) $(CLIENT_LDFLAGS)
 
 libpseudo: $(LIBPSEUDO)
 
