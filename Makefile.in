@@ -55,7 +55,7 @@ WRAPOBJS=pseudo_wrappers.o
 
 # needed for anything that links with pseduo_client.o, pretty much
 CLIENT_LDFLAGS=-ldl -lpthread
-DB_LDFLAGS=-lsqlite3
+DB_LDFLAGS=-lsqlite3 -lpthread
 
 PSEUDO=$(BIN)/pseudo
 PSEUDODB=$(BIN)/pseudodb
