@@ -1,0 +1,8 @@
+There's a new "perftest" program. I recommend you run it with a ramdisk. So,
+if you've mounted a ramdisk on /tmp/ram:
+	./perftest /tmp/ram
+
+This is a pretty unscientific test, but is designed to exercise some
+reasonably common use cases and give ballpark figures as to the effect
+of changes to the database indexes, etc.
+
