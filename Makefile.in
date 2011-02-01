@@ -47,12 +47,15 @@ GUTS=$(filter-out "$(GLOB_PATTERN)",$(wildcard $(GLOB_PATTERN)))
 SOURCES=$(wildcard *.c)
 OBJS=$(subst .c,.o,$(SOURCES))
 
-DBLDFLAGS=-lsqlite3
 USE_64=wrapfuncs64.in
 
 SHOBJS=pseudo_tables.o pseudo_util.o
-DBOBJS=pseudo_db.o -ldl -lpthread
+DBOBJS=pseudo_db.o
 WRAPOBJS=pseudo_wrappers.o
+
+# needed for anything that links with pseduo_client.o, pretty much
+CLIENT_LDFLAGS=-ldl -lpthread
+DB_LDFLAGS=-lsqlite3
 
 PSEUDO=$(BIN)/pseudo
 PSEUDODB=$(BIN)/pseudodb
@@ -89,26 +92,26 @@ pseudo: $(PSEUDO)
 $(PSEUDO): $(BIN) pseudo.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_server.o pseudo_ipc.o
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDO) \
 		pseudo.o pseudo_server.o pseudo_client.o pseudo_ipc.o \
-		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
+		$(DBOBJS) $(SHOBJS) $(DB_LDFLAGS) $(CLIENT_LDFLAGS)
 
 pseudolog: $(PSEUDOLOG)
 
 $(PSEUDOLOG): $(BIN) pseudolog.o $(SHOBJS) $(DBOBJS) pseudo_client.o pseudo_ipc.o
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDOLOG) pseudolog.o pseudo_client.o pseudo_ipc.o \
-		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS)
+		$(DBOBJS) $(SHOBJS) $(DB_LDFLAGS) $(CLIENT_LDFLAGS)
 
 pseudodb: $(PSEUDODB)
 
 $(PSEUDODB): $(BIN) pseudodb.o $(SHOBJS) $(DBOBJS) pseudo_ipc.o
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -o $(PSEUDODB) pseudodb.o \
-		$(DBOBJS) $(SHOBJS) $(DBLDFLAGS) pseudo_ipc.o
+		$(DBOBJS) $(SHOBJS) pseudo_ipc.o $(DB_LDFLAGS)
 
 libpseudo: $(LIBPSEUDO)
 
 $(LIBPSEUDO): $(LIB) $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
 	$(CC) $(CFLAGS) $(CFLAGS_PSEUDO) -shared -o $(LIBPSEUDO) \
 		pseudo_client.o pseudo_ipc.o \
-		$(WRAPOBJS) $(SHOBJS) -ldl
+		$(WRAPOBJS) $(SHOBJS) $(CLIENT_LDFLAGS)
 
 %.o: %.c
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(CFLAGS_PSEUDO) $<
