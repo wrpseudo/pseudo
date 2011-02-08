@@ -1,3 +1,6 @@
+2011-02-08:
+	* (seebs) Get full paths for exec*()
+
 2011-01-24:
 	* (mhatle) Revert last result cache and related commits.
 	  caching proved to be unreliable.

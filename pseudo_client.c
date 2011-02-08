@@ -1240,3 +1240,148 @@ pseudo_stat64_from32(struct stat64 *buf64, struct stat *buf) {
 	buf64->st_mtime = buf->st_mtime;
 	buf64->st_ctime = buf->st_ctime;
 }
+
+/* stuff for handling paths and execs */
+static char *previous_path;
+static char *previous_path_segs;
+static char **path_segs;
+static size_t *path_lens;
+
+/* Makes an array of strings which are the path components
+ * of previous_path.  Does this by duping the path, then replacing
+ * colons with null terminators, and storing the addresses of the
+ * starts of the substrings.
+ */
+static void
+populate_path_segs(void) {
+	size_t len = 0;
+	char *s;
+	int c;
+
+	free(path_segs);
+	free(previous_path_segs);
+	free(path_lens);
+	path_segs = NULL;
+	path_lens = NULL;
+	previous_path_segs = NULL;
+
+	if (!previous_path)
+		return;
+
+	for (s = previous_path; *s; ++s) {
+		if (*s == ':')
+			++c;
+	}
+	path_segs = malloc((c+2) * sizeof(*path_segs));
+	if (!path_segs) {
+		pseudo_diag("warning: failed to allocate space for %d path segments.\n",
+			c);
+		return;
+	}
+	path_lens = malloc((c + 2) * sizeof(*path_lens));
+	if (!path_lens) {
+		pseudo_diag("warning: failed to allocate space for %d path lengths.\n",
+			c);
+		free(path_segs);
+		path_segs = 0;
+		return;
+	}
+	previous_path_segs = strdup(previous_path);
+	if (!previous_path_segs) {
+		pseudo_diag("warning: failed to allocate space for path copy.\n");
+		free(path_segs);
+		path_segs = NULL;
+		free(path_lens);
+		path_lens = NULL;
+		return;
+	}
+	c = 0;
+	path_segs[c++] = previous_path;
+	len = 0;
+	for (s = previous_path; *s; ++s) {
+		if (*s == ':') {
+			*s = '\0';
+			path_lens[c - 1] = len;
+			len = 0;
+			path_segs[c++] = s + 1;
+		} else {
+			++len;
+		}
+	}
+	path_lens[c - 1] = len;
+	path_segs[c] = NULL;
+	path_lens[c] = 0;
+}
+
+char *
+pseudo_exec_path(const char *filename, int search_path) {
+	char *path = getenv("PATH");
+	char *candidate;
+	int i;
+	struct stat buf;
+
+	if (!filename)
+		return NULL;
+
+	pseudo_antimagic();
+	if (!path) {
+		free(path_segs);
+		free(previous_path);
+		path_segs = 0;
+		previous_path = 0;
+	} else if (!previous_path || strcmp(previous_path, path)) {
+		free(previous_path);
+		previous_path = strdup(path);
+		populate_path_segs();
+	}
+
+	/* absolute paths just get canonicalized. */
+	if (*filename == '/') {
+		candidate = pseudo_fix_path(NULL, filename, 0, 0, NULL, 0);
+		pseudo_magic();
+		return candidate;
+	}
+
+	if (!search_path) {
+		candidate = pseudo_fix_path(pseudo_cwd, filename, 0, pseudo_cwd_len, NULL, 0);
+		/* executable or not, it's the only thing we can try */
+		pseudo_magic();
+		return candidate;
+	}
+
+	for (i = 0; path_segs[i]; ++i) {
+		path = path_segs[i];
+		pseudo_debug(2, "exec_path: checking %s for %s\n", path, filename);
+		if (!*path || (*path == '.' && path_lens[i] == 1)) {
+			/* empty path or . is cwd */
+			candidate = pseudo_fix_path(pseudo_cwd, filename, 0, pseudo_cwd_len, NULL, 0);
+			pseudo_debug(2, "exec_path: in cwd, got %s\n", candidate);
+		} else if (*path == '/') {
+			candidate = pseudo_fix_path(path, filename, 0, path_lens[i], NULL, 0);
+			pseudo_debug(2, "exec_path: got %s\n", candidate);
+		} else {
+			/* oh you jerk, making me do extra work */
+			size_t len;
+			char *dir = pseudo_fix_path(pseudo_cwd, path, 0, pseudo_cwd_len, &len, 0);
+			if (dir) {
+				candidate = pseudo_fix_path(dir, filename, 0, len, NULL, 0);
+				pseudo_debug(2, "exec_path: got %s for non-absolute path\n", candidate);
+			} else {
+				pseudo_diag("couldn't allocate intermediate path.\n");
+				candidate = NULL;
+			}
+			free(dir);
+		}
+		if (candidate && !stat(candidate, &buf) && !S_ISDIR(buf.st_mode) && (buf.st_mode & 0111)) {
+			pseudo_debug(1, "exec_path: %s => %s\n", filename, candidate);
+			pseudo_magic();
+			return candidate;
+		} else {
+			free(candidate);
+		}
+	}
+	/* blind guess being as good as anything */
+	pseudo_magic();
+	return strdup(filename);
+}
+

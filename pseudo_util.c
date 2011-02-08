@@ -590,11 +590,9 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
 	*current = '\0';
 	/* at any given point:
 	 * current points to just after the last / of newpath
-	 * path points to the next path element of path
+	 * path points to the next element of path
 	 * newpathlen is the total allocated length of newpath
-	 * (current - newpathlen) is the used length of newpath
-	 * oldpath is the starting point of path
-	 * (path - oldpath) is how far into path we are
+	 * (current - newpath) is the used length of newpath
 	 */
 	if (pseudo_append_elements(&newpath, &effective_root, &newpathlen, &current, path, pathlen, leave_last) != -1) {
 		--current;

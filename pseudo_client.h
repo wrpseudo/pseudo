@@ -53,6 +53,7 @@ extern FILE *pseudo_grp;
 extern int pseudo_client_getcwd(void);
 extern int pseudo_client_chroot(const char *);
 extern char *pseudo_root_path(const char *, int, int, const char *, int);
+extern char *pseudo_exec_path(const char *filename, int);
 #define PSEUDO_ROOT_PATH(x, y, z) pseudo_root_path(__func__, __LINE__, (x), (y), (z));
 extern char *pseudo_cwd;
 extern size_t pseudo_cwd_len;
