@@ -115,6 +115,31 @@ static struct sql_index {
 	{ NULL, NULL, NULL },
 };
 
+static char *file_pragmas[] = {
+	"PRAGMA legacy_file_format = OFF;",
+	"PRAGMA journal_mode = OFF;",
+	"PRAGMA locking_mode = EXCLUSIVE;",
+	/* Setting this to NORMAL makes pseudo noticably slower
+	 * than fakeroot, but is perhaps more secure.  However,
+	 * note that sqlite always flushes to the OS; what is lacking
+	 * in non-synchronous mode is waiting for the OS to
+	 * confirm delivery to media, and also a bunch of cache
+	 * flushing and reloading which we probably don't really
+	 * need.
+	 */
+	"PRAGMA synchronous = OFF;",
+	NULL
+};
+
+static char *log_pragmas[] = {
+	"PRAGMA legacy_file_format = OFF;",
+	"PRAGMA journal_mode = OFF;",
+	"PRAGMA locking_mode = EXCLUSIVE;",
+	"PRAGMA synchronous = OFF;",
+	NULL
+};
+
+
 /* table migrations: */
 /* If there is no migration table, we assume "version -1" -- the
  * version shipped with wrlinux 3.0, which had no version
@@ -171,6 +196,52 @@ static struct sql_migration {
 	/* message type (ping, op) */
 	{ "ALTER TABLE logs ADD type INTEGER;" },
 	{ NULL },
+};
+
+/* cleanup database before getting started
+ *
+ * On a large build, the logs database gets GIGANTIC...  And
+ * we rarely-if-ever delete things from it.  So instead of
+ * doing the vacuum operation on it at startup, which can impose
+ * a several-minute delay, we do it only on deletions.
+ *
+ * There's no setup for log database right now.
+ */
+char *file_setups[] = {
+	"VACUUM;",
+	NULL,
+};
+
+struct database_info {
+	char *pathname;
+	struct sql_index *indexes;
+	struct sql_table *tables;
+	struct sql_migration *migrations;
+	char **pragmas;
+	char **setups;
+	struct sqlite3 **db;
+};
+
+static struct database_info db_infos[] = {
+	{
+		"logs.db",
+		log_indexes,
+		log_tables,
+		log_migrations,
+		log_pragmas,
+		NULL,
+		&log_db
+	},
+	{
+		"files.db",
+		file_indexes,
+		file_tables,
+		file_migrations,
+		file_pragmas,
+		file_setups,
+		&file_db
+	},
+	{ 0, 0, 0, 0, 0, 0, 0 }
 };
 
 /* pretty-print error along with the underlying SQL error. */
@@ -235,7 +306,7 @@ make_tables(sqlite3 *db,
 		if (sql_tables[i].values) {
 			for (j = 0; sql_tables[i].values[j].fmt; ++j) {
 				char buffer[256];
-				sprintf(buffer, sql_tables[i].values[j].fmt, sql_tables[i].values[j].arg);
+				snprintf(buffer, sizeof(buffer), sql_tables[i].values[j].fmt, sql_tables[i].values[j].arg);
 				sql = sqlite3_mprintf("INSERT INTO %s ( %s ) VALUES ( %s );",
 					sql_tables[i].name,
 					*sql_tables[i].names,
@@ -383,123 +454,86 @@ cleanup_db(void) {
 		sqlite3_close(log_db);
 }
 
-/* I hate this function.
- * The need to separate logs and files into separate database (performance
- * and stability suffered when they were together) was discovered after
- * this was written, and it is still full of half-considered code and
- * unreasonable tests.  The test for whether db == &file_db is particularly
- * odious.
- *
- * The basic idea is to open the database, and make sure the tables exist
- * (using the make_tables function above).  Options are set to make sqlite
- * run reasonably efficiently.
+/* This function has been rewritten and I no longer hate it.  I just feel
+ * like it's important to say that.
  */
 static int
-get_db(sqlite3 **db) {
+get_db(struct database_info *dbinfo) {
 	int rc;
+	int i;
 	char *sql;
 	char **results;
 	int rows, columns;
 	char *errmsg;
 	static int registered_cleanup = 0;
 	char *dbfile;
+	sqlite3 *db;
 
-	if (!db)
+	if (!dbinfo)
 		return 1;
-	if (*db)
+	if (!dbinfo->db)
+		return 1;
+	/* this database is perhaps already initialized? */
+	if (*(dbinfo->db))
 		return 0;
-	if (db == &file_db) {
-		dbfile = pseudo_localstatedir_path("files.db");
-		rc = sqlite3_open(dbfile, db);
-#ifdef NPROFILE
-		sqlite3_profile(*db, xProfile, NULL);
-#endif
-		free(dbfile);
-	} else {
-		dbfile = pseudo_localstatedir_path("logs.db");
-		rc = sqlite3_open(dbfile, db);
-		free(dbfile);
-	}
+
+	dbfile = pseudo_localstatedir_path(dbinfo->pathname);
+	rc = sqlite3_open(dbfile, &db);
+	free(dbfile);
 	if (rc) {
-		pseudo_diag("Failed: %s\n", sqlite3_errmsg(*db));
-		sqlite3_close(*db);
-		*db = NULL;
+		pseudo_diag("Failed: %s\n", sqlite3_errmsg(db));
+		sqlite3_close(db);
+		*(dbinfo->db) = NULL;
 		return 1;
 	}
+	/* we store this in the database_info, but hereafter we'll just use
+	 * the name db, because it is shorter.
+	 */
+	*dbinfo->db = db;
 	if (!registered_cleanup) {
 		atexit(cleanup_db);
 		registered_cleanup = 1;
 	}
-	if (db == &file_db) {
-		rc = sqlite3_exec(*db, "PRAGMA legacy_file_format = OFF;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "file_db legacy_file_format");
-		}
-		rc = sqlite3_exec(*db, "PRAGMA journal_mode = OFF;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "file_db journal_mode");
-		}
-		rc = sqlite3_exec(*db, "PRAGMA locking_mode = EXCLUSIVE;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "file_db locking_mode");
-		}
-		/* Setting this to NORMAL makes pseudo noticably slower
-		 * than fakeroot, but is perhaps more secure.  However,
-		 * note that sqlite always flushes to the OS; what is lacking
-		 * in non-synchronous mode is waiting for the OS to
-		 * confirm delivery to media, and also a bunch of cache
-		 * flushing and reloading which we probably don't really
-		 * need.
-		 */
-		rc = sqlite3_exec(*db, "PRAGMA synchronous = OFF;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "file_db synchronous");
-		}
-	} else if (db == &log_db) {
-		rc = sqlite3_exec(*db, "PRAGMA legacy_file_format = OFF;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "log_db legacy_file_format");
-		}
-		rc = sqlite3_exec(*db, "PRAGMA journal_mode = OFF;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "log_db journal_mode");
-		}
-		rc = sqlite3_exec(*db, "PRAGMA locking_mode = EXCLUSIVE;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "log_db locking_mode");
-		}
-		rc = sqlite3_exec(*db, "PRAGMA synchronous = OFF;", NULL, NULL, &errmsg);
-		if (rc) {
-			dberr(*db, "log_db synchronous");
+	if (dbinfo->pragmas) {
+		for (i = 0; dbinfo->pragmas[i]; ++i) {
+			rc = sqlite3_exec(db, dbinfo->pragmas[i], NULL, NULL, &errmsg);
+			if (rc) {
+				dberr(db, dbinfo->pragmas[i]);
+			}
 		}
 	}
 	/* create database tables or die trying */
 	sql =	"SELECT name FROM sqlite_master "
 		"WHERE type = 'table' "
 		"ORDER BY name;";
-	rc = sqlite3_get_table(*db, sql, &results, &rows, &columns, &errmsg);
+	rc = sqlite3_get_table(db, sql, &results, &rows, &columns, &errmsg);
 	if (rc) {
 		pseudo_diag("Failed: %s\n", errmsg);
 	} else {
-		if (db == &file_db) {
-			rc = make_tables(*db, file_tables, file_indexes, file_migrations, results, rows);
-		} else if (db == &log_db) {
-			rc = make_tables(*db, log_tables, log_indexes, log_migrations, results, rows);
-		}
+		rc = make_tables(db, dbinfo->tables, dbinfo->indexes, dbinfo->migrations, results, rows);
 		sqlite3_free_table(results);
 	}
-	/* cleanup database before getting started
-	 *
-	 * On a large build, the logs database gets GIGANTIC...  And
-	 * we rarely-if-ever delete things from it.  So instead of
-	 * doing the vacuum operation on it at startup, which can impose
-	 * a several-minute delay, we do it only on deletions.
-	 *
+	/* as of now, the only setup is a vacuum operation which we don't care about
+	 * the results of.
 	 */
-	if (db == &file_db) {
-		sqlite3_exec(*db, "VACUUM;", NULL, NULL, &errmsg);
+	if (dbinfo->setups) {
+		for (i = 0; dbinfo->setups[i]; ++i) {
+			sqlite3_exec(db, dbinfo->setups[i], NULL, NULL, &errmsg);
+		}
 	}
 	return rc;
+}
+
+static int
+get_dbs(void) {
+	int err = 0;
+	int i;
+	for (i = 0; db_infos[i].db; ++i) {
+		if (get_db(&db_infos[i]))
+			err = 1;
+		
+	}
+	return !err;
 }
 
 /* put a prepared log entry into the database */
@@ -509,7 +543,7 @@ pdb_log_traits(pseudo_query_t *traits) {
 	log_entry *e;
 	int rc;
 
-	if (!log_db && get_db(&log_db)) {
+	if (!log_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 1;
 	}
@@ -607,7 +641,7 @@ pdb_log_entry(log_entry *e) {
 	int field;
 	int rc;
 
-	if (!log_db && get_db(&log_db)) {
+	if (!log_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 1;
 	}
@@ -705,7 +739,7 @@ pdb_log_msg(pseudo_sev_t severity, pseudo_msg_t *msg, const char *program, const
 		text = buffer;
 	}
 
-	if (!log_db && get_db(&log_db)) {
+	if (!log_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 1;
 	}
@@ -839,7 +873,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 	pseudo_query_field_t f;
 	static buffer *sql;
 
-	if (!log_db && get_db(&log_db)) {
+	if (!log_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return NULL;
 	}
@@ -1227,7 +1261,7 @@ pdb_link_file(pseudo_msg_t *msg) {
 		    " ( path, dev, ino, uid, gid, mode, rdev, deleting ) "
 		    " VALUES (?, ?, ?, ?, ?, ?, ?, 0);";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1272,7 +1306,7 @@ pdb_unlink_file_dev(pseudo_msg_t *msg) {
 	int rc;
 	char *sql = "DELETE FROM files WHERE dev = ? AND ino = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1305,7 +1339,7 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 	char *sql = "UPDATE files SET path = ? "
 		"WHERE path = 'NAMELESS FILE' and dev = ? AND ino = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1339,7 +1373,7 @@ pdb_may_unlink_file(pseudo_msg_t *msg, int deleting) {
 	int rc, exact;
 	char *sql_mark_file = "UPDATE files SET deleting = ? WHERE path = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1383,7 +1417,7 @@ pdb_cancel_unlink_file(pseudo_msg_t *msg) {
 	int rc, exact;
 	char *sql_mark_file = "UPDATE files SET deleting = 0 WHERE path = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1423,7 +1457,7 @@ pdb_did_unlink_files(int deleting) {
 	int rc, exact;
 	char *sql_delete_exact = "DELETE FROM files WHERE deleting = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1457,7 +1491,7 @@ pdb_did_unlink_file(char *path, int deleting) {
 	int rc, exact;
 	char *sql_delete_exact = "DELETE FROM files WHERE path = ? AND deleting = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1492,7 +1526,7 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 	int rc, exact;
 	char *sql_delete_exact = "DELETE FROM files WHERE path = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1538,7 +1572,7 @@ pdb_unlink_contents(pseudo_msg_t *msg) {
 	char *sql_delete_sub = "DELETE FROM files WHERE "
 				"(path > (? || '/') AND path < (? || '0'));";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1587,7 +1621,7 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 	char *sql_update_sub = "UPDATE files SET path = replace(path, ?, ?) "
 			       "WHERE (path > (? || '/') AND path < (? || '0'));";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1656,7 +1690,7 @@ pdb_renumber_all(dev_t from, dev_t to) {
 		    " SET dev = ? "
 		    " WHERE dev = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1697,7 +1731,7 @@ pdb_update_inode(pseudo_msg_t *msg) {
 		    " SET dev = ?, ino = ? "
 		    " WHERE path = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1749,7 +1783,7 @@ pdb_update_file(pseudo_msg_t *msg) {
 		    " SET uid = ?, gid = ?, mode = ?, rdev = ? "
 		    " WHERE dev = ? AND ino = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1789,7 +1823,7 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 	int rc;
 	char *sql = "SELECT * FROM files WHERE path = ? AND dev = ? AND ino = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1840,7 +1874,7 @@ pdb_find_file_path(pseudo_msg_t *msg) {
 	int rc;
 	char *sql = "SELECT * FROM files WHERE path = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 1;
 	}
@@ -1897,7 +1931,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 	char *sql = "SELECT path FROM files WHERE dev = ? AND ino = ?;";
 	char *response;
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1946,7 +1980,7 @@ pdb_find_file_dev(pseudo_msg_t *msg) {
 	int rc;
 	char *sql = "SELECT * FROM files WHERE dev = ? AND ino = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -1995,7 +2029,7 @@ pdb_find_file_ino(pseudo_msg_t *msg) {
 	int rc;
 	char *sql = "SELECT * FROM files WHERE ino = ?;";
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
@@ -2039,7 +2073,7 @@ pdb_file_list
 pdb_files(void) {
 	pdb_file_list l;
 
-	if (!file_db && get_db(&file_db)) {
+	if (!file_db && get_dbs()) {
 		pseudo_diag("database error.\n");
 		return 0;
 	}
