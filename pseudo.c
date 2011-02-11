@@ -66,6 +66,28 @@ usage(int status) {
 	exit(status);
 }
 
+/* helper function to make a directory, just like mkdir -p.
+ * Can't use system() because the child shell would end up trying
+ * to do the same thing...
+ */
+static void
+mkdir_p(char *path) {
+	size_t len = strlen(path);
+	size_t i;
+
+	for (i = 1; i < len; ++i) {
+		/* try to create all the directories in path, ignoring
+		 * failures
+		 */
+		if (path[i] == '/') {
+			path[i] = '\0';
+			(void) mkdir(path, 0755);
+			path[i] = '/';
+		}
+	}
+	(void) mkdir(path, 0755);
+}
+
 /* main server process */
 int
 main(int argc, char *argv[]) {
@@ -76,6 +98,7 @@ main(int argc, char *argv[]) {
 	int rc;
 	char opts[pseudo_path_max()], *optptr = opts;
 	char *lockname;
+	char *lockpath;
 
 	opts[0] = '\0';
 
@@ -371,6 +394,12 @@ main(int argc, char *argv[]) {
 	pseudo_new_pid();
 
 	pseudo_debug(3, "opening lock.\n");
+	lockpath = pseudo_localstatedir_path(NULL);
+	if (!lockpath) {
+		pseudo_diag("Couldn't allocate a file path.\n");
+		exit(EXIT_FAILURE);
+	}
+	mkdir_p(lockpath);
 	lockname = pseudo_localstatedir_path(PSEUDO_LOCKFILE);
 	if (!lockname) {
 		pseudo_diag("Couldn't allocate a file path.\n");

@@ -860,6 +860,7 @@ pseudo_client_shutdown(void) {
 		}
 	}
 	pseudo_path = pseudo_localstatedir_path(NULL);
+	mkdir_p(pseudo_path);
 	if (pseudo_localstate_dir_fd == -1) {
 		if (pseudo_path) {
 			pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);

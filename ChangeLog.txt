@@ -1,3 +1,9 @@
+2011-02-10:
+	* (seebs) pseudo_client_shutdown(), and the pseudo server, have to
+	  be smart enough to make the local state directory in case the
+	  pseudo binary is invoked directly by a user before being spawned
+	  by the client.
+
 2011-02-09:
 	* (seebs) the long-awaited cleanup of the database initialization
 	  code.  it's not really beautiful but it's quite a bit better.
