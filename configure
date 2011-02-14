@@ -92,6 +92,7 @@ if [ "${SQLITE3_VERSION}" -lt "03006000" ]; then
 fi
 
 sed -e '
+  s,@UNAME_S@,'"$(uname -s)"',g
   s,@PREFIX@,'"$opt_prefix"',g
   s,@SUFFIX@,'"$opt_suffix"',g
   s,@SQLITE@,'"$opt_sqlite"',g

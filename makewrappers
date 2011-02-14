@@ -17,6 +17,9 @@
 #
 """convert wrapfuncs.in to wrapper function stubs and tables"""
 
+# why getopt?  because argparse is new in 2.7, and optparse is deprecated
+# in 2.7, but getopt stays unchanging...
+import getopt
 import glob
 import sys
 import re
@@ -357,10 +360,42 @@ class Function:
             pretty += ' (%s)' % self.comments
         return pretty
 
+def process_port(port):
+    funclist = process_wrapfuncs("ports/%s/wrapfuncs.in" % port)
+    return funclist
+
+def process_wrapfuncs(filename):
+    """Process a wrapfuncs.in file, generating a list of prototypes."""
+    # parse the list of functions
+    sys.stdout.write("%s: " % filename)
+    funclist = open(filename)
+    for line in funclist:
+	line = line.rstrip()
+	if line.startswith('#') or not line:
+	    continue
+	try:
+	    func = Function(line)
+	    funcs.append(func)
+	    sys.stdout.write(".")
+	except Exception, e:
+	    print "Parsing failed:", e
+	    exit(1)
+    funclist.close()
+    print ""
+    return funclist
+
 def main():
     """Read in function definitions, write out files based on templates."""
     funcs = []
     sources = []
+    host_ports = {
+	'Darwin': 'darwin',
+	'GNU/Linux': 'linux'
+    }
+    host_descrs = {
+	'darwin': 'Mac OS X (Snow Leopard only)',
+	'linux': 'Linux systems (recent glibc/kernel)'
+    }
 
     # error checking helpfully provided by the exception handler
     copyright_file = open('guts/COPYRIGHT')
@@ -377,23 +412,21 @@ def main():
             print "Invalid or malformed template %s.  Aborting." % path
             exit(1)
 
-    for filename in sys.argv[1:]:
-        # parse the list of functions
-        sys.stdout.write("%s: " % filename)
-        funclist = open(filename)
-        for line in funclist:
-            line = line.rstrip()
-            if line.startswith('#') or not line:
-                continue
-            try:
-                func = Function(line)
-                funcs.append(func)
-                sys.stdout.write(".")
-            except Exception, e:
-                print "Parsing failed:", e
-                exit(1)
-        funclist.close()
-        print ""
+    optlist, args = getopt.getopt(sys.argv[1:], 'u:')
+    for opt in optlist:
+        if opt[0] == '-u':
+	    uname_s = opt[1]
+
+    try:
+        funcs = process_port(host_ports[uname_s])
+    except KeyError:
+        print "Unknown uname -s result: '%s'." % uname_s
+	print "Known system types are:"
+	print "%-20s %-10s %s" % ("uname -s", "port name", "description")
+	for key in host_ports:
+	    print "%-20s %-10s %s" % (key, host_ports[key],
+	                              host_descrs[host_ports[key]])
+    exit(0)
 
     # the per-function stuff
     print "Writing functions...",

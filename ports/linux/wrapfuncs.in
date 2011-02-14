@@ -122,3 +122,19 @@ int fsetxattr(int filedes, const char *name, const void *value, size_t size, int
 int removexattr(const char *pathname, const char *name);
 int lremovexattr(const char *pathname, const char *name);
 int fremovexattr(int filedes, const char *name);
+int open64(const char *path, int flags, ...{mode_t mode}); /* flags=0 */
+int openat64(int dirfd, const char *path, int flags, ...{mode_t mode}); /* flags=0 */
+int __openat64_2(int dirfd, const char *path, int flags); /* flags=0 */
+int creat64(const char *path, mode_t mode);
+int __xstat64(int ver, const char *path, struct stat64 *buf);
+int __lxstat64(int ver, const char *path, struct stat64 *buf); /* flags=AT_SYMLINK_NOFOLLOW */
+int __fxstat64(int ver, int fd, struct stat64 *buf);
+int __fxstatat64(int ver, int dirfd, const char *path, struct stat64 *buf, int flags);
+FILE *fopen64(const char *path, const char *mode);
+int nftw64(const char *path, int (*fn)(const char *, const struct stat64 *, int, struct FTW *), int nopenfd, int flag);
+FILE *freopen64(const char *path, const char *mode, FILE *stream);
+int ftw64(const char *path, int (*fn)(const char *, const struct stat64 *, int), int nopenfd);
+int glob64(const char *pattern, int flags, int (*errfunc)(const char *, int), glob64_t *pglob);
+int scandir64(const char *path, struct dirent64 ***namelist, int (*filter)(const struct dirent64 *), int (*compar)());
+int truncate64(const char *path, off64_t length);
+int mkstemp64(char *template); /* flags=AT_SYMLINK_NOFOLLOW */

@@ -22,6 +22,7 @@ PREFIX=@PREFIX@
 SUFFIX=@SUFFIX@
 SQLITE=@SQLITE@
 BITS=@BITS@
+UNAME_S=@UNAME_S@
 MARK64=@MARK64@
 RPATH=@RPATH@
 VERSION=0.3
@@ -46,8 +47,6 @@ GUTS=$(filter-out "$(GLOB_PATTERN)",$(wildcard $(GLOB_PATTERN)))
 
 SOURCES=$(wildcard *.c)
 OBJS=$(subst .c,.o,$(SOURCES))
-
-USE_64=wrapfuncs64.in
 
 SHOBJS=pseudo_tables.o pseudo_util.o
 DBOBJS=pseudo_db.o
@@ -128,7 +127,7 @@ tables: enums/*.in maketables templatefile.py $(TABLES)
 	./maketables enums/*.in
 
 wrappers: wrapfuncs.in $(USE_64) makewrappers templatefile.py $(TEMPLATES)
-	./makewrappers wrapfuncs.in $(USE_64)
+	./makewrappers -u "$(UNAME_S)"
 
 .SECONDARY: tables wrappers
 
