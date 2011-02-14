@@ -1,0 +1,40 @@
+# On Darwin, mode_t promotes to int, so you have to use int for va_arg
+int open(const char *path, int flags, ...{int mode}); /* flags=0 */
+int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int rename(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int unlink(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
+int stat(const char *path, struct stat *buf); /* inode64=1 */
+int lstat(const char *path, struct stat *buf); /* flags=AT_SYMLINK_NOFOLLOW, inode64=1 */
+int fstat(int fd, struct stat *buf); /* inode64=1 */
+int chmod(const char *path, mode_t mode);
+int chown(const char *path, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group); /* flags=AT_SYMLINK_NOFOLLOW */
+int mknod(const char *path, mode_t mode, dev_t dev); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
+int fcntl(int fd, int cmd, ...{struct flock *lock});
+# just so we know the inums of symlinks
+int symlink(const char *oldname, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkstemp(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
+# primarily for use with chroot()
+ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
+int acct(const char *path);
+int mkfifo(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+# for emulation of passwd utilities
+int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
+# we use "pathname" to avoid canonicalizing paths, because these functions are
+# unimplemented
+ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size);
+ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size);
+ssize_t listxattr(const char *pathname, char *list, size_t size);
+ssize_t flistxattr(int filedes, char *list, size_t size);
+int setxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
+int fsetxattr(int filedes, const char *name, const void *value, size_t size, int flags);
+# local color UIDs
+int getgrouplist(const char *name, int basegid, int *groups, int *ngroups);
+int scandir(const char *path, struct dirent ***namelist, int (*filter)(struct dirent *), int (*compar)());
+int getgroups(int size, gid_t *list);
+int fgetgrent_r(FILE *fp, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp); /* real_func=pseudo_fgetgrent_r */
+int fgetpwent_r(FILE *fp, struct passwd *pbuf, char *buf, size_t buflen, struct passwd **pbufp); /* real_func=pseudo_fgetpwent_r */
+int getpwent_r(struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp); /* real_func=pseudo_getpwent_r */
+int getgrent_r(struct group *gbuf, char *buf, size_t buflen, struct group **gbufp); /* real_func=pseudo_getgrent_r */

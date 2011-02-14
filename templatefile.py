@@ -16,6 +16,8 @@ class TemplateFile:
 
         # empty footer if none specified:
         self.sections['footer'] = []
+	# empty per-port if none specified:
+        self.sections['port'] = []
 
         # lines appended to body by default
         self.sections['body'] = []
@@ -45,7 +47,10 @@ class TemplateFile:
                 current.append(line)
         self.template.close()
         for section, data in self.sections.items():
-            self.sections[section] = Template("\n".join(data))
+	    if len(data) > 0:
+                self.sections[section] = Template("\n".join(data))
+	    else:
+		self.sections[section] = None
 
         # You need a file if this isn't a file-per-item
         if not self.file_per_item:
@@ -68,8 +73,7 @@ class TemplateFile:
             strings.append(data.safe_substitute({}))
         return "\n".join(strings)
 
-    def emit(self, template, item=None):
-        """Emit a template, with optional interpolation of an item."""
+    def get_file(self, item):
         if self.file_per_item:
             if not item:
                 return
@@ -84,16 +88,24 @@ class TemplateFile:
                       (path, self.path, template)
                 return
 
+    def emit(self, template, item=None):
+        """Emit a template, with optional interpolation of an item."""
         if template == "copyright":
             # hey, at least it's not a global variable, amirite?
-            self.file.write(TemplateFile.copyright)
+	    self.get_file(item)
+	    if self.file:
+                self.file.write(TemplateFile.copyright)
         elif template in self.sections:
             templ = self.sections[template]
-            self.file.write(templ.safe_substitute(item))
-            self.file.write("\n")
+	    if templ:
+	        self.get_file(item)
+		if self.file:
+                    self.file.write(templ.safe_substitute(item))
+                    self.file.write("\n")
         else:
             print "Warning: Unknown template '%s'." % template
 
         if self.file_per_item:
-            self.file.close()
+	    if self.file:
+                self.file.close()
             self.file = None

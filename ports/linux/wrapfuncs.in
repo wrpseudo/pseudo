@@ -1,0 +1,85 @@
+int open(const char *path, int flags, ...{mode_t mode}); /* flags=0 */
+char *get_current_dir_name(void);
+int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int rename(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int unlink(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
+int unlinkat(int dirfd, const char *path, int rflags); /* flags=AT_SYMLINK_NOFOLLOW */
+int __xstat(int ver, const char *path, struct stat *buf);
+int __lxstat(int ver, const char *path, struct stat *buf); /* flags=AT_SYMLINK_NOFOLLOW */
+int __fxstat(int ver, int fd, struct stat *buf);
+int chmod(const char *path, mode_t mode);
+int chown(const char *path, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group); /* flags=AT_SYMLINK_NOFOLLOW */
+int __fxstatat(int ver, int dirfd, const char *path, struct stat *buf, int flags);
+int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flags);
+int fchmodat(int dirfd, const char *path, mode_t mode, int flags);
+int openat(int dirfd, const char *path, int flags, ...{mode_t mode});
+int __openat_2(int dirfd, const char *path, int flags);
+int __xmknod(int ver, const char *path, mode_t mode, dev_t *dev); /* flags=AT_SYMLINK_NOFOLLOW */
+int __xmknodat(int ver, int dirfd, const char *path, mode_t mode, dev_t *dev); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkdirat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
+int fcntl(int fd, int cmd, ...{struct flock *lock});
+# just so we know the inums of symlinks
+int symlink(const char *oldname, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int symlinkat(const char *oldname, int dirfd, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkstemp(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
+# primarily for use with chroot()
+ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
+ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
+int acct(const char *path);
+char *canonicalize_file_name(const char *filename);
+int eaccess(const char *path, int mode);
+int mkfifo(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkfifoat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+# we use "pathname" to avoid canonicalizing paths, because these functions are
+# unimplemented
+ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size);
+ssize_t lgetxattr(const char *pathname, const char *name, void *value, size_t size);
+ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size);
+ssize_t listxattr(const char *pathname, char *list, size_t size);
+ssize_t llistxattr(const char *pathname, char *list, size_t size);
+ssize_t flistxattr(int filedes, char *list, size_t size);
+int setxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
+int lsetxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
+int fsetxattr(int filedes, const char *name, const void *value, size_t size, int flags);
+int removexattr(const char *pathname, const char *name);
+int lremovexattr(const char *pathname, const char *name);
+int fremovexattr(int filedes, const char *name);
+int open64(const char *path, int flags, ...{mode_t mode}); /* flags=0 */
+int openat64(int dirfd, const char *path, int flags, ...{mode_t mode}); /* flags=0 */
+int __openat64_2(int dirfd, const char *path, int flags); /* flags=0 */
+int creat64(const char *path, mode_t mode);
+int stat(const char *path, struct stat *buf); /* real_func=pseudo_stat */
+int lstat(const char *path, struct stat *buf); /* real_func=pseudo_lstat */
+int fstat(int fd, struct stat *buf); /* real_func=pseudo_fstat */
+int __xstat64(int ver, const char *path, struct stat64 *buf);
+int __lxstat64(int ver, const char *path, struct stat64 *buf); /* flags=AT_SYMLINK_NOFOLLOW */
+int __fxstat64(int ver, int fd, struct stat64 *buf);
+int __fxstatat64(int ver, int dirfd, const char *path, struct stat64 *buf, int flags);
+FILE *fopen64(const char *path, const char *mode);
+int nftw64(const char *path, int (*fn)(const char *, const struct stat64 *, int, struct FTW *), int nopenfd, int flag);
+FILE *freopen64(const char *path, const char *mode, FILE *stream);
+int ftw64(const char *path, int (*fn)(const char *, const struct stat64 *, int), int nopenfd);
+int glob64(const char *pattern, int flags, int (*errfunc)(const char *, int), glob64_t *pglob);
+int scandir64(const char *path, struct dirent64 ***namelist, int (*filter)(const struct dirent64 *), int (*compar)());
+int truncate64(const char *path, off64_t length);
+int mkstemp64(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
+int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
+int setgroups(size_t size, const gid_t *list);
+int setfsgid(gid_t fsgid);
+int setfsuid(uid_t fsuid);
+int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
+int setresuid(uid_t ruid, uid_t euid, uid_t suid);
+int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
+int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
+int scandir(const char *path, struct dirent ***namelist, int (*filter)(const struct dirent *), int (*compar)());
+int getgroups(int size, gid_t *list);
+int lckpwdf(void);
+int ulckpwdf(void);
+int euidaccess(const char *path, int mode);
+int getpw(uid_t uid, char *buf);
+int getpwent_r(struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp);
+int getgrent_r(struct group *gbuf, char *buf, size_t buflen, struct group **gbufp);

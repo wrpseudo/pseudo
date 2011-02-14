@@ -220,7 +220,7 @@ pseudo_msg_new(size_t pathlen, const char *path) {
  */
 
 void
-pseudo_msg_stat(pseudo_msg_t *msg, const struct stat64 *buf) {
+pseudo_msg_stat(pseudo_msg_t *msg, const PSEUDO_STATBUF *buf) {
 	if (!msg || !buf)
 		return;
 	msg->uid = buf->st_uid;
@@ -233,7 +233,7 @@ pseudo_msg_stat(pseudo_msg_t *msg, const struct stat64 *buf) {
 }
 
 void
-pseudo_stat_msg(struct stat64 *buf, const pseudo_msg_t *msg) {
+pseudo_stat_msg(PSEUDO_STATBUF *buf, const pseudo_msg_t *msg) {
 	if (!msg || !buf)
 		return;
 	buf->st_uid = msg->uid;
@@ -242,3 +242,23 @@ pseudo_stat_msg(struct stat64 *buf, const pseudo_msg_t *msg) {
 	buf->st_rdev = msg->rdev;
 }
 
+#if PSEUDO_STATBUF_64
+void
+pseudo_msg_stat_plain(pseudo_msg_t *msg, const struct stat *buf) {
+	PSEUDO_STATBUF buf64;
+	if (buf) {
+		pseudo_stat64_from32(&buf64, buf);
+		pseudo_msg_stat(msg, &buf64);
+	}
+}
+
+void
+pseudo_stat_msg_plain(struct stat *buf, const pseudo_msg_t *msg) {
+	PSEUDO_STATBUF buf64;
+	if (buf) {
+		pseudo_stat64_from32(&buf64, buf);
+		pseudo_stat_msg(&buf64, msg);
+		pseudo_stat32_from64(buf, &buf64);
+	}
+}
+#endif

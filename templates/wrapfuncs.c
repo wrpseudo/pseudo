@@ -13,7 +13,9 @@
  * script if you want to modify this. */
 @body
 
-static ${type} (*real_${name})(${decl_args}) = NULL;
+static ${type} (*real_${name})(${decl_args}) = ${real_init};
+
+${maybe_skip}
 
 ${type}
 ${name}(${decl_args}) {
@@ -69,8 +71,9 @@ wrap_${name}(${wrap_args}) {
 	${maybe_variadic_decl}
 	${maybe_variadic_start}
 
-#include "guts/${name}.c"
+#include "ports/${port}/guts/${name}.c"
 
 	${rc_return}
 }
 
+${end_maybe_skip}

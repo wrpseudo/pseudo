@@ -8,4 +8,6 @@ pseudodb
 pseudolog
 pseudo_tables.c
 pseudo_tables.h
+port_wrappers.c
+pseudo_ports.h
 templatefile.pyc

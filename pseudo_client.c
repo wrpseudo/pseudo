@@ -38,7 +38,11 @@
 #include "pseudo_client.h"
 
 /* GNU extension */
+#if PSEUDO_PORT_LINUX
 extern char *program_invocation_name;
+#else
+static char *program_invocation_name = "unknown";
+#endif
 
 static char *base_path(int dirfd, const char *path, int leave_last);
 
@@ -60,6 +64,7 @@ size_t pseudo_chroot_len = 0;
 char *pseudo_cwd_rel = NULL;
 /* used for PSEUDO_DISABLED */
 int pseudo_disabled = 0;
+static int pseudo_local_only = 0;
 
 static char **fd_paths = NULL;
 static int nfds = 0;
@@ -117,7 +122,9 @@ pseudo_init_client(void) {
 	 * pseudo (and cause it to reinit the defaults).
 	 */
 	env = getenv("PSEUDO_DISABLED");
-	if (!env) pseudo_get_value("PSEUDO_DISABLED");
+	if (!env) {
+		env = pseudo_get_value("PSEUDO_DISABLED");
+	}
 	if (env) {
 		int actually_disabled = 1;
 		switch (*env) {
@@ -127,6 +134,11 @@ pseudo_init_client(void) {
 		case 'n':
 		case 'N':
 			actually_disabled = 0;
+			break;
+		case 's':
+		case 'S':
+			actually_disabled = 0;
+			pseudo_local_only = 1;
 			break;
 		}
 		if (actually_disabled) {
@@ -601,7 +613,7 @@ client_spawn_server(void) {
 
 		pseudo_set_value("PSEUDO_RELOADED", "YES");
 		pseudo_setupenv();
-		pseudo_dropenv(); /* drop LD_PRELOAD */
+		pseudo_dropenv(); /* drop PRELINK_LIBRARIES */
 
 		pseudo_debug(4, "calling execv on %s\n", argv[0]);
 
@@ -679,8 +691,12 @@ pseudo_fd(int fd, int how) {
 static int
 client_connect(void) {
 	/* we have a server pid, is it responsive? */
-	struct sockaddr_un sun = { AF_UNIX, PSEUDO_SOCKET };
+	struct sockaddr_un sun = { .sun_family = AF_UNIX, .sun_path = PSEUDO_SOCKET };
 	int cwd_fd;
+
+#if PSEUDO_PORT_DARWIN
+	sun.sun_len = strlen(PSEUDO_SOCKET) + 1;
+#endif
 
 	connect_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	connect_fd = pseudo_fd(connect_fd, MOVE_FD);
@@ -959,8 +975,29 @@ base_path(int dirfd, const char *path, int leave_last) {
 	return newpath;
 }
 
+#if PSEUDO_STATBUF_64
 pseudo_msg_t *
-pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat64 *buf, ...) {
+pseudo_client_op_plain(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat *buf, ...) {
+	char *oldpath = NULL;
+	PSEUDO_STATBUF buf64;
+
+	if (op == OP_RENAME) {
+		va_list ap;
+		va_start(ap, buf);
+		oldpath = va_arg(ap, char *);
+		va_end(ap);
+	}
+	if (buf) {
+		pseudo_stat64_from32(&buf64, buf);
+		return pseudo_client_op(op, access, fd, dirfd, path, &buf64, oldpath);
+	} else {
+		return pseudo_client_op(op, access, fd, dirfd, path, NULL, oldpath);
+	}
+}
+#endif
+
+pseudo_msg_t *
+pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const PSEUDO_STATBUF *buf, ...) {
 	pseudo_msg_t *result = 0;
 	pseudo_msg_t msg = { .type = PSEUDO_MSG_OP };
 	size_t pathlen = -1;
@@ -1156,7 +1193,12 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		struct timeval tv1, tv2;
 		pseudo_debug(4, "sending request [ino %llu]\n", (unsigned long long) msg.ino);
 		gettimeofday(&tv1, NULL);
-		result = pseudo_client_request(&msg, pathlen, path);
+		if (pseudo_local_only) {
+			/* disable server */
+			result = NULL;
+		} else {
+			result = pseudo_client_request(&msg, pathlen, path);
+		}
 		gettimeofday(&tv2, NULL);
 		++messages;
 		message_time.tv_sec += (tv2.tv_sec - tv1.tv_sec);
@@ -1208,40 +1250,6 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	return result;
 }
 
-void
-pseudo_stat32_from64(struct stat *buf32, struct stat64 *buf) {
-	buf32->st_dev = buf->st_dev;
-	buf32->st_ino = buf->st_ino;
-	buf32->st_mode = buf->st_mode;
-	buf32->st_nlink = buf->st_nlink;
-	buf32->st_uid = buf->st_uid;
-	buf32->st_gid = buf->st_gid;
-	buf32->st_rdev = buf->st_rdev;
-	buf32->st_size = buf->st_size;
-	buf32->st_blksize = buf->st_blksize;
-	buf32->st_blocks = buf->st_blocks;
-	buf32->st_atime = buf->st_atime;
-	buf32->st_mtime = buf->st_mtime;
-	buf32->st_ctime = buf->st_ctime;
-}
-
-void
-pseudo_stat64_from32(struct stat64 *buf64, struct stat *buf) {
-	buf64->st_dev = buf->st_dev;
-	buf64->st_ino = buf->st_ino;
-	buf64->st_mode = buf->st_mode;
-	buf64->st_nlink = buf->st_nlink;
-	buf64->st_uid = buf->st_uid;
-	buf64->st_gid = buf->st_gid;
-	buf64->st_rdev = buf->st_rdev;
-	buf64->st_size = buf->st_size;
-	buf64->st_blksize = buf->st_blksize;
-	buf64->st_blocks = buf->st_blocks;
-	buf64->st_atime = buf->st_atime;
-	buf64->st_mtime = buf->st_mtime;
-	buf64->st_ctime = buf->st_ctime;
-}
-
 /* stuff for handling paths and execs */
 static char *previous_path;
 static char *previous_path_segs;
@@ -1257,7 +1265,7 @@ static void
 populate_path_segs(void) {
 	size_t len = 0;
 	char *s;
-	int c;
+	int c = 0;
 
 	free(path_segs);
 	free(previous_path_segs);

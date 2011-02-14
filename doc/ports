@@ -1,0 +1,23 @@
+The "ports" system provides functionality for porting pseudo to new targets.
+The original motivation was a requirement to support older and newer Linux
+systems on which the signature for clone() differed.
+
+The Darwin port is totally nonfunctional at this point, but it compiles,
+and sufficiently careful hand-tuning of DYLD_INSERT_LIBRARIES and a
+manually-started server can actually pass a simple test.  It will get
+worked on in my copious free time.
+
+The basic design of a port is that it provides a wrapfuncs.in list of
+function signatures, guts implementations, and optionally some port-specific
+defines or a block of wrapper code for pseudo_wrappers.c.  This is used
+for cases where the default wrapper would not be appropriate, and may
+be combined with the new hand_wrapped=1 flag in wrapfuncs.in.
+
+A port may specify preports or subports.  Preports are ports that are
+included and processed *before* the current port -- meaning that functions
+in the current port can override them.  Subports are processed *after*
+the current port -- meaning that they can override functions in the
+current port.  The preports and subports are specified by scripts,
+which echo a list of port names to standard output.  (Be sure any
+diagnostic messages go to standard error.)
+

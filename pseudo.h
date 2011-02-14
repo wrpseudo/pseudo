@@ -65,6 +65,8 @@ extern ssize_t pseudo_path_max(void);
 #define PSEUDO_PWD_MAX 4096
 extern int pseudo_etc_file(const char *filename, char *realname, int flags, char **search, int dircount);
 #define PSEUDO_ETC_FILE(name, realname, flags) pseudo_etc_file((name), (realname), (flags), (char *[]) { pseudo_chroot, pseudo_passwd }, 2)
+extern void pseudo_stat32_from64(struct stat *, const struct stat64 *);
+extern void pseudo_stat64_from32(struct stat64 *, const struct stat *);
 
 extern char *pseudo_version;
 
@@ -111,3 +113,4 @@ extern char *pseudo_version;
 #define O_LARGEFILE 0
 #endif
 
+#include "pseudo_ports.h"

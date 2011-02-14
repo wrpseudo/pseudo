@@ -94,8 +94,8 @@ main(int argc, char *argv[]) {
 	int o;
 	char *s;
 	int lockfd, newfd;
-	char *ld_env = getenv("LD_PRELOAD");
-	int rc;
+	char *ld_env = getenv(PRELINK_LIBRARIES);
+	int rc = 0;
 	char opts[pseudo_path_max()], *optptr = opts;
 	char *lockname;
 	char *lockpath;
@@ -105,17 +105,17 @@ main(int argc, char *argv[]) {
 	pseudo_init_util();
 
 	if (ld_env && strstr(ld_env, "libpseudo")) {
-		pseudo_debug(2, "can't run daemon with libpseudo in LD_PRELOAD\n");
+		pseudo_debug(2, "can't run daemon with libpseudo in %s\n", PRELINK_LIBRARIES);
 		s = pseudo_get_value("PSEUDO_RELOADED");
 		if (s) {
-			pseudo_diag("I can't seem to make LD_PRELOAD go away.  Sorry.\n");
-			pseudo_diag("LD_PRELOAD: %s\n", ld_env);
+			pseudo_diag("I can't seem to make %s go away.  Sorry.\n", PRELINK_LIBRARIES);
+			pseudo_diag("%s: %s\n", PRELINK_LIBRARIES, ld_env);
 			exit(EXIT_FAILURE);
 		}
 		free(s);
 		pseudo_set_value("PSEUDO_RELOADED", "YES");
 		pseudo_setupenv();
-		pseudo_dropenv(); /* Drop LD_PRELOAD */
+		pseudo_dropenv(); /* Drop PRELINK_LIBRARIES */
 
 		execv(argv[0], argv);
 		exit(EXIT_FAILURE);
@@ -359,14 +359,14 @@ main(int argc, char *argv[]) {
 			if ((path = getenv("PATH")) == NULL)
 				path = "/bin:/usr/bin";
 			while (*path) {
-				struct stat64 buf;
+				struct stat buf;
 				int len = strcspn(path, ":");
 				snprintf(fullpath, pseudo_path_max(), "%.*s/%s",
 					len, path, argv[0]);
 				path += len;
 				if (*path == ':')
 					++path;
-				if (!stat64(fullpath, &buf)) {
+				if (!stat(fullpath, &buf)) {
 					if (buf.st_mode & 0111) {
 						found = 1;
 						break;
@@ -937,14 +937,14 @@ pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag) 
 
 int
 pseudo_db_check(int fix) {
-	struct stat64 buf;
+	struct stat buf;
 	pseudo_msg_t *m;
 	pdb_file_list l;
 	int errors = 0;
 	int delete_some = 0;
 	/* magic cookie used to show who's deleting the files */
 	int magic_cookie = (int) getpid();
-	int rc;
+	int rc = 0;
 
 	l = pdb_files();
 	if (!l) {
@@ -959,7 +959,7 @@ pseudo_db_check(int fix) {
 		if (m->pathlen > 0) {
 			int fixup_needed = 0;
 			pseudo_debug(1, "Checking <%s>\n", m->path);
-			if (lstat64(m->path, &buf)) {
+			if (lstat(m->path, &buf)) {
 				errors = EXIT_FAILURE;
 				pseudo_diag("can't stat <%s>\n", m->path);
 				continue;
