@@ -22,7 +22,6 @@ PREFIX=@PREFIX@
 SUFFIX=@SUFFIX@
 SQLITE=@SQLITE@
 BITS=@BITS@
-UNAME_S=@UNAME_S@
 MARK64=@MARK64@
 RPATH=@RPATH@
 VERSION=0.3
@@ -126,8 +125,8 @@ pseudo_server.o: pseudo_server.h
 tables: enums/*.in maketables templatefile.py $(TABLES)
 	./maketables enums/*.in
 
-wrappers: wrapfuncs.in $(USE_64) makewrappers templatefile.py $(TEMPLATES)
-	./makewrappers -u "$(UNAME_S)"
+wrappers: makewrappers templatefile.py $(TEMPLATES) ports/*/wrapfuncs.in
+	./makewrappers
 
 .SECONDARY: tables wrappers
 

@@ -15,6 +15,8 @@
 
 static ${type} (*real_${name})(${decl_args}) = NULL;
 
+${maybe_skip}
+
 ${type}
 ${name}(${decl_args}) {
 	sigset_t saved;
@@ -69,8 +71,9 @@ wrap_${name}(${wrap_args}) {
 	${maybe_variadic_decl}
 	${maybe_variadic_start}
 
-#include "guts/${name}.c"
+#include "ports/${port}/guts/${name}.c"
 
 	${rc_return}
 }
 
+${end_maybe_skip}

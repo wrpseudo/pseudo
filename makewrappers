@@ -17,13 +17,13 @@
 #
 """convert wrapfuncs.in to wrapper function stubs and tables"""
 
-# why getopt?  because argparse is new in 2.7, and optparse is deprecated
-# in 2.7, but getopt stays unchanging...
-import getopt
+import datetime
 import glob
 import sys
 import re
-import datetime
+import os.path
+import string
+import subprocess
 from templatefile import TemplateFile
 
 class ArgumentList:
@@ -197,7 +197,7 @@ class Argument:
 
 class Function:
     """A function signature and additional data about how the function works"""
-    def __init__(self, line):
+    def __init__(self, port, line):
         # table of known default values:
         default_values = {
             'gid_t': '0',
@@ -209,8 +209,10 @@ class Function:
     
         self.dirfd = 'AT_FDCWD'
         self.flags = '0'
+	self.port = port
+	self.directory = ''
         self.paths_to_munge = []
-        self.nowrappers = None
+        self.hand_wrapped = None
         # used for the copyright date when creating stub functions
         self.date = datetime.date.today().year
     
@@ -267,6 +269,22 @@ class Function:
                 value = value.rstrip()
                 setattr(self, key, value)
     
+    def end_maybe_skip(self):
+	if self.hand_wrapped:
+	    return """/* Hand-written wrapper for this function. */
+#endif
+"""
+	else:
+	    return ""
+
+    def maybe_skip(self):
+	if self.hand_wrapped:
+	    return """/* Hand-written wrapper for this function. */
+#if 0
+"""
+	else:
+	    return ""
+
     def comment(self):
         """declare self (in a comment)"""
         return self.decl(comment = True)
@@ -360,13 +378,77 @@ class Function:
             pretty += ' (%s)' % self.comments
         return pretty
 
-def process_port(port):
-    funclist = process_wrapfuncs("ports/%s/wrapfuncs.in" % port)
-    return funclist
+class Port:
+    """
+A Port is a set of function declarations and code providing
+details specific to a specific host environment, such as Linux.
+Ports can override each other, and each port can indicate
+additional ports to include.
+"""
 
-def process_wrapfuncs(filename):
+    def __init__(self, port, sources):
+	self.name = port
+	self.subports = []
+
+	if os.path.exists(self.portfile("pseudo_wrappers.c")):
+	    self.wrappers = self.portfile("pseudo_wrappers.c")
+	else:
+	    self.wrappers = None
+
+	if os.path.exists(self.portfile("wrapfuncs.in")):
+	    self.funcs = process_wrapfuncs(port)
+	else:
+	    self.funcs = {}
+
+	for source in sources:
+	    source.emit('port', self)
+
+	if os.path.exists(self.portfile("subports")):
+	    subport_proc = subprocess.Popen([self.portfile("subports"), self.name], stdout=subprocess.PIPE)
+	    portlist = subport_proc.communicate()[0]
+	    retcode = subport_proc.poll()
+	    if retcode:
+		raise Exception("subports script failed for port %s" % self.name)
+
+	    for subport in string.split(portlist):
+		next = Port(subport, sources)
+		self.subports.append(next)
+
+    def functions(self):
+	mergedfuncs = self.funcs
+	for sub in self.subports:
+	    subfuncs = sub.functions()
+	    for name in subfuncs.keys():
+		mergedfuncs[name] = subfuncs[name]
+	return mergedfuncs
+
+    def include(self):
+	if self.wrappers:
+	    return '#include "%s"' % self.wrappers
+	else:
+	    return '/* no #include for %s */' % self.name
+
+    def portfile(self, name):
+	return "ports/%s/%s" % (self.name, name)
+
+    def __getitem__(self, key):
+        """Make this object look like a dict for Templates to use"""
+        try:
+            attr = getattr(self, key)
+        except AttributeError:
+	    return None
+
+        if callable(attr):
+            return attr()
+        else:
+            return attr
+
+
+def process_wrapfuncs(port):
     """Process a wrapfuncs.in file, generating a list of prototypes."""
-    # parse the list of functions
+    filename = "ports/%s/wrapfuncs.in" % port
+    funcs = {}
+    directory = os.path.dirname(filename)
     sys.stdout.write("%s: " % filename)
     funclist = open(filename)
     for line in funclist:
@@ -374,15 +456,16 @@ def process_wrapfuncs(filename):
 	if line.startswith('#') or not line:
 	    continue
 	try:
-	    func = Function(line)
-	    funcs.append(func)
+	    func = Function(port, line)
+	    func.directory = directory
+	    funcs[func.name] = func
 	    sys.stdout.write(".")
 	except Exception, e:
 	    print "Parsing failed:", e
 	    exit(1)
     funclist.close()
     print ""
-    return funclist
+    return funcs
 
 def main():
     """Read in function definitions, write out files based on templates."""
@@ -390,7 +473,7 @@ def main():
     sources = []
     host_ports = {
 	'Darwin': 'darwin',
-	'GNU/Linux': 'linux'
+	'Linux': 'linux'
     }
     host_descrs = {
 	'darwin': 'Mac OS X (Snow Leopard only)',
@@ -412,13 +495,9 @@ def main():
             print "Invalid or malformed template %s.  Aborting." % path
             exit(1)
 
-    optlist, args = getopt.getopt(sys.argv[1:], 'u:')
-    for opt in optlist:
-        if opt[0] == '-u':
-	    uname_s = opt[1]
-
     try:
-        funcs = process_port(host_ports[uname_s])
+	port = Port('common', sources)
+
     except KeyError:
         print "Unknown uname -s result: '%s'." % uname_s
 	print "Known system types are:"
@@ -426,14 +505,14 @@ def main():
 	for key in host_ports:
 	    print "%-20s %-10s %s" % (key, host_ports[key],
 	                              host_descrs[host_ports[key]])
-    exit(0)
 
     # the per-function stuff
     print "Writing functions...",
-    for func in funcs:
+    all_funcs = port.functions()
+    for name in sorted(all_funcs.keys()):
         # populate various tables and files with each function
         for source in sources:
-            source.emit('body', func)
+            source.emit('body', all_funcs[name])
     print "done.  Cleaning up."
     
     for source in sources:

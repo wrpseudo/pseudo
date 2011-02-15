@@ -1,0 +1,27 @@
+#!/bin/sh
+found=false
+printf >&2 "Checking for old/new clone mechanics..."
+cat > dummy.c <<EOF
+#include <sched.h>
+int clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) { return 0; }
+EOF
+if	cc -c -o dummy.o dummy.c >/dev/null 2>&1; then
+	rm -f dummy.c dummy.o
+	echo >&2 "New clone."
+	echo "newclone"
+	found=true
+fi
+cat > dummy.c <<EOF
+#include <sched.h>
+int clone(int (*fn)(void *), void *child_stack, int flags, void *arg) { return 0; }
+EOF
+if	! $found && cc -c -o dummy.o dummy.c >/dev/null 2>&1; then
+	rm -f dummy.c dummy.o
+	echo >&2 "Old clone."
+	echo "oldclone"
+	found=true
+fi
+rm -f dummy.c dummy.o
+if ! $found; then
+	echo >&2 "Can't tell, omitting clone(2) support."
+fi

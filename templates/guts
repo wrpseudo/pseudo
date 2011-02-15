@@ -1,4 +1,4 @@
-@name guts/${name}.c
+@name ports/${port}/guts/${name}.c
 @body
 /* 
  * Copyright (c) ${date} Wind River Systems; see
