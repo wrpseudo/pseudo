@@ -152,6 +152,7 @@ clean:
 		pseudo_wrapfuncs.h pseudo_wrapfuncs.c \
 		pseudo_wrapper_table.c \
 		pseudo_tables.c pseudo_tables.h \
+		pseudo_ports.h port_wrappers.c \
 		offsets32 offsets64
 
 distclean: clean

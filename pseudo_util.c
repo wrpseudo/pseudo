@@ -216,6 +216,7 @@ static char *libpseudo_name = "libpseudo.so";
 static char *libpseudo_pattern = "(^|=| )libpseudo[^ ]*\\.so($| )";
 static regex_t libpseudo_regex;
 static int libpseudo_regex_compiled = 0;
+
 /* Okay, so, there's a funny story behind this.  On one of the systems
  * we need to run on, /usr/bin/find happens to provide its own
  * definitions of regcomp and regexec which are INCOMPATIBLE with the
@@ -226,8 +227,13 @@ static int libpseudo_regex_compiled = 0;
  * no one called us from a program with incompatible variants.
  *
  */
+#if PSEUDO_PORT_LINUX
 static int (*real_regcomp)(regex_t *__restrict __preg, const char *__restrict __pattern, int __cflags);
 static int (*real_regexec)(const regex_t *__restrict __preg, const char *__restrict __string, size_t __nmatch, regmatch_t __pmatch[__restrict_arr], int __eflags);
+#else
+#define real_regcomp regcomp
+#define real_regexec regexec
+#endif /* PSEUDO_PORT_LINUX */
 
 static int
 libpseudo_regex_init(void) {
@@ -235,12 +241,14 @@ libpseudo_regex_init(void) {
 
 	if (libpseudo_regex_compiled)
 		return 0;
+#if PSEUDO_PORT_LINUX
 	real_regcomp = dlsym(RTLD_NEXT, "regcomp");
 	if (!real_regcomp)
 		real_regcomp = regcomp;
 	real_regexec = dlsym(RTLD_NEXT, "regexec");
 	if (!real_regexec)
 		real_regexec = regexec;
+#endif
 	rc = (*real_regcomp)(&libpseudo_regex, libpseudo_pattern, REG_EXTENDED);
 	if (rc == 0)
 		libpseudo_regex_compiled = 1;
@@ -255,6 +263,7 @@ without_libpseudo(char *list) {
 	regmatch_t pmatch[1];
 	int counter = 0;
 	int skip_start = 0;
+	int rc;
 
 	if (libpseudo_regex_init())
 		return NULL;
@@ -399,7 +408,7 @@ pseudo_append_element(char **pnewpath, char **proot, size_t *pallocated, char **
 	static int link_recursion = 0;
 	size_t curlen, allocated;
 	char *newpath, *current, *root;
-	struct stat64 buf;
+	struct stat buf;
 	if (!pnewpath || !*pnewpath ||
 	    !pcurrent || !*pcurrent ||
 	    !proot || !*proot ||
@@ -461,7 +470,7 @@ pseudo_append_element(char **pnewpath, char **proot, size_t *pallocated, char **
 	/* if lstat fails, that's fine -- nonexistent files aren't symlinks */
 	if (!leave_this) {
 		int is_link;
-		is_link = (lstat64(newpath, &buf) != -1) && S_ISLNK(buf.st_mode);
+		is_link = (lstat(newpath, &buf) != -1) && S_ISLNK(buf.st_mode);
 		if (link_recursion >= PSEUDO_MAX_LINK_RECURSION && is_link) {
 			pseudo_diag("link recursion too deep, not expanding path '%s'.\n", newpath);
 			is_link = 0;
@@ -1200,7 +1209,11 @@ pseudo_logfile(char *defname) {
 	char *pseudo_path;
 	char *filename = pseudo_get_value("PSEUDO_DEBUG_FILE");
 	char *s;
+#if PSEUDO_PORT_LINUX
 	extern char *program_invocation_short_name; /* glibcism */
+#else
+	char *program_invocation_short_name = "unknown";
+#endif
 	int fd;
 
 	if (!filename) {

@@ -38,7 +38,11 @@
 #include "pseudo_client.h"
 
 /* GNU extension */
+#if PSEUDO_PORT_LINUX
 extern char *program_invocation_name;
+#else
+static char *program_invocation_name = "unknown";
+#endif
 
 static char *base_path(int dirfd, const char *path, int leave_last);
 
@@ -679,7 +683,7 @@ pseudo_fd(int fd, int how) {
 static int
 client_connect(void) {
 	/* we have a server pid, is it responsive? */
-	struct sockaddr_un sun = { AF_UNIX, PSEUDO_SOCKET };
+	struct sockaddr_un sun = { .sun_family = AF_UNIX, .sun_path = PSEUDO_SOCKET };
 	int cwd_fd;
 
 	connect_fd = socket(PF_UNIX, SOCK_STREAM, 0);
@@ -1257,7 +1261,7 @@ static void
 populate_path_segs(void) {
 	size_t len = 0;
 	char *s;
-	int c;
+	int c = 0;
 
 	free(path_segs);
 	free(previous_path_segs);

@@ -1,0 +1,1 @@
+int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);

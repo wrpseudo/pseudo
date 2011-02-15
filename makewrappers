@@ -389,6 +389,7 @@ additional ports to include.
     def __init__(self, port, sources):
 	self.name = port
 	self.subports = []
+	self.preports = []
 
 	if os.path.exists(self.portfile("pseudo_wrappers.c")):
 	    self.wrappers = self.portfile("pseudo_wrappers.c")
@@ -403,6 +404,17 @@ additional ports to include.
 	for source in sources:
 	    source.emit('port', self)
 
+	if os.path.exists(self.portfile("preports")):
+	    subport_proc = subprocess.Popen([self.portfile("preports"), self.name], stdout=subprocess.PIPE)
+	    portlist = subport_proc.communicate()[0]
+	    retcode = subport_proc.poll()
+	    if retcode:
+		raise Exception("preports script failed for port %s" % self.name)
+
+	    for preport in string.split(portlist):
+		next = Port(preport, sources)
+		self.preports.append(next)
+
 	if os.path.exists(self.portfile("subports")):
 	    subport_proc = subprocess.Popen([self.portfile("subports"), self.name], stdout=subprocess.PIPE)
 	    portlist = subport_proc.communicate()[0]
@@ -415,12 +427,21 @@ additional ports to include.
 		self.subports.append(next)
 
     def functions(self):
-	mergedfuncs = self.funcs
+	mergedfuncs = {}
+	for pre in self.preports:
+	    prefuncs = pre.functions()
+	    for name in prefuncs.keys():
+		mergedfuncs[name] = prefuncs[name]
+	for name in self.funcs.keys():
+	    mergedfuncs[name] = self.funcs[name]
 	for sub in self.subports:
 	    subfuncs = sub.functions()
 	    for name in subfuncs.keys():
 		mergedfuncs[name] = subfuncs[name]
 	return mergedfuncs
+
+    def define(self):
+        return '#define PSEUDO_PORT_%s 1' % string.upper(self.name)
 
     def include(self):
 	if self.wrappers:
