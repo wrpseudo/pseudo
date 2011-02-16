@@ -6,7 +6,7 @@
  *	int rc = -1;
  */
 
-	rc = wrap___fxstatat(_STAT_VER, AT_FDCWD, path, buf, AT_NOFOLLOW_SYMLINKS);
+	rc = wrap___fxstatat(_STAT_VER, AT_FDCWD, path, buf, AT_SYMLINK_NOFOLLOW);
 
 /*	return rc;
  * }

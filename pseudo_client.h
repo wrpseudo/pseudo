@@ -18,6 +18,11 @@
  *
  */
 extern pseudo_msg_t *pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const PSEUDO_STATBUF *buf, ...);
+#if PSEUDO_STATBUF_64
+extern pseudo_msg_t *pseudo_client_op_plain(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat *buf, ...);
+#else
+#define pseudo_client_op_plain pseudo_client_op
+#endif
 extern void pseudo_antimagic(void);
 extern void pseudo_magic(void);
 extern void pseudo_client_touchuid(void);
@@ -25,8 +30,6 @@ extern void pseudo_client_touchgid(void);
 extern char *pseudo_client_fdpath(int fd);
 extern int pseudo_client_shutdown(void);
 extern int pseudo_fd(int fd, int how);
-extern void pseudo_stat32_from64(struct stat *, struct stat64 *);
-extern void pseudo_stat64_from32(struct stat64 *, struct stat *);
 #define MOVE_FD	0
 #define COPY_FD	1
 #define PSEUDO_MIN_FD	20

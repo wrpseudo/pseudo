@@ -967,6 +967,27 @@ base_path(int dirfd, const char *path, int leave_last) {
 	return newpath;
 }
 
+#if PSEUDO_STATBUF_64
+pseudo_msg_t *
+pseudo_client_op_plain(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat *buf, ...) {
+	char *oldpath = NULL;
+	PSEUDO_STATBUF buf64;
+
+	if (op == OP_RENAME) {
+		va_list ap;
+		va_start(ap, buf);
+		oldpath = va_arg(ap, char *);
+		va_end(ap);
+	}
+	if (buf) {
+		pseudo_stat64_from32(&buf64, buf);
+		return pseudo_client_op(op, access, fd, dirfd, path, &buf64, oldpath);
+	} else {
+		return pseudo_client_op(op, access, fd, dirfd, path, NULL, oldpath);
+	}
+}
+#endif
+
 pseudo_msg_t *
 pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const PSEUDO_STATBUF *buf, ...) {
 	pseudo_msg_t *result = 0;
@@ -1214,40 +1235,6 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	pseudo_magic();
 
 	return result;
-}
-
-void
-pseudo_stat32_from64(struct stat *buf32, struct stat64 *buf) {
-	buf32->st_dev = buf->st_dev;
-	buf32->st_ino = buf->st_ino;
-	buf32->st_mode = buf->st_mode;
-	buf32->st_nlink = buf->st_nlink;
-	buf32->st_uid = buf->st_uid;
-	buf32->st_gid = buf->st_gid;
-	buf32->st_rdev = buf->st_rdev;
-	buf32->st_size = buf->st_size;
-	buf32->st_blksize = buf->st_blksize;
-	buf32->st_blocks = buf->st_blocks;
-	buf32->st_atime = buf->st_atime;
-	buf32->st_mtime = buf->st_mtime;
-	buf32->st_ctime = buf->st_ctime;
-}
-
-void
-pseudo_stat64_from32(struct stat64 *buf64, struct stat *buf) {
-	buf64->st_dev = buf->st_dev;
-	buf64->st_ino = buf->st_ino;
-	buf64->st_mode = buf->st_mode;
-	buf64->st_nlink = buf->st_nlink;
-	buf64->st_uid = buf->st_uid;
-	buf64->st_gid = buf->st_gid;
-	buf64->st_rdev = buf->st_rdev;
-	buf64->st_size = buf->st_size;
-	buf64->st_blksize = buf->st_blksize;
-	buf64->st_blocks = buf->st_blocks;
-	buf64->st_atime = buf->st_atime;
-	buf64->st_mtime = buf->st_mtime;
-	buf64->st_ctime = buf->st_ctime;
 }
 
 /* stuff for handling paths and execs */

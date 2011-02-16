@@ -10,12 +10,12 @@
 	struct stat buf;
 	int save_errno = errno;
 
-	if (real_fstat(fd, &buf) == -1) {
+	if (wrap_fstat(fd, &buf) == -1) {
 		/* can't stat it, can't chmod it */
 		return -1;
 	}
 	buf.st_mode = (buf.st_mode & ~07777) | (mode & 07777);
-	msg = pseudo_client_op(OP_FCHMOD, 0, fd, -1, 0, &buf);
+	msg = pseudo_client_op_plain(OP_FCHMOD, 0, fd, -1, 0, &buf);
 	real_fchmod(fd, PSEUDO_FS_MODE(mode));
 	if (!msg) {
 		errno = ENOSYS;
