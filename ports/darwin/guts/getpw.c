@@ -2,11 +2,11 @@
  * Copyright (c) 2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * int fxstat(int fd, struct stat *buf)
+ * int getpw(uid_t uid, char *buf)
  *	int rc = -1;
  */
 
-	rc = real_fxstat(fd, buf);
+	rc = real_getpw(uid, buf);
 
 /*	return rc;
  * }

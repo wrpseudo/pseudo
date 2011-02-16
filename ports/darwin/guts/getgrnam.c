@@ -2,11 +2,11 @@
  * Copyright (c) 2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * int fchmod(int fd, mode_t mode)
- *	int rc = -1;
+ * struct group *getgrnam(const char *name)
+ *	struct group *rc = NULL;
  */
 
-	rc = real_fchmod(fd, mode);
+	rc = real_getgrnam(name);
 
 /*	return rc;
  * }

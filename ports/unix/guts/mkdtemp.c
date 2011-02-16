@@ -6,7 +6,7 @@
  * wrap_mkdtemp(char *template) {
  *	char * rc = NULL;
  */
-	struct stat64 buf;
+	struct stat buf;
  	int save_errno;
 	size_t len;
 	char *tmp_template;
@@ -29,7 +29,7 @@
 	if (rc != NULL) {
 		save_errno = errno;
 
-		if (real___xstat64(_STAT_VER, rc, &buf) != -1) {
+		if (real_stat(rc, &buf) != -1) {
 			pseudo_client_op(OP_CREAT, 0, -1, -1, tmp_template, &buf);
 		} else {
 			pseudo_debug(1, "mkdtemp (path %s) succeeded, but fstat failed (%s).\n",

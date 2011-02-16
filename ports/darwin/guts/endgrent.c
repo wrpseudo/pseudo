@@ -2,12 +2,12 @@
  * Copyright (c) 2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * int dup(int fd)
- *	int rc = -1;
+ * void endgrent(void)
+ *	
  */
 
-	rc = real_dup(fd);
+	(void) real_endgrent();
 
-/*	return rc;
+/*	return;
  * }
  */

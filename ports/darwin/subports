@@ -1,2 +1,3 @@
 #!/bin/sh
-echo "uids_generic"
+# no subports at this time
+exit 0

@@ -2,11 +2,11 @@
  * Copyright (c) 2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * int setgroups(int size, const gid_t *list)
+ * int fstat(int fd, struct stat *buf)
  *	int rc = -1;
  */
 
-	rc = real_setgroups(size, list);
+	rc = wrap___fxstat(_STAT_VER, fd, buf);
 
 /*	return rc;
  * }

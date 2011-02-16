@@ -7,10 +7,10 @@
  *	int rc = -1;
  */
  	pseudo_msg_t *msg;
-	struct stat64 buf;
+	struct stat buf;
 	int save_errno = errno;
 
-	if (real___fxstat64(_STAT_VER, fd, &buf) == -1) {
+	if (real_fstat(fd, &buf) == -1) {
 		/* can't stat it, can't chmod it */
 		return -1;
 	}

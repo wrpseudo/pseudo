@@ -3,3 +3,4 @@
 /* #defines for port-specific hackery */
 @port
 ${define}
+${portdefs}

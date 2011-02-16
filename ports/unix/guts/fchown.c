@@ -7,12 +7,12 @@
  *	int rc = -1;
  */
  	pseudo_msg_t *msg;
-	struct stat64 buf;
+	struct stat buf;
 	int save_errno;
 
-	if (real___fxstat64(_STAT_VER, fd, &buf) == -1) {
+	if (real_fstat(fd, &buf) == -1) {
 		save_errno = errno;
-		pseudo_debug(2, "fchown failing because fxstat failed: %s\n",
+		pseudo_debug(2, "fchown failing because fstat failed: %s\n",
 			strerror(errno));
 		errno = save_errno;
 		return -1;

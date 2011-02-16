@@ -220,7 +220,7 @@ pseudo_msg_new(size_t pathlen, const char *path) {
  */
 
 void
-pseudo_msg_stat(pseudo_msg_t *msg, const struct stat64 *buf) {
+pseudo_msg_stat(pseudo_msg_t *msg, const PSEUDO_STATBUF *buf) {
 	if (!msg || !buf)
 		return;
 	msg->uid = buf->st_uid;
@@ -233,7 +233,7 @@ pseudo_msg_stat(pseudo_msg_t *msg, const struct stat64 *buf) {
 }
 
 void
-pseudo_stat_msg(struct stat64 *buf, const pseudo_msg_t *msg) {
+pseudo_stat_msg(PSEUDO_STATBUF *buf, const pseudo_msg_t *msg) {
 	if (!msg || !buf)
 		return;
 	buf->st_uid = msg->uid;

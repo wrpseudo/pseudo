@@ -105,9 +105,13 @@ pseudo_server_write_pid(pid_t pid) {
 
 int
 pseudo_server_start(int daemonize) {
-	struct sockaddr_un sun = { AF_UNIX, PSEUDO_SOCKET };
+	struct sockaddr_un sun = { .sun_family = AF_UNIX, .sun_path = PSEUDO_SOCKET };
 	char *pseudo_path;
 	int rc, newfd;
+
+#if PSEUDO_PORT_DARWIN
+	sun.sun_len = strlen(PSEUDO_SOCKET) + 1;
+#endif
 
 	listen_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (listen_fd < 0) {

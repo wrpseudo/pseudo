@@ -56,6 +56,7 @@ static int _libpseudo_initted = 0;
 
 static void
 _libpseudo_init(void) {
+	pseudo_diag("starting libpseudo_init, antimagic %d\n", antimagic);
 	pseudo_getlock();
 	pseudo_antimagic();
 	_libpseudo_initted = 1;
@@ -66,6 +67,7 @@ _libpseudo_init(void) {
 
 	pseudo_magic();
 	pseudo_droplock();
+	pseudo_diag("finished libpseudo_init, antimagic %d\n", antimagic);
 }
 
 void
@@ -78,6 +80,7 @@ pseudo_init_wrappers(void) {
 	int i;
 	static int done = 0;
 
+	pseudo_diag("starting init_wrappers, antimagic %d\n", antimagic);
 	pseudo_getlock();
 	pseudo_antimagic();
 
@@ -110,6 +113,7 @@ pseudo_init_wrappers(void) {
 
 	pseudo_magic();
 	pseudo_droplock();
+	pseudo_diag("finished init_wrappers, antimagic %d\n", antimagic);
 }
 
 static void

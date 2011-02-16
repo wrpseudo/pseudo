@@ -3,26 +3,19 @@ int open(const char *path, int flags, ...{int mode}); /* flags=0 */
 char *getcwd(char *buf, size_t size);
 char *getwd(char *buf);
 char *get_current_dir_name(void);
-int close(int fd);
 int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
 int rename(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
 int unlink(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
-int creat(const char *path, mode_t mode);
-int xstat(const char *path, struct stat *buf);
-int lxstat(const char *path, struct stat *buf); /* flags=AT_SYMLINK_NOFOLLOW */
-int fxstat(int fd, struct stat *buf);
+int stat(const char *path, struct stat *buf);
+int lstat(const char *path, struct stat *buf); /* flags=AT_SYMLINK_NOFOLLOW */
+int fstat(int fd, struct stat *buf);
 int chmod(const char *path, mode_t mode);
-int fchmod(int fd, mode_t mode);
 int chown(const char *path, uid_t owner, gid_t group);
-int fchown(int fd, uid_t owner, gid_t group);
 int lchown(const char *path, uid_t owner, gid_t group); /* flags=AT_SYMLINK_NOFOLLOW */
 int mknod(const char *path, mode_t mode, dev_t dev); /* flags=AT_SYMLINK_NOFOLLOW */
-int dup2(int oldfd, int newfd);
-int dup(int fd);
 int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
 int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
 int chdir(const char *path);
-int fchdir(int dirfd);
 int fcntl(int fd, int cmd, ...{struct flock *lock});
 # just so we know the inums of symlinks
 int symlink(const char *oldname, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
@@ -31,24 +24,6 @@ FILE *fopen(const char *path, const char *mode);
 int fclose(FILE *fp);
 FILE *freopen(const char *path, const char *mode, FILE *stream);
 int mkstemp(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
-# I bet you never knew there were this many of these!
-int setfsuid(uid_t fsuid);
-int setfsgid(gid_t fsgid);
-int seteuid(uid_t euid);
-int setegid(gid_t egid);
-uid_t getuid(void);
-uid_t geteuid(void);
-gid_t getgid(void);
-gid_t getegid(void);
-int setresuid(uid_t ruid, uid_t euid, uid_t suid);
-int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
-int setuid(uid_t uid);
-int setgid(gid_t gid);
-int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
-int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
-int setreuid(uid_t ruid, uid_t euid);
-int setregid(gid_t rgid, gid_t egid);
-int setgroups(int size, const gid_t *list);
 # primarily for use with chroot()
 int chroot(const char *path);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */

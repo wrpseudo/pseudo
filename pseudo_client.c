@@ -605,7 +605,7 @@ client_spawn_server(void) {
 
 		pseudo_set_value("PSEUDO_RELOADED", "YES");
 		pseudo_setupenv();
-		pseudo_dropenv(); /* drop LD_PRELOAD */
+		pseudo_dropenv(); /* drop PRELINK_LIBRARIES */
 
 		pseudo_debug(4, "calling execv on %s\n", argv[0]);
 
@@ -685,6 +685,10 @@ client_connect(void) {
 	/* we have a server pid, is it responsive? */
 	struct sockaddr_un sun = { .sun_family = AF_UNIX, .sun_path = PSEUDO_SOCKET };
 	int cwd_fd;
+
+#if PSEUDO_PORT_DARWIN
+	sun.sun_len = strlen(PSEUDO_SOCKET) + 1;
+#endif
 
 	connect_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	connect_fd = pseudo_fd(connect_fd, MOVE_FD);
@@ -964,7 +968,7 @@ base_path(int dirfd, const char *path, int leave_last) {
 }
 
 pseudo_msg_t *
-pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat64 *buf, ...) {
+pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const PSEUDO_STATBUF *buf, ...) {
 	pseudo_msg_t *result = 0;
 	pseudo_msg_t msg = { .type = PSEUDO_MSG_OP };
 	size_t pathlen = -1;

@@ -7,7 +7,7 @@
  *	int rc = -1;
  */
 	struct stat buf;
-	if (real___lxstat(_STAT_VER, path, &buf) == -1) {
+	if (real_lstat(path, &buf) == -1) {
 		errno = ENOENT;
 		return -1;
 	}

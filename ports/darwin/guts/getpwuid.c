@@ -2,11 +2,11 @@
  * Copyright (c) 2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * int lxstat(const char *path, struct stat *buf)
- *	int rc = -1;
+ * struct passwd *getpwuid(uid_t uid)
+ *	struct passwd *rc = NULL;
  */
 
-	rc = real_lxstat(path, buf);
+	rc = real_getpwuid(uid);
 
 /*	return rc;
  * }

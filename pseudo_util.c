@@ -204,7 +204,7 @@ static ssize_t pseudo_sys_max_pathlen = -1;
  * libc.so -- this forces rebuilds of the library when the C library
  * changes.  The problem is that the pseudo binary may be
  * a prebuilt, in which case it doesn't know about CHECKSUM, so it
- * has to determine whether a given LD_PRELOAD contains libpseudo.so
+ * has to determine whether a given PRELINK_LIBRARIES contains libpseudo.so
  * or libpseudoCHECKSUM.so, without prior knowledge... Fancy!
  * 
  * We search for anything matching libpseudo*.so, where * is any
@@ -255,7 +255,7 @@ libpseudo_regex_init(void) {
 	return rc;
 }
 
-/* given a space-separated list of files, ala LD_PRELOAD, return that
+/* given a space-separated list of files, ala PRELINK_LIBRARIES, return that
  * list without any variants of libpseudo*.so.
  */
 static char *
@@ -630,17 +630,17 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
  * we don't try to fix the library path.
  */
 void pseudo_dropenv() {
-	char * ld_preload = getenv("LD_PRELOAD");
+	char * ld_preload = getenv(PRELINK_LIBRARIES);
 
 	if (ld_preload) {
 		ld_preload = without_libpseudo(ld_preload);
 		if (!ld_preload) {
-			pseudo_diag("fatal: can't allocate new LD_PRELOAD variable.\n");
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
 		}
 		if (ld_preload && strlen(ld_preload))
-			setenv("LD_PRELOAD", ld_preload, 1);
+			setenv(PRELINK_LIBRARIES, ld_preload, 1);
 		else
-			unsetenv("LD_PRELOAD");
+			unsetenv(PRELINK_LIBRARIES);
 	}
 }
 
@@ -659,15 +659,15 @@ pseudo_dropenvp(char * const *envp) {
 
 	j = 0;
 	for (i = 0; envp[i]; ++i) {
-		if (STARTSWITH(envp[i], "LD_PRELOAD=")) {
+		if (STARTSWITH(envp[i], PRELINK_LIBRARIES "=")) {
 			char *new_val = without_libpseudo(envp[i]);
 			if (!new_val) {
 				pseudo_diag("fatal: can't allocate new environment variable.\n");
 				return 0;
 			} else {
 				/* don't keep an empty value; if the whole string is
-				 * LD_PRELOAD=, we just drop it. */
-				if (strcmp(new_val, "LD_PRELOAD=")) {
+				 * PRELINK_LIRBARIES=, we just drop it. */
+				if (strcmp(new_val, PRELINK_LIBRARIES "=")) {
 					new_envp[j++] = new_val;
 				}
 			}
@@ -699,35 +699,35 @@ pseudo_setupenv() {
                 i++;
         }
 
-	char * ld_preload = getenv("LD_PRELOAD");
+	char * ld_preload = getenv(PRELINK_LIBRARIES);
 	if (ld_preload) {
 		ld_preload = with_libpseudo(ld_preload);
 		if (!ld_preload) {
-			pseudo_diag("fatal: can't allocate new LD_PRELOAD variable.\n");
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
 		}
-		setenv("LD_PRELOAD", ld_preload, 1);
+		setenv(PRELINK_LIBRARIES, ld_preload, 1);
 	} else {
-		setenv("LD_PRELOAD", libpseudo_name, 1);
+		setenv(PRELINK_LIBRARIES, libpseudo_name, 1);
 	}
 
-	const char *ld_library_path = getenv("LD_LIBRARY_PATH");
+	const char *ld_library_path = getenv(PRELINK_PATH);
 	char * libdir_path = pseudo_libdir_path(NULL);
 	if (!ld_library_path) {
 		size_t len = strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
 		char *newenv = malloc(len);
 		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_PATH);
 		}
 		snprintf(newenv, len, "%s:%s64", libdir_path, libdir_path);
-		setenv("LD_LIBRARY_PATH", newenv, 1);
+		setenv(PRELINK_PATH, newenv, 1);
 	} else if (!strstr(ld_library_path, libdir_path)) {
 		size_t len = strlen(ld_library_path) + 1 + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
 		char *newenv = malloc(len);
 		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_PATH);
 		}
 		snprintf(newenv, len, "%s:%s:%s64", ld_library_path, libdir_path, libdir_path);
-		setenv("LD_LIBRARY_PATH", newenv, 1);
+		setenv(PRELINK_PATH, newenv, 1);
 	} else {
 		/* nothing to do, ld_library_path exists and contains
 		 * our preferred path */
@@ -760,10 +760,10 @@ pseudo_setupenvp(char * const *envp) {
 	free(pseudo_get_localstatedir());
 
 	for (i = 0; envp[i]; ++i) {
-		if (STARTSWITH(envp[i], "LD_PRELOAD=")) {
+		if (STARTSWITH(envp[i], PRELINK_LIBRARIES "=")) {
 			ld_preload = envp[i];
 		}
-		if (STARTSWITH(envp[i], "LD_LIBRARY_PATH=")) {
+		if (STARTSWITH(envp[i], PRELINK_PATH "=")) {
 			ld_library_path = envp[i];
 		}
 		++env_count;
@@ -785,30 +785,30 @@ pseudo_setupenvp(char * const *envp) {
 	if (ld_preload) {
 		ld_preload = with_libpseudo(ld_preload);
 		if (!ld_preload) {
-			pseudo_diag("fatal: can't allocate new LD_PRELOAD variable.\n");
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
 		}
 		new_envp[j++] = ld_preload;
 	} else {
-		size_t len = strlen("LD_PRELOAD=") + strlen(libpseudo_name) + 1;
+		size_t len = strlen(PRELINK_LIBRARIES "=") + strlen(libpseudo_name) + 1;
 		char *newenv = malloc(len);
-		snprintf(newenv, len, "LD_PRELOAD=%s", libpseudo_name);
+		snprintf(newenv, len, PRELINK_LIBRARIES "=%s", libpseudo_name);
 		new_envp[j++] = newenv;
 	}
 
 	char *libdir_path = pseudo_libdir_path(NULL);
 	if (!ld_library_path) {
-		size_t len = strlen("LD_LIBRARY_PATH=") + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
+		size_t len = strlen(PRELINK_PATH "=") + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
 		char *newenv = malloc(len);
 		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_PATH);
 		}
-		snprintf(newenv, len, "LD_LIBRARY_PATH=%s:%s64", libdir_path, libdir_path);
+		snprintf(newenv, len, PRELINK_PATH "=%s:%s64", libdir_path, libdir_path);
 		new_envp[j++] = newenv;
 	} else if (!strstr(ld_library_path, libdir_path)) {
 		size_t len = strlen(ld_library_path) + 1 + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
 		char *newenv = malloc(len);
 		if (!newenv) {
-			pseudo_diag("fatal: can't allocate new LD_LIBRARY_PATH variable.\n");
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_PATH);
 		}
 		snprintf(newenv, len, "%s:%s:%s64", ld_library_path, libdir_path, libdir_path);
 		new_envp[j++] = newenv;
@@ -819,8 +819,8 @@ pseudo_setupenvp(char * const *envp) {
 	free(libdir_path);
 
 	for (i = 0; envp[i]; ++i) {
-		if (STARTSWITH(envp[i], "LD_PRELOAD=")) continue;
-		if (STARTSWITH(envp[i], "LD_LIBRARY_PATH=")) continue;
+		if (STARTSWITH(envp[i], PRELINK_LIBRARIES "=")) continue;
+		if (STARTSWITH(envp[i], PRELINK_PATH "=")) continue;
 		new_envp[j++] = envp[i];
 	}
 

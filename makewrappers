@@ -396,6 +396,11 @@ additional ports to include.
 	else:
 	    self.wrappers = None
 
+	if os.path.exists(self.portfile("portdefs.h")):
+	    self.portdef_file = self.portfile("portdefs.h")
+	else:
+	    self.portdef_file = None
+
 	if os.path.exists(self.portfile("wrapfuncs.in")):
 	    self.funcs = process_wrapfuncs(port)
 	else:
@@ -442,6 +447,12 @@ additional ports to include.
 
     def define(self):
         return '#define PSEUDO_PORT_%s 1' % string.upper(self.name)
+
+    def portdefs(self):
+	if self.portdef_file:
+	    return '#include "%s"' % self.portdef_file
+	else:
+	    return '/* no portdefs for %s */' % self.name
 
     def include(self):
 	if self.wrappers:

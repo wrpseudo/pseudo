@@ -6,12 +6,12 @@
  * wrap_access(const char *path, int mode) {
  *	int rc = -1;
  */
-	struct stat64 buf;
+	struct stat buf;
 
 	/* note:  no attempt to handle the case where user isn't
 	 * root.
 	 */
-	rc = wrap___fxstatat64(_STAT_VER, AT_FDCWD, path, &buf, 0);
+	rc = wrap_stat(path, &buf);
 	if (rc == -1)
 		return rc;
 

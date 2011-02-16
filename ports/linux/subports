@@ -25,4 +25,3 @@ rm -f dummy.c dummy.o
 if ! $found; then
 	echo >&2 "Can't tell, omitting clone(2) support."
 fi
-echo "uids_generic"

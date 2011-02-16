@@ -2,11 +2,11 @@
  * Copyright (c) 2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * int fchdir(int dirfd)
- *	int rc = -1;
+ * struct passwd *getpwnam(const char *name)
+ *	struct passwd *rc = NULL;
  */
 
-	rc = real_fchdir(dirfd);
+	rc = real_getpwnam(name);
 
 /*	return rc;
  * }
