@@ -6,6 +6,9 @@
  *	int rc = -1;
  */
 
+	/* suppress warnings */
+	(void) pathname;
+	(void) name;
 	errno = ENOTSUP;
 
 /*	return rc;

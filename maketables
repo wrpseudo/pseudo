@@ -108,15 +108,20 @@ class DataType:
             return attr
 
     def __repr__(self):
+        column = 0
         out = ""
         out += "type: %s_t" % self.name
-        out += " %s_ENUM\n" % self.prefix
+        out += " (prefix '%s_ENUM')\n" % self.prefix
         for col in self.columns:
-            out += "\tcol: %s (%s)\n" % (col["name"], col["value"])
+            out += "  extra column: %s (default '%s')\n" % (col["name"], col["value"])
+        out += "   "
         for item in self.data:
-            out += "item: %s\n" % item["name"]
-            for col in item["cols"]:
-                out += "\t%s(%s)\n" % (col["name"], col["value"])
+            column = column + 1
+            if column > 4 and column % 4 == 1:
+                out += "\n   "
+            out += "%-19s" % item["name"]
+#            for col in item["cols"]:
+#                out += "\t%s(%s)\n" % (col["name"], col["value"])
         return out
 
     def comment(self):

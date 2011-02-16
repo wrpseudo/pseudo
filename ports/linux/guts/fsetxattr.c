@@ -6,6 +6,12 @@
  *	int rc = -1;
  */
 
+	/* suppress warnings */
+	(void) filedes;
+	(void) name;
+	(void) value;
+	(void) size;
+	(void) flags;
 	errno = ENOTSUP;
 
 /*	return rc;

@@ -209,8 +209,8 @@ class Function:
     
         self.dirfd = 'AT_FDCWD'
         self.flags = '0'
-	self.port = port
-	self.directory = ''
+        self.port = port
+        self.directory = ''
         self.paths_to_munge = []
         self.hand_wrapped = None
         # used for the copyright date when creating stub functions
@@ -270,20 +270,20 @@ class Function:
                 setattr(self, key, value)
     
     def end_maybe_skip(self):
-	if self.hand_wrapped:
-	    return """/* Hand-written wrapper for this function. */
+        if self.hand_wrapped:
+            return """/* Hand-written wrapper for this function. */
 #endif
 """
-	else:
-	    return ""
+        else:
+            return ""
 
     def maybe_skip(self):
-	if self.hand_wrapped:
-	    return """/* Hand-written wrapper for this function. */
+        if self.hand_wrapped:
+            return """/* Hand-written wrapper for this function. */
 #if 0
 """
-	else:
-	    return ""
+        else:
+            return ""
 
     def comment(self):
         """declare self (in a comment)"""
@@ -387,88 +387,94 @@ additional ports to include.
 """
 
     def __init__(self, port, sources):
-	self.name = port
-	self.subports = []
-	self.preports = []
+        self.name = port
+        self.subports = []
+        self.preports = []
 
-	if os.path.exists(self.portfile("pseudo_wrappers.c")):
-	    self.wrappers = self.portfile("pseudo_wrappers.c")
-	else:
-	    self.wrappers = None
+        if os.path.exists(self.portfile("pseudo_wrappers.c")):
+            self.wrappers = self.portfile("pseudo_wrappers.c")
+        else:
+            self.wrappers = None
 
-	if os.path.exists(self.portfile("portdefs.h")):
-	    self.portdef_file = self.portfile("portdefs.h")
-	else:
-	    self.portdef_file = None
+        if os.path.exists(self.portfile("portdefs.h")):
+            self.portdef_file = self.portfile("portdefs.h")
+        else:
+            self.portdef_file = None
 
-	if os.path.exists(self.portfile("wrapfuncs.in")):
-	    self.funcs = process_wrapfuncs(port)
-	else:
-	    self.funcs = {}
+        if os.path.exists(self.portfile("wrapfuncs.in")):
+            self.funcs = process_wrapfuncs(port)
+        else:
+            self.funcs = {}
 
-	for source in sources:
-	    source.emit('port', self)
+        for source in sources:
+            source.emit('port', self)
 
-	if os.path.exists(self.portfile("preports")):
-	    subport_proc = subprocess.Popen([self.portfile("preports"), self.name], stdout=subprocess.PIPE)
-	    portlist = subport_proc.communicate()[0]
-	    retcode = subport_proc.poll()
-	    if retcode:
-		raise Exception("preports script failed for port %s" % self.name)
+        if os.path.exists(self.portfile("preports")):
+            subport_proc = subprocess.Popen([self.portfile("preports"), self.name], stdout=subprocess.PIPE)
+            portlist = subport_proc.communicate()[0]
+            retcode = subport_proc.poll()
+            if retcode:
+                raise Exception("preports script failed for port %s" % self.name)
 
-	    for preport in string.split(portlist):
-		next = Port(preport, sources)
-		self.preports.append(next)
+            for preport in string.split(portlist):
+                next = Port(preport, sources)
+                self.preports.append(next)
 
-	if os.path.exists(self.portfile("subports")):
-	    subport_proc = subprocess.Popen([self.portfile("subports"), self.name], stdout=subprocess.PIPE)
-	    portlist = subport_proc.communicate()[0]
-	    retcode = subport_proc.poll()
-	    if retcode:
-		raise Exception("subports script failed for port %s" % self.name)
+        if os.path.exists(self.portfile("subports")):
+            subport_proc = subprocess.Popen([self.portfile("subports"), self.name], stdout=subprocess.PIPE)
+            portlist = subport_proc.communicate()[0]
+            retcode = subport_proc.poll()
+            if retcode:
+                raise Exception("subports script failed for port %s" % self.name)
 
-	    for subport in string.split(portlist):
-		next = Port(subport, sources)
-		self.subports.append(next)
+            for subport in string.split(portlist):
+                next = Port(subport, sources)
+                self.subports.append(next)
 
     def functions(self):
-	mergedfuncs = {}
-	for pre in self.preports:
-	    prefuncs = pre.functions()
-	    for name in prefuncs.keys():
-		mergedfuncs[name] = prefuncs[name]
-	for name in self.funcs.keys():
-	    mergedfuncs[name] = self.funcs[name]
-	for sub in self.subports:
-	    subfuncs = sub.functions()
-	    for name in subfuncs.keys():
-		mergedfuncs[name] = subfuncs[name]
-	return mergedfuncs
+        mergedfuncs = {}
+        for pre in self.preports:
+            prefuncs = pre.functions()
+            for name in prefuncs.keys():
+                if name in mergedfuncs:
+                    print "Warning: %s from %s overriding %s" % (name, pre.name, mergedfuncs[name].port)
+                mergedfuncs[name] = prefuncs[name]
+        for name in self.funcs.keys():
+            if name in mergedfuncs:
+                print "Warning: %s from %s overriding %s" % (name, self.name, mergedfuncs[name].port)
+            mergedfuncs[name] = self.funcs[name]
+        for sub in self.subports:
+            subfuncs = sub.functions()
+            for name in subfuncs.keys():
+                if name in mergedfuncs:
+                    print "Warning: %s from %s overriding %s" % (name, sub.name, mergedfuncs[name].port)
+                mergedfuncs[name] = subfuncs[name]
+        return mergedfuncs
 
     def define(self):
         return '#define PSEUDO_PORT_%s 1' % string.upper(self.name)
 
     def portdefs(self):
-	if self.portdef_file:
-	    return '#include "%s"' % self.portdef_file
-	else:
-	    return '/* no portdefs for %s */' % self.name
+        if self.portdef_file:
+            return '#include "%s"' % self.portdef_file
+        else:
+            return '/* no portdefs for %s */' % self.name
 
     def include(self):
-	if self.wrappers:
-	    return '#include "%s"' % self.wrappers
-	else:
-	    return '/* no #include for %s */' % self.name
+        if self.wrappers:
+            return '#include "%s"' % self.wrappers
+        else:
+            return '/* no #include for %s */' % self.name
 
     def portfile(self, name):
-	return "ports/%s/%s" % (self.name, name)
+        return "ports/%s/%s" % (self.name, name)
 
     def __getitem__(self, key):
         """Make this object look like a dict for Templates to use"""
         try:
             attr = getattr(self, key)
         except AttributeError:
-	    return None
+            return None
 
         if callable(attr):
             return attr()
@@ -484,17 +490,17 @@ def process_wrapfuncs(port):
     sys.stdout.write("%s: " % filename)
     funclist = open(filename)
     for line in funclist:
-	line = line.rstrip()
-	if line.startswith('#') or not line:
-	    continue
-	try:
-	    func = Function(port, line)
-	    func.directory = directory
-	    funcs[func.name] = func
-	    sys.stdout.write(".")
-	except Exception, e:
-	    print "Parsing failed:", e
-	    exit(1)
+        line = line.rstrip()
+        if line.startswith('#') or not line:
+            continue
+        try:
+            func = Function(port, line)
+            func.directory = directory
+            funcs[func.name] = func
+            sys.stdout.write(".")
+        except Exception, e:
+            print "Parsing failed:", e
+            exit(1)
     funclist.close()
     print ""
     return funcs
@@ -504,12 +510,12 @@ def main():
     funcs = []
     sources = []
     host_ports = {
-	'Darwin': 'darwin',
-	'Linux': 'linux'
+        'Darwin': 'darwin',
+        'Linux': 'linux'
     }
     host_descrs = {
-	'darwin': 'Mac OS X (Snow Leopard only)',
-	'linux': 'Linux systems (recent glibc/kernel)'
+        'darwin': 'Mac OS X (Snow Leopard only)',
+        'linux': 'Linux systems (recent glibc/kernel)'
     }
 
     # error checking helpfully provided by the exception handler
@@ -528,15 +534,15 @@ def main():
             exit(1)
 
     try:
-	port = Port('common', sources)
+        port = Port('common', sources)
 
     except KeyError:
         print "Unknown uname -s result: '%s'." % uname_s
-	print "Known system types are:"
-	print "%-20s %-10s %s" % ("uname -s", "port name", "description")
-	for key in host_ports:
-	    print "%-20s %-10s %s" % (key, host_ports[key],
-	                              host_descrs[host_ports[key]])
+        print "Known system types are:"
+        print "%-20s %-10s %s" % ("uname -s", "port name", "description")
+        for key in host_ports:
+            print "%-20s %-10s %s" % (key, host_ports[key],
+                                      host_descrs[host_ports[key]])
 
     # the per-function stuff
     print "Writing functions...",

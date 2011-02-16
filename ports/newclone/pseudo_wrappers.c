@@ -2,6 +2,11 @@ static int
 wrap_clone(int (*fn)(void *), void *child_stack, int flags, void *arg, va_list
 ap) {
 	/* unused */
+	(void) fn;
+	(void) child_stack;
+	(void) flags;
+	(void) arg;
+	(void) ap;
 	return 0;
 }
 

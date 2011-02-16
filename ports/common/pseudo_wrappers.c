@@ -3,16 +3,25 @@
  */
 static int
 wrap_execl(const char *file, const char *arg, va_list ap) {
+	(void) file;
+	(void) arg;
+	(void) ap;
 	return 0; 
 }
 
 static int
 wrap_execle(const char *file, const char *arg, va_list ap) {
+	(void) file;
+	(void) arg;
+	(void) ap;
 	return 0;
 }
 
 static int
 wrap_execlp(const char *file, const char *arg, va_list ap) {
+	(void) file;
+	(void) arg;
+	(void) ap;
 	return 0;
 }
 

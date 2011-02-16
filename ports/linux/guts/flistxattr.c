@@ -6,6 +6,10 @@
  *	ssize_t rc = -1;
  */
 
+	/* suppress warnings */
+	(void) filedes;
+	(void) list;
+	(void) size;
 	errno = ENOTSUP;
 
 /*	return rc;

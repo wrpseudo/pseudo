@@ -6,6 +6,11 @@
  *	ssize_t rc = -1;
  */
 
+	/* suppress warnings */
+	(void) pathname;
+	(void) name;
+	(void) value;
+	(void) size;
 	errno = ENOTSUP;
 
 /*	return rc;

@@ -305,6 +305,8 @@ with_libpseudo(char *list, char *libdir_path) {
 		/* <%s:%s/%s\0> */
 		len = strlen(list) + 1 + strlen(libdir_path) + 1 + strlen(libpseudo_name) + 1;
 #else
+		/* suppress warning */
+		(void) libdir_path;
 		/* <%s %s\0> */
 		len = strlen(list) + 1 + strlen(libpseudo_name) + 1;
 #endif
