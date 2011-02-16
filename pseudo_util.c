@@ -213,7 +213,11 @@ static ssize_t pseudo_sys_max_pathlen = -1;
  * the end of the string or a space after it.
  */
 static char *libpseudo_name = "libpseudo.so";
+#if PSEUDO_PORT_DARWIN
+static char *libpseudo_pattern = "(^|=| )[^ ]*libpseudo[^ ]*\\.so($| )";
+#else
 static char *libpseudo_pattern = "(^|=| )libpseudo[^ ]*\\.so($| )";
+#endif
 static regex_t libpseudo_regex;
 static int libpseudo_regex_compiled = 0;
 
@@ -290,17 +294,37 @@ without_libpseudo(char *list) {
 }
 
 static char *
-with_libpseudo(char *list) {
+with_libpseudo(char *list, char *libdir_path) {
 	regmatch_t pmatch[1];
+
 	if (libpseudo_regex_init())
 		return NULL;
 	if ((*real_regexec)(&libpseudo_regex, list, 1, pmatch, 0)) {
+		size_t len;
+#if PSEUDO_PORT_DARWIN
+		/* <%s:%s/%s\0> */
+		len = strlen(list) + 1 + strlen(libdir_path) + 1 + strlen(libpseudo_name) + 1;
+#else
 		/* <%s %s\0> */
-		size_t len = strlen(list) + 1 + strlen(libpseudo_name) + 1;
+		len = strlen(list) + 1 + strlen(libpseudo_name) + 1;
+#endif
 		char *new = malloc(len);
-		if (new)
-			snprintf(new, len, "%s %s", list,
+		if (new) {
+			/* insert space only if there were previous bits */
+			/* on Darwin, we have to provide the full path to
+			 * libpseudo
+			 */
+#if PSEUDO_PORT_DARWIN
+			snprintf(new, len, "%s%s%s/%s", list,
+				*list ? ":" : "",
+				libdir_path ? libdir_path : "",
 				libpseudo_name);
+#else
+			snprintf(new, len, "%s%s%s", list,
+				*list ? " " : "",
+				libpseudo_name);
+#endif
+		}
 		return new;
 	} else {
 		return list;
@@ -698,17 +722,6 @@ pseudo_setupenv() {
                 i++;
         }
 
-	char * ld_preload = getenv(PRELINK_LIBRARIES);
-	if (ld_preload) {
-		ld_preload = with_libpseudo(ld_preload);
-		if (!ld_preload) {
-			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
-		}
-		setenv(PRELINK_LIBRARIES, ld_preload, 1);
-	} else {
-		setenv(PRELINK_LIBRARIES, libpseudo_name, 1);
-	}
-
 	const char *ld_library_path = getenv(PRELINK_PATH);
 	char * libdir_path = pseudo_libdir_path(NULL);
 	if (!ld_library_path) {
@@ -731,7 +744,36 @@ pseudo_setupenv() {
 		/* nothing to do, ld_library_path exists and contains
 		 * our preferred path */
 	}
+
+	char * ld_preload = getenv(PRELINK_LIBRARIES);
+	if (ld_preload) {
+		ld_preload = with_libpseudo(ld_preload, libdir_path);
+		if (!ld_preload) {
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
+		}
+		setenv(PRELINK_LIBRARIES, ld_preload, 1);
+		free(ld_preload);
+	} else {
+		ld_preload = with_libpseudo("", libdir_path);
+		if (!ld_preload) {
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
+		}
+		setenv(PRELINK_LIBRARIES, ld_preload, 1);
+		free(ld_preload);
+	}
+
+	/* we kept libdir path until now because with_libpseudo might
+	 * need it
+	 */
 	free(libdir_path);
+
+
+#if PSEUDO_PORT_DARWIN
+	char *force_flat = getenv("DYLD_FORCE_FLAT_NAMESPACE");
+	if (!force_flat) {
+		setenv("DYLD_FORCE_FLAT_NAMESPACE", "1", 1);
+	}
+#endif
 }
 
 /* add pseudo stuff to the environment.
@@ -781,19 +823,6 @@ pseudo_setupenvp(char * const *envp) {
 		return NULL;
 	}	
 
-	if (ld_preload) {
-		ld_preload = with_libpseudo(ld_preload);
-		if (!ld_preload) {
-			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
-		}
-		new_envp[j++] = ld_preload;
-	} else {
-		size_t len = strlen(PRELINK_LIBRARIES "=") + strlen(libpseudo_name) + 1;
-		char *newenv = malloc(len);
-		snprintf(newenv, len, PRELINK_LIBRARIES "=%s", libpseudo_name);
-		new_envp[j++] = newenv;
-	}
-
 	char *libdir_path = pseudo_libdir_path(NULL);
 	if (!ld_library_path) {
 		size_t len = strlen(PRELINK_PATH "=") + strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
@@ -815,6 +844,22 @@ pseudo_setupenvp(char * const *envp) {
 		/* keep old value */
 		new_envp[j++] = ld_library_path;
 	}
+
+	if (ld_preload) {
+		ld_preload = with_libpseudo(ld_preload, libdir_path);
+		if (!ld_preload) {
+			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
+		}
+		new_envp[j++] = ld_preload;
+	} else {
+		ld_preload = with_libpseudo("", libdir_path);
+		size_t len = strlen(PRELINK_LIBRARIES "=") + strlen(ld_preload) + 1;
+		char *newenv = malloc(len);
+		snprintf(newenv, len, PRELINK_LIBRARIES "=%s", ld_preload);
+		new_envp[j++] = newenv;
+		free(ld_preload);
+	}
+
 	free(libdir_path);
 
 	for (i = 0; envp[i]; ++i) {
@@ -1020,12 +1065,16 @@ char *
 pseudo_get_libdir() {
 	char *s = pseudo_get_value("PSEUDO_LIBDIR");
 	if (!s) {
-		char *pseudo_libdir = pseudo_prefix_path(PSEUDO_LIBDIR);
+		char *pseudo_libdir;
+		pseudo_libdir = pseudo_prefix_path(PSEUDO_LIBDIR);
 		if (pseudo_libdir) {
 			pseudo_set_value("PSEUDO_LIBDIR", pseudo_libdir);
 			s = pseudo_libdir;
 		}
 	}
+#if PSEUDO_PORT_DARWIN
+	/* on Darwin, we need lib64, because dyld won't search */
+#else
 	/* If we somehow got lib64 in there, clean it down to just lib... */
 	if (s) {
 		size_t len = strlen(s);
@@ -1034,6 +1083,7 @@ pseudo_get_libdir() {
 			pseudo_set_value("PSEUDO_LIBDIR", s);
 		}
 	}
+#endif
 
 	return s;
 }

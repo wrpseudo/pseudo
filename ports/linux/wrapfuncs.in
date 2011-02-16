@@ -74,3 +74,9 @@ int truncate64(const char *path, off64_t length);
 int mkstemp64(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
 int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
 int setgroups(size_t size, const gid_t *list);
+int setfsgid(gid_t fsgid);
+int setfsuid(uid_t fsuid);
+int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
+int setresuid(uid_t ruid, uid_t euid, uid_t suid);
+int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
+int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);

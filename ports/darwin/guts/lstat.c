@@ -7,7 +7,6 @@
  */
 
 	pseudo_msg_t *msg;
-	int save_errno;
 
 	rc = real_lstat(path, buf);
 	if (rc == -1) {
@@ -22,8 +21,6 @@
 	if (msg) {
 		pseudo_stat_msg(buf, msg);
 	}
-
-	errno = save_errno;
 
 /*	return rc;
  * }

@@ -2,7 +2,6 @@
 int open(const char *path, int flags, ...{int mode}); /* flags=0 */
 char *getcwd(char *buf, size_t size);
 char *getwd(char *buf);
-char *get_current_dir_name(void);
 int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
 int rename(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
 int unlink(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
@@ -29,9 +28,6 @@ int chroot(const char *path);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
 int access(const char *path, int mode);
 int acct(const char *path);
-char *canonicalize_file_name(const char *filename);
-int eaccess(const char *path, int mode);
-int euidaccess(const char *path, int mode);
 FTS *fts_open(char * const *path_argv, int options, int (*compar)(const FTSENT **, const FTSENT **));
 int ftw(const char *path, int (*fn)(const char *, const struct stat *, int), int nopenfd);
 int nftw(const char *path, int (*fn)(const char *, const struct stat *, int, struct FTW *), int nopenfd, int flag);
@@ -39,7 +35,6 @@ int glob(const char *pattern, int flags, int (*errfunc)(const char *, int), glob
 int lutimes(const char *path, const struct timeval *tv);
 char *mkdtemp(char *template);
 int mkfifo(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
-int mkfifoat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
 char *mktemp(char *template);
 long pathconf(const char *path, int name);
 char *realpath(const char *name, char *resolved_name);
@@ -56,19 +51,14 @@ struct passwd *getpwnam(const char *name);
 struct passwd *getpwuid(uid_t uid);
 int getpwnam_r(const char *name, struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp);
 int getpwuid_r(uid_t uid, struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp);
-int getpwent_r(struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp);
 struct passwd *getpwent(void);
 void setpwent(void);
 void endpwent(void);
-int lckpwdf(void);
-int ulckpwdf(void);
-int getpw(uid_t uid, char *buf);
 struct group *getgrnam(const char *name);
 struct group *getgrgid(gid_t gid);
 int getgrnam_r(const char *name, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp);
 int getgrgid_r(gid_t gid, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp);
 struct group *getgrent(void);
-int getgrent_r(struct group *gbuf, char *buf, size_t buflen, struct group **gbufp);
 void setgrent(void);
 void endgrent(void);
 int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
@@ -76,18 +66,12 @@ int getgroups(int size, gid_t *list);
 # we use "pathname" to avoid canonicalizing paths, because these functions are
 # unimplemented
 ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size);
-ssize_t lgetxattr(const char *pathname, const char *name, void *value, size_t size);
 ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size);
 ssize_t listxattr(const char *pathname, char *list, size_t size);
-ssize_t llistxattr(const char *pathname, char *list, size_t size);
 ssize_t flistxattr(int filedes, char *list, size_t size);
 int setxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
-int lsetxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
 int fsetxattr(int filedes, const char *name, const void *value, size_t size, int flags);
 int removexattr(const char *pathname, const char *name);
-int lremovexattr(const char *pathname, const char *name);
 int fremovexattr(int filedes, const char *name);
 # local color UIDs
 int getgrouplist(const char *name, int basegid, int *groups, int *ngroups);
-int fgetgrent_r(FILE *fp, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp);
-int fgetpwent_r(FILE *fp, struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp);
