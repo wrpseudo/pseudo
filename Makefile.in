@@ -111,7 +111,9 @@ $(LIBPSEUDO): $(LIB) $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
 		pseudo_client.o pseudo_ipc.o \
 		$(WRAPOBJS) $(SHOBJS) $(CLIENT_LDFLAGS)
 
-%.o: %.c
+# *everything* now relies on stuff that's generated in the
+# wrapper process.
+%.o: %.c pseudo_wrapfuncs.h
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(CFLAGS_PSEUDO) $<
 
 $(OBJS): pseudo_tables.h
