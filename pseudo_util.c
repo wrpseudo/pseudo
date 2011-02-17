@@ -213,11 +213,10 @@ static ssize_t pseudo_sys_max_pathlen = -1;
  * the end of the string or a space after it.
  */
 static char *libpseudo_name = "libpseudo.so";
-#if PSEUDO_PORT_DARWIN
+/* this used to look for a "libpseudo*.so", but it turns out you can
+ * specify a path even on Linux.
+ */
 static char *libpseudo_pattern = "(^|=| )[^ ]*libpseudo[^ ]*\\.so($| )";
-#else
-static char *libpseudo_pattern = "(^|=| )libpseudo[^ ]*\\.so($| )";
-#endif
 static regex_t libpseudo_regex;
 static int libpseudo_regex_compiled = 0;
 
@@ -259,8 +258,8 @@ libpseudo_regex_init(void) {
 	return rc;
 }
 
-/* given a space-separated list of files, ala PRELINK_LIBRARIES, return that
- * list without any variants of libpseudo*.so.
+/* given a space-or-colon-separated list of files, ala PRELINK_LIBRARIES,
+ # return that list without any variants of libpseudo*.so.
  */
 static char *
 without_libpseudo(char *list) {
@@ -271,7 +270,7 @@ without_libpseudo(char *list) {
 	if (libpseudo_regex_init())
 		return NULL;
 
-	if (list[0] == '=' || list[0] == ' ')
+	if (list[0] == '=' || list[0] == PSEUDO_LINKPATH_SEPARATOR[0])
 		skip_start = 1;
 
 	if ((*real_regexec)(&libpseudo_regex, list, 1, pmatch, 0)) {
@@ -318,18 +317,18 @@ with_libpseudo(char *list, char *libdir_path) {
 			 */
 #if PSEUDO_PORT_DARWIN
 			snprintf(new, len, "%s%s%s/%s", list,
-				*list ? ":" : "",
+				*list ? PSEUDO_LINKPATH_SEPARATOR : "",
 				libdir_path ? libdir_path : "",
 				libpseudo_name);
 #else
 			snprintf(new, len, "%s%s%s", list,
-				*list ? " " : "",
+				*list ? PSEUDO_LINKPATH_SEPARATOR : "",
 				libpseudo_name);
 #endif
 		}
 		return new;
 	} else {
-		return list;
+		return strdup(list);
 	}
 }
 
@@ -655,17 +654,19 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
  * we don't try to fix the library path.
  */
 void pseudo_dropenv() {
-	char * ld_preload = getenv(PRELINK_LIBRARIES);
+	char *ld_preload = getenv(PRELINK_LIBRARIES);
 
 	if (ld_preload) {
 		ld_preload = without_libpseudo(ld_preload);
 		if (!ld_preload) {
 			pseudo_diag("fatal: can't allocate new %s variable.\n", PRELINK_LIBRARIES);
 		}
-		if (ld_preload && strlen(ld_preload))
+		if (ld_preload && strlen(ld_preload)) {
+			pseudo_diag("ld_preload without: <%s>\n", ld_preload);
 			setenv(PRELINK_LIBRARIES, ld_preload, 1);
-		else
+		} else {
 			unsetenv(PRELINK_LIBRARIES);
+		}
 	}
 }
 
@@ -725,7 +726,7 @@ pseudo_setupenv() {
         }
 
 	const char *ld_library_path = getenv(PRELINK_PATH);
-	char * libdir_path = pseudo_libdir_path(NULL);
+	char *libdir_path = pseudo_libdir_path(NULL);
 	if (!ld_library_path) {
 		size_t len = strlen(libdir_path) + 1 + (strlen(libdir_path) + 2) + 1;
 		char *newenv = malloc(len);
@@ -747,7 +748,7 @@ pseudo_setupenv() {
 		 * our preferred path */
 	}
 
-	char * ld_preload = getenv(PRELINK_LIBRARIES);
+	char *ld_preload = getenv(PRELINK_LIBRARIES);
 	if (ld_preload) {
 		ld_preload = with_libpseudo(ld_preload, libdir_path);
 		if (!ld_preload) {
