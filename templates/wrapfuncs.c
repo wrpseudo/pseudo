@@ -13,7 +13,7 @@
  * script if you want to modify this. */
 @body
 
-static ${type} (*real_${name})(${decl_args}) = NULL;
+static ${type} (*real_${name})(${decl_args}) = ${real_init};
 
 ${maybe_skip}
 

@@ -211,6 +211,7 @@ class Function:
         self.flags = '0'
         self.port = port
         self.directory = ''
+        self.real_func = None
         self.paths_to_munge = []
         self.hand_wrapped = None
         # used for the copyright date when creating stub functions
@@ -328,6 +329,18 @@ class Function:
         for path in self.paths_to_munge:
             free_paths.append("free((void *) %s);" % path)
         return "\n\t\t\t".join(free_paths)
+
+    def real_predecl(self):
+    	if self.real_func:
+	    return self.decl().replace(self.name, self.real_func, 1) + ";"
+	else:
+	    return ""
+
+    def real_init(self):
+    	if self.real_func:
+	    return self.real_func
+	else:
+	    return "NULL"
 
     def rc_return(self):
         """return rc (or just return)"""

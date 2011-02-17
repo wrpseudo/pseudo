@@ -8,4 +8,5 @@
 /* ${comment} */
 static ${type} wrap_${name}(${wrap_args});
 static ${type} (*real_${name})(${decl_args});
+${real_predecl}
 @footer

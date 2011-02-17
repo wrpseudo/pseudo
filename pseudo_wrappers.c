@@ -95,8 +95,11 @@ pseudo_init_wrappers(void) {
 					/* leave it NULL, which our implementation checks for */
 					pseudo_diag("No wrapper for %s: %s\n", pseudo_functions[i].name, e);
 				} else {
-					if (f)
+					if (f) {
 						*pseudo_functions[i].real = f;
+					} else {
+						pseudo_diag("no real %s?\n", pseudo_functions[i].name);
+					}
 				}
 			}
 		}
