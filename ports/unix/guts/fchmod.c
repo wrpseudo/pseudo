@@ -17,13 +17,11 @@
 	buf.st_mode = (buf.st_mode & ~07777) | (mode & 07777);
 	msg = pseudo_client_op_plain(OP_FCHMOD, 0, fd, -1, 0, &buf);
 	real_fchmod(fd, PSEUDO_FS_MODE(mode));
-	if (!msg) {
-		errno = ENOSYS;
-		rc = -1;
-	} else if (msg->result != RESULT_SUCCEED) {
+	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;
 	} else {
+		/* just pretend we worked */
 		errno = save_errno;
 		rc = 0;
 	}

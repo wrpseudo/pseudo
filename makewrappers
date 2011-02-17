@@ -452,7 +452,7 @@ additional ports to include.
         return mergedfuncs
 
     def define(self):
-        return '#define PSEUDO_PORT_%s 1' % string.upper(self.name)
+        return '#define PSEUDO_PORT_%s 1' % string.upper(self.name).replace('/', '_')
 
     def portdefs(self):
         if self.portdef_file:

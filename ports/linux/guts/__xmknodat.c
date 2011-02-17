@@ -51,13 +51,11 @@
 			(mode & ~07777);
 	buf.st_rdev = *dev;
 	msg = pseudo_client_op(OP_MKNOD, 0, -1, dirfd, path, &buf);
-	if (!msg) {
-		errno = ENOSYS;
-		rc = -1;
-	} else if (msg->result != RESULT_SUCCEED) {
+	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;
 	} else {
+		/* just pretend we worked */
 		rc = 0;
 	}
 	if (rc == -1) {

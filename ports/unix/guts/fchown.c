@@ -42,13 +42,11 @@
 	pseudo_debug(2, "fchown, fd %d: %d:%d -> %d:%d\n",
 		fd, owner, group, buf.st_uid, buf.st_gid);
 	msg = pseudo_client_op_plain(OP_FCHOWN, 0, fd, -1, 0, &buf);
-	if (!msg) {
-		errno = ENOSYS;
-		rc = -1;
-	} else if (msg->result != RESULT_SUCCEED) {
+	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;
 	} else {
+		/* just pretend we worked */
 		rc = 0;
 	}
 

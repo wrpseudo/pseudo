@@ -64,6 +64,7 @@ size_t pseudo_chroot_len = 0;
 char *pseudo_cwd_rel = NULL;
 /* used for PSEUDO_DISABLED */
 int pseudo_disabled = 0;
+static int pseudo_local_only = 0;
 
 static char **fd_paths = NULL;
 static int nfds = 0;
@@ -121,7 +122,9 @@ pseudo_init_client(void) {
 	 * pseudo (and cause it to reinit the defaults).
 	 */
 	env = getenv("PSEUDO_DISABLED");
-	if (!env) pseudo_get_value("PSEUDO_DISABLED");
+	if (!env) {
+		env = pseudo_get_value("PSEUDO_DISABLED");
+	}
 	if (env) {
 		int actually_disabled = 1;
 		switch (*env) {
@@ -131,6 +134,11 @@ pseudo_init_client(void) {
 		case 'n':
 		case 'N':
 			actually_disabled = 0;
+			break;
+		case 's':
+		case 'S':
+			actually_disabled = 0;
+			pseudo_local_only = 1;
 			break;
 		}
 		if (actually_disabled) {
@@ -1185,7 +1193,12 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		struct timeval tv1, tv2;
 		pseudo_debug(4, "sending request [ino %llu]\n", (unsigned long long) msg.ino);
 		gettimeofday(&tv1, NULL);
-		result = pseudo_client_request(&msg, pathlen, path);
+		if (pseudo_local_only) {
+			/* disable server */
+			result = NULL;
+		} else {
+			result = pseudo_client_request(&msg, pathlen, path);
+		}
 		gettimeofday(&tv2, NULL);
 		++messages;
 		message_time.tv_sec += (tv2.tv_sec - tv1.tv_sec);

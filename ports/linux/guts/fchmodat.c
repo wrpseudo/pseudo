@@ -58,13 +58,11 @@
 
 	buf.st_mode = (buf.st_mode & ~07777) | (mode & 07777);
 	msg = pseudo_client_op(OP_CHMOD, 0, -1, dirfd, path, &buf);
-	if (!msg) {
-		errno = ENOSYS;
-		rc = -1;
-	} else if (msg->result != RESULT_SUCCEED) {
+	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;
 	} else {
+		/* if server is down, just pretend we worked */
 		rc = 0;
 	}
 

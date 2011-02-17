@@ -8,7 +8,7 @@ EOF
 if	cc -c -o dummy.o dummy.c >/dev/null 2>&1; then
 	rm -f dummy.c dummy.o
 	echo >&2 "New clone."
-	echo "newclone"
+	echo "linux/newclone"
 	found=true
 fi
 cat > dummy.c <<EOF
@@ -18,7 +18,7 @@ EOF
 if	! $found && cc -c -o dummy.o dummy.c >/dev/null 2>&1; then
 	rm -f dummy.c dummy.o
 	echo >&2 "Old clone."
-	echo "oldclone"
+	echo "linux/oldclone"
 	found=true
 fi
 rm -f dummy.c dummy.o
