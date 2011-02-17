@@ -10,7 +10,7 @@
 	struct stat buf;
 	int save_errno = errno;
 
-	if (wrap_fstat(fd, &buf) == -1) {
+	if (real_fstat(fd, &buf) == -1) {
 		/* can't stat it, can't chmod it */
 		return -1;
 	}

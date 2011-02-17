@@ -29,7 +29,7 @@
 	if (rc != NULL) {
 		save_errno = errno;
 
-		if (wrap_stat(rc, &buf) != -1) {
+		if (real_stat(rc, &buf) != -1) {
 			pseudo_client_op_plain(OP_CREAT, 0, -1, -1, tmp_template, &buf);
 		} else {
 			pseudo_debug(1, "mkdtemp (path %s) succeeded, but fstat failed (%s).\n",

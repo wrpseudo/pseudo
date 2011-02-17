@@ -11,7 +11,7 @@
 	/* note:  no attempt to handle the case where user isn't
 	 * root.
 	 */
-	rc = wrap_stat(path, &buf);
+	rc = real_stat(path, &buf);
 	if (rc == -1)
 		return rc;
 

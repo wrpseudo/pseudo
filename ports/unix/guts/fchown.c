@@ -10,7 +10,7 @@
 	struct stat buf;
 	int save_errno;
 
-	if (wrap_fstat(fd, &buf) == -1) {
+	if (real_fstat(fd, &buf) == -1) {
 		save_errno = errno;
 		pseudo_debug(2, "fchown failing because fstat failed: %s\n",
 			strerror(errno));
