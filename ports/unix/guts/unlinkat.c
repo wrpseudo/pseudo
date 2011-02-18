@@ -8,7 +8,7 @@
  */
 	pseudo_msg_t *msg;
 	int save_errno;
-	struct stat64 buf;
+	struct stat buf;
 	int old_db_entry;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
@@ -29,14 +29,14 @@
 #endif
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-	rc = real___lxstat64(_STAT_VER, path, &buf);
+	rc = real_lstat(path, &buf);
 #else
-	rc = real___fxstatat64(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
+	rc = real___fxstatat(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 	if (rc == -1) {
 		return rc;
 	}
-	msg = pseudo_client_op(OP_MAY_UNLINK, 0, -1, dirfd, path, &buf);
+	msg = pseudo_client_op_plain(OP_MAY_UNLINK, 0, -1, dirfd, path, &buf);
 	if (msg && msg->result == RESULT_SUCCEED)
 		old_db_entry = 1;
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
@@ -47,10 +47,10 @@
 	if (old_db_entry) {
 		if (rc == -1) {
 			save_errno = errno;
-			pseudo_client_op(OP_CANCEL_UNLINK, 0, -1, -1, path, &buf);
+			pseudo_client_op_plain(OP_CANCEL_UNLINK, 0, -1, -1, path, &buf);
 			errno = save_errno;
 		} else {
-			pseudo_client_op(OP_DID_UNLINK, 0, -1, -1, path, &buf);
+			pseudo_client_op_plain(OP_DID_UNLINK, 0, -1, -1, path, &buf);
 		}
 	} else {
 		pseudo_debug(1, "unlink on <%s>, not in database, no effect.\n", path);

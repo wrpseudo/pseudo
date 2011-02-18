@@ -91,15 +91,22 @@ pseudo_init_wrappers(void) {
 				char *e;
 				dlerror();
 				f = dlsym(RTLD_NEXT, pseudo_functions[i].name);
-				if ((e = dlerror()) != NULL) {
-					/* leave it NULL, which our implementation checks for */
-					pseudo_diag("No wrapper for %s: %s\n", pseudo_functions[i].name, e);
+				if (f) {
+					*pseudo_functions[i].real = f;
 				} else {
-					if (f) {
-						*pseudo_functions[i].real = f;
-					} else {
-						pseudo_diag("no real %s?\n", pseudo_functions[i].name);
+					e = dlerror();
+#ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
+					char *s = pseudo_functions[i].name;
+					s += strlen(s) - 2;
+					/* *at() don't have to exist */
+					if (!strcmp(s, "at")) {
+						continue;
 					}
+#else
+					if (e != NULL) {
+						pseudo_diag("No real function for %s: %s\n", pseudo_functions[i].name, e);
+					}
+#endif
 				}
 			}
 		}

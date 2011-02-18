@@ -6,7 +6,7 @@
  * wrap_symlinkat(const char *oldname, int dirfd, const char *newpath) {
  *	int rc = -1;
  */
- 	struct stat64 buf;
+ 	struct stat buf;
 	char *roldname = 0;
 
 	if (oldname[0] == '/' && pseudo_chroot_len && !pseudo_nosymlinkexp) {
@@ -30,9 +30,9 @@
 		return rc;
 	}
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-	rc = real___lxstat64(_STAT_VER, newpath, &buf);
+	rc = real_lstat(newpath, &buf);
 #else
-	rc = real___fxstatat64(_STAT_VER, dirfd, newpath, &buf, AT_SYMLINK_NOFOLLOW);
+	rc = real___fxstatat(_STAT_VER, dirfd, newpath, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 	if (rc == -1) {
 		int save_errno = errno;
@@ -43,7 +43,7 @@
 		return rc;
 	}
 	/* just record the entry */
-	pseudo_client_op(OP_SYMLINK, 0, -1, dirfd, newpath, &buf);
+	pseudo_client_op_plain(OP_SYMLINK, 0, -1, dirfd, newpath, &buf);
 
 	free(roldname);
 

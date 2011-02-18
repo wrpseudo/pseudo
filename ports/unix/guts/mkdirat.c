@@ -16,16 +16,16 @@
 	rc = real_mkdirat(dirfd, path, PSEUDO_FS_MODE(mode));
 #endif
 	if (rc != -1) {
-		struct stat64 buf;
+		struct stat buf;
 		int stat_rc;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-		stat_rc = real___lxstat64(_STAT_VER, path, &buf);
+		stat_rc = real_lstat(path, &buf);
 #else
-		stat_rc = real___fxstatat64(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
+		stat_rc = real_fstatat(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 		if (stat_rc != -1) {
-			pseudo_client_op(OP_MKDIR, 0, -1, dirfd, path, &buf);
+			pseudo_client_op_plain(OP_MKDIR, 0, -1, dirfd, path, &buf);
 		} else {
 			pseudo_debug(1, "mkdir of %s succeeded, but stat failed: %s\n",
 				path, strerror(errno));

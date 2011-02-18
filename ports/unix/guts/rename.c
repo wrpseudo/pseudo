@@ -7,7 +7,7 @@
  *	int rc = -1;
  */
  	pseudo_msg_t *msg;
- 	struct stat64 oldbuf, newbuf;
+ 	struct stat oldbuf, newbuf;
 	int oldrc, newrc;
 	int save_errno;
 	int old_db_entry = 0;
@@ -23,14 +23,14 @@
 
 	save_errno = errno;
 
-	newrc = real___lxstat64(_STAT_VER, newpath, &newbuf);
-	oldrc = real___lxstat64(_STAT_VER, oldpath, &oldbuf);
+	newrc = real_lstat(newpath, &newbuf);
+	oldrc = real_lstat(oldpath, &oldbuf);
 
 	errno = save_errno;
 
 	/* newpath must be removed. */
 	/* as with unlink, we have to mark that the file may get deleted */
-	msg = pseudo_client_op(OP_MAY_UNLINK, 0, -1, -1, newpath, newrc ? NULL : &newbuf);
+	msg = pseudo_client_op_plain(OP_MAY_UNLINK, 0, -1, -1, newpath, newrc ? NULL : &newbuf);
 	if (msg && msg->result == RESULT_SUCCEED)
 		old_db_entry = 1;
 	rc = real_rename(oldpath, newpath);
@@ -40,10 +40,10 @@
 			/* since we failed, that wasn't really unlinked -- put
 			 * it back.
 			 */
-			pseudo_client_op(OP_CANCEL_UNLINK, 0, -1, -1, newpath, &newbuf);
+			pseudo_client_op_plain(OP_CANCEL_UNLINK, 0, -1, -1, newpath, &newbuf);
 		} else {
 			/* confirm that the file was removed */
-			pseudo_client_op(OP_DID_UNLINK, 0, -1, -1, newpath, &newbuf);
+			pseudo_client_op_plain(OP_DID_UNLINK, 0, -1, -1, newpath, &newbuf);
 		}
 	}
 	if (rc == -1) {
@@ -86,9 +86,9 @@
 		}
 		pseudo_debug(1, "creating new '%s' [%llu] to rename\n",
 			oldpath, (unsigned long long) oldbuf.st_ino);
-		pseudo_client_op(OP_LINK, 0, -1, -1, oldpath, &oldbuf);
+		pseudo_client_op_plain(OP_LINK, 0, -1, -1, oldpath, &oldbuf);
 	}
-	pseudo_client_op(OP_RENAME, 0, -1, -1, newpath, &oldbuf, oldpath);
+	pseudo_client_op_plain(OP_RENAME, 0, -1, -1, newpath, &oldbuf, oldpath);
 
 	errno = save_errno;
 /*	return rc;

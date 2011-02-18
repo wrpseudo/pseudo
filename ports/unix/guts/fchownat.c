@@ -7,7 +7,7 @@
  *	int rc = -1;
  */
  	pseudo_msg_t *msg;
-	struct stat64 buf;
+	struct stat buf;
 	int save_errno;
 	int doing_link = 0;
 
@@ -17,12 +17,12 @@
 		return -1;
 	}
 	if (flags & AT_SYMLINK_NOFOLLOW) {
-		rc = real___lxstat64(_STAT_VER, path, &buf);
+		rc = real_lstat(path, &buf);
 	} else {
-		rc = real___xstat64(_STAT_VER, path, &buf);
+		rc = real_stat(path, &buf);
 	}
 #else
-	rc = real___fxstatat64(_STAT_VER, dirfd, path, &buf, flags);
+	rc = real___fxstatat(_STAT_VER, dirfd, path, &buf, flags);
 #endif
 	if (rc == -1) {
 		return rc;
@@ -34,11 +34,11 @@
 	save_errno = errno;
 
 	if (owner == (uid_t) -1 || group == (gid_t) -1) {
-		msg = pseudo_client_op(OP_STAT, 0, -1, -1, path, &buf);
+		msg = pseudo_client_op_plain(OP_STAT, 0, -1, -1, path, &buf);
 		/* copy in any existing values... */
 		if (msg) {
 			if (msg->result == RESULT_SUCCEED) {
-				pseudo_stat_msg(&buf, msg);
+				pseudo_stat_msg_plain(&buf, msg);
 			} else {
 				pseudo_debug(2, "chownat to %d:%d on %d/%s, ino %llu, new file.\n",
 					owner, group, dirfd, path,
@@ -53,7 +53,7 @@
 	if (group != (gid_t) -1) {
 		buf.st_gid = group;
 	}
-	msg = pseudo_client_op(OP_CHOWN, 0, -1, dirfd, path, &buf);
+	msg = pseudo_client_op_plain(OP_CHOWN, 0, -1, dirfd, path, &buf);
 	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;

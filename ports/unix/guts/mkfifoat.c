@@ -6,9 +6,8 @@
  * wrap_mkfifoat(int dirfd, const char *path, mode_t mode) {
  *	int rc = -1;
  */
- 	dev_t unused = 0;
 
-	rc = wrap___xmknodat(_STAT_VER, dirfd, path, (mode & 07777) | S_IFIFO, &unused);
+	rc = wrap_mknodat(dirfd, path, (mode & 07777) | S_IFIFO, (dev_t) 0);
 
 /*	return rc;
  * }
