@@ -22,7 +22,7 @@
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 		stat_rc = real_lstat(path, &buf);
 #else
-		stat_rc = real_fstatat(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
+		stat_rc = real___fxstatat(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 		if (stat_rc != -1) {
 			pseudo_client_op_plain(OP_MKDIR, 0, -1, dirfd, path, &buf);
