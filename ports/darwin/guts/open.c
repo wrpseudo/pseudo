@@ -10,7 +10,6 @@
 	int existed = 1;
 	int save_errno;
 
-	pseudo_diag("into darwin/guts/open\n");
 	/* if a creation has been requested, check whether file exists */
 	if (flags & O_CREAT) {
 		save_errno = errno;

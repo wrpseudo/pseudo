@@ -137,7 +137,7 @@ class Argument:
             self.vararg = False
 
         # try for a function pointer
-        match = re.match('(.*)\(\*([a-zA-Z0-9_]*)\)\((.*)\)', text)
+        match = re.match('(.*)\(\*([a-zA-Z0-9$_]*)\)\((.*)\)', text)
         if match:
             self.function_pointer = True
             self.args = match.group(3)
@@ -145,7 +145,7 @@ class Argument:
             self.name = match.group(2).rstrip()
         else:
             # plain declaration
-            match = re.match('(.*[ *])\(?\*?([a-zA-Z0-9_]*)\)?', text)
+            match = re.match('(.*[ *])\(?\*?([a-zA-Z0-9$_]*)\)?', text)
             # there may not be a match, say in the special case
             # where an arg is '...'
             if match:
@@ -211,6 +211,9 @@ class Function:
         self.flags = '0'
         self.port = port
         self.directory = ''
+	# On Darwin, some functions are SECRETLY converted to foo$INODE64
+	# when called.  So we have to look those up for real_*
+	self.inode64 = None
         self.real_func = None
         self.paths_to_munge = []
         self.hand_wrapped = None
@@ -270,6 +273,12 @@ class Function:
                 value = value.rstrip()
                 setattr(self, key, value)
     
+    def maybe_inode64(self):
+        if self.inode64 and os.uname()[0] == 'Darwin':
+	    return "$INODE64"
+	else:
+	    return ""
+
     def end_maybe_skip(self):
         if self.hand_wrapped:
             return """/* Hand-written wrapper for this function. */
@@ -522,14 +531,6 @@ def main():
     """Read in function definitions, write out files based on templates."""
     funcs = []
     sources = []
-    host_ports = {
-        'Darwin': 'darwin',
-        'Linux': 'linux'
-    }
-    host_descrs = {
-        'darwin': 'Mac OS X (Snow Leopard only)',
-        'linux': 'Linux systems (recent glibc/kernel)'
-    }
 
     # error checking helpfully provided by the exception handler
     copyright_file = open('guts/COPYRIGHT')

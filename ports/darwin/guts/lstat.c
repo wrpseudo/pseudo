@@ -18,7 +18,7 @@
 	 * don't need to check for a symlink on this end
 	 */
 	msg = pseudo_client_op(OP_STAT, 0, -1, -1, path, buf);
-	if (msg) {
+	if (msg && msg->result == RESULT_SUCCEED) {
 		pseudo_stat_msg(buf, msg);
 	}
 

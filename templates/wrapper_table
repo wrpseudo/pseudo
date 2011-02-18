@@ -11,7 +11,7 @@ static struct {
 } pseudo_functions[] = {
 @body
 	{ /* ${comment}; */
-		"${name}",
+		"${name}${maybe_inode64}",
 		(int (**)(void)) &real_${name},
 		(int (*)(void)) wrap_${name}
 	},
