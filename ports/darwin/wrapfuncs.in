@@ -1,7 +1,5 @@
 # On Darwin, mode_t promotes to int, so you have to use int for va_arg
 int open(const char *path, int flags, ...{int mode}); /* flags=0 */
-char *getcwd(char *buf, size_t size);
-char *getwd(char *buf);
 int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
 int rename(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
 int unlink(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
@@ -14,7 +12,6 @@ int lchown(const char *path, uid_t owner, gid_t group); /* flags=AT_SYMLINK_NOFO
 int mknod(const char *path, mode_t mode, dev_t dev); /* flags=AT_SYMLINK_NOFOLLOW */
 int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
 int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
-int chdir(const char *path);
 int fcntl(int fd, int cmd, ...{struct flock *lock});
 # just so we know the inums of symlinks
 int symlink(const char *oldname, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
@@ -26,43 +23,10 @@ int mkstemp(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
 # primarily for use with chroot()
 int chroot(const char *path);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
-int access(const char *path, int mode);
 int acct(const char *path);
-FTS *fts_open(char * const *path_argv, int options, int (*compar)(const FTSENT **, const FTSENT **));
-int ftw(const char *path, int (*fn)(const char *, const struct stat *, int), int nopenfd);
-int nftw(const char *path, int (*fn)(const char *, const struct stat *, int, struct FTW *), int nopenfd, int flag);
-int glob(const char *pattern, int flags, int (*errfunc)(const char *, int), glob_t *pglob);
-int lutimes(const char *path, const struct timeval *tv);
-char *mkdtemp(char *template);
 int mkfifo(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
-char *mktemp(char *template);
-long pathconf(const char *path, int name);
-char *realpath(const char *name, char *resolved_name);
-int remove(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
-DIR *opendir(const char *path);
-int scandir(const char *path, struct dirent ***namelist, int (*filter)(struct dirent *), int (*compar)());
-char *tempnam(const char *template, const char *pfx);
-char *tmpnam(char *s);
-int truncate(const char *path, off_t length);
-int utime(const char *path, const struct utimbuf *buf);
-int utimes(const char *path, const struct timeval *times);
 # for emulation of passwd utilities
-struct passwd *getpwnam(const char *name);
-struct passwd *getpwuid(uid_t uid);
-int getpwnam_r(const char *name, struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp);
-int getpwuid_r(uid_t uid, struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp);
-struct passwd *getpwent(void);
-void setpwent(void);
-void endpwent(void);
-struct group *getgrnam(const char *name);
-struct group *getgrgid(gid_t gid);
-int getgrnam_r(const char *name, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp);
-int getgrgid_r(gid_t gid, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp);
-struct group *getgrent(void);
-void setgrent(void);
-void endgrent(void);
 int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
-int getgroups(int size, gid_t *list);
 # we use "pathname" to avoid canonicalizing paths, because these functions are
 # unimplemented
 ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size);
@@ -71,7 +35,9 @@ ssize_t listxattr(const char *pathname, char *list, size_t size);
 ssize_t flistxattr(int filedes, char *list, size_t size);
 int setxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
 int fsetxattr(int filedes, const char *name, const void *value, size_t size, int flags);
-int removexattr(const char *pathname, const char *name);
-int fremovexattr(int filedes, const char *name);
 # local color UIDs
 int getgrouplist(const char *name, int basegid, int *groups, int *ngroups);
+int scandir(const char *path, struct dirent ***namelist, int (*filter)(struct dirent *), int (*compar)());
+int getgroups(int size, gid_t *list);
+int fgetgrent_r(FILE *fp, struct group *gbuf, char *buf, size_t buflen, struct group **gbufp); /* real_func=pseudo_fgetgrent_r */
+int fgetpwent_r(FILE *fp, struct passwd *pbuf, char *buf, size_t buflen, struct passwd **pbufp); /* real_func=pseudo_fgetpwent_r */

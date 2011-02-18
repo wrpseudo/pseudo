@@ -1,8 +1,9 @@
-/*
- * Copyright (c) 2011 Wind River Systems; see
+/* 
+ * Copyright (c) 2010 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * int scandir(const char *path, struct dirent ***namelist, int (*filter)(const struct dirent *), int (*compar)())
+ * static int
+ * wrap_scandir(const char *path, struct dirent ***namelist, int (*filter)(struct dirent *), int (*compar)(const void *, const void *)) {
  *	int rc = -1;
  */
 

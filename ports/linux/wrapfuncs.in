@@ -80,3 +80,5 @@ int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 int setresuid(uid_t ruid, uid_t euid, uid_t suid);
 int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
 int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
+int scandir(const char *path, struct dirent ***namelist, int (*filter)(const struct dirent *), int (*compar)());
+int getgroups(int size, gid_t *list);

@@ -20,7 +20,7 @@
 				if (found < *ngroups)
 					groups[found] = gbuf->gr_gid;
 				++found;
-				if (gbuf->gr_gid == basegid)
+				if ((int) gbuf->gr_gid == basegid)
 					found_group = 1;
 			}
 		}
