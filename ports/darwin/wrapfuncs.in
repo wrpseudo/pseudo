@@ -15,10 +15,6 @@ int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
 int fcntl(int fd, int cmd, ...{struct flock *lock});
 # just so we know the inums of symlinks
 int symlink(const char *oldname, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
-# needed because glibc stdio does horrible things with inline asm syscalls
-FILE *fopen(const char *path, const char *mode);
-int fclose(FILE *fp);
-FILE *freopen(const char *path, const char *mode, FILE *stream);
 int mkstemp(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
 # primarily for use with chroot()
 int chroot(const char *path);
