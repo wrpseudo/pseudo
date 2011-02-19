@@ -1257,7 +1257,7 @@ static void
 populate_path_segs(void) {
 	size_t len = 0;
 	char *s;
-	int c;
+	int c = 0;
 
 	free(path_segs);
 	free(previous_path_segs);
