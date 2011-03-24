@@ -1,5 +1,7 @@
 2011-03-24:
 	* (seebs) more work on OS X port.
+	* (seebs) include errno in the verbose debug output
+	* (seebs) fix darwin fcntl.
 
 2011-02-18:
 	* (seebs) moving things to Unix port, cleanup for Darwin

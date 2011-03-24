@@ -60,7 +60,7 @@ ${name}(${decl_args}) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: $name\n");
+	pseudo_debug(4, "completed: $name (maybe: %s)\n", strerror(save_errno));
 	errno = save_errno;
 	${rc_return}
 }
