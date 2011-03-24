@@ -23,10 +23,6 @@
 		errno = EEXIST;
 		return -1;
 	}
-	if (!dev) {
-		errno = EINVAL;
-		return -1;
-	}
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	rc = real_open(path, O_CREAT | O_WRONLY | O_EXCL, PSEUDO_FS_MODE(mode));
 #else
