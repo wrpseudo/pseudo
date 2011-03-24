@@ -948,7 +948,7 @@ pseudo_prefix_path(char *file) {
 char *
 pseudo_bindir_path(char *file) {
 	char * rc;
-	char * bindir = pseudo_get_bindir(NULL);
+	char * bindir = pseudo_get_bindir();
 
 	if (!bindir) {
 		pseudo_diag("You must set the PSEUDO_BINDIR environment variable to run pseudo.\n");
@@ -965,7 +965,7 @@ pseudo_bindir_path(char *file) {
 char *
 pseudo_libdir_path(char *file) {
 	char * rc;
-	char * libdir = pseudo_get_libdir(NULL);
+	char * libdir = pseudo_get_libdir();
 
 	if (!libdir) {
 		pseudo_diag("You must set the PSEUDO_LIBDIR environment variable to run pseudo.\n");
@@ -982,7 +982,7 @@ pseudo_libdir_path(char *file) {
 char *
 pseudo_localstatedir_path(char *file) {
 	char * rc;
-	char * localstatedir = pseudo_get_localstatedir(NULL);
+	char * localstatedir = pseudo_get_localstatedir();
 
 	if (!localstatedir) {
 		pseudo_diag("You must set the PSEUDO_LOCALSTATEDIR environment variable to run pseudo.\n");
@@ -1052,7 +1052,7 @@ pseudo_get_prefix(char *pathname) {
 }
 
 char *
-pseudo_get_bindir() {
+pseudo_get_bindir(void) {
 	char *s = pseudo_get_value("PSEUDO_BINDIR");
 	if (!s) {
 		char *pseudo_bindir = pseudo_prefix_path(PSEUDO_BINDIR);;
@@ -1065,7 +1065,7 @@ pseudo_get_bindir() {
 }
 
 char *
-pseudo_get_libdir() {
+pseudo_get_libdir(void) {
 	char *s = pseudo_get_value("PSEUDO_LIBDIR");
 	if (!s) {
 		char *pseudo_libdir;
@@ -1205,6 +1205,23 @@ pseudo_access_fopen(const char *mode) {
  * - /etc/<file>
  */
 
+#if PSEUDO_PORT_DARWIN
+/* on Darwin, you can't just use /etc/passwd for system lookups,
+ * you have to use the real library calls because they know about
+ * Directory Services.  So...
+ *
+ * We make up fake fds and FILE * objects that can't possibly be
+ * valid.
+ */
+int pseudo_host_etc_passwd_fd = -3;
+int pseudo_host_etc_group_fd = -4;
+static FILE pseudo_fake_passwd_file;
+static FILE pseudo_fake_group_file;
+FILE *pseudo_host_etc_passwd_file = &pseudo_fake_passwd_file;
+FILE *pseudo_host_etc_group_file = &pseudo_fake_group_file;
+
+#endif
+
 int
 pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs, int dircount) {
 	char filename[pseudo_path_max()];
@@ -1242,6 +1259,15 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 	} else {
 		pseudo_debug(2, "pseudo_etc_file: no search dirs.\n");
 	}
+#if PSEUDO_PORT_DARWIN
+	if (!strcmp("passwd", file)) {
+		pseudo_debug(2, "Darwin hackery: pseudo_etc_passwd returning magic passwd fd\n");
+		return pseudo_host_etc_passwd_fd;
+	} else if (!strcmp("group", file)) {
+		pseudo_debug(2, "Darwin hackery: pseudo_etc_passwd returning magic group fd\n");
+		return pseudo_host_etc_group_fd;
+	}
+#endif
 	snprintf(filename, pseudo_path_max(), "/etc/%s", file);
 	pseudo_debug(2, "falling back on <%s> for <%s>\n",
 		filename, file);

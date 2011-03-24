@@ -32,6 +32,8 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include "pseudo.h"
 #include "pseudo_ipc.h"
@@ -299,10 +301,26 @@ pseudo_file_close(int *fd, FILE **fp) {
 	}
 	pseudo_antimagic();
 	if (*fp) {
+#if PSEUDO_PORT_DARWIN
+		if (*fp == pseudo_host_etc_passwd_file) {
+			endpwent();
+		} else if (*fp != pseudo_host_etc_group_file) {
+			endgrent();
+		} else {
+			fclose(*fp);
+		}
+#else
 		fclose(*fp);
+#endif
 		*fd = -1;
 		*fp = 0;
 	}
+#if PSEUDO_PORT_DARWIN
+	if (*fd == pseudo_host_etc_passwd_fd ||
+	    *fd == pseudo_host_etc_group_fd) {
+		*fd = -1;
+	}
+#endif
 	/* this should be impossible */
 	if (*fd >= 0) {
 		close(*fd);
@@ -320,6 +338,15 @@ pseudo_file_open(char *name, int *fd, FILE **fp) {
 	pseudo_file_close(fd, fp);
 	pseudo_antimagic();
 	*fd = PSEUDO_ETC_FILE(name, NULL, O_RDONLY);
+#if PSEUDO_PORT_DARWIN
+	if (*fd == pseudo_host_etc_passwd_fd) {
+		*fp = pseudo_host_etc_passwd_file;
+		setpwent();
+	} else if (*fd == pseudo_host_etc_group_fd) {
+		*fp = pseudo_host_etc_group_file;
+		setgrent();
+	}
+#endif
 	if (*fd >= 0) {
 		*fd = pseudo_fd(*fd, MOVE_FD);
 		*fp = fdopen(*fd, "r");

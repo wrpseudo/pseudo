@@ -66,13 +66,39 @@ pseudo_fgetgrent_r(FILE *fp, struct group *gbuf, char *buf, size_t buflen, struc
 	if (!gbuf || !fp || !buf)
 		goto error_out;
 
-	started_at = ftell(fp);
-	if (started_at == -1) {
-		goto error_out;
-	}
-	s = fgets(linebuf, PLENTY_LONG, fp);
-	if (!s) {
-		goto error_out;
+	if (fp == pseudo_host_etc_group_file) {
+		struct group *g = getgrent();
+		if (g) {
+			char *s = linebuf;
+			s += snprintf(linebuf, PLENTY_LONG,
+				"%s:%s:%ld:",
+				g->gr_name,
+				g->gr_passwd,
+				(long) g->gr_gid);
+			if (g->gr_mem) {
+				int i;
+				for (i = 0; g->gr_mem[i]; ++i) {
+					s += snprintf(s, 
+						PLENTY_LONG - (s - linebuf),
+						"%s,",
+						g->gr_mem[i]);
+				}
+				if (s[-1] == ',')
+					--s;
+			}
+			strcpy(s, "\n");
+		} else {
+			goto error_out;
+		}
+	} else {
+		started_at = ftell(fp);
+		if (started_at == -1) {
+			goto error_out;
+		}
+		s = fgets(linebuf, PLENTY_LONG, fp);
+		if (!s) {
+			goto error_out;
+		}
 	}
 	/* fgets will have stored a '\0' if there was no error; if there
 	 * was an error, though, linebuf was initialized to all zeroes so
@@ -163,13 +189,33 @@ pseudo_fgetpwent_r(FILE *fp, struct passwd *pbuf, char *buf, size_t buflen, stru
 	if (!pbuf || !fp || !buf)
 		goto error_out;
 
-	started_at = ftell(fp);
-	if (started_at == -1) {
-		goto error_out;
-	}
-	s = fgets(linebuf, PLENTY_LONG, fp);
-	if (!s) {
-		goto error_out;
+	if (fp == pseudo_host_etc_passwd_file) {
+		struct passwd *p = getpwent();
+		if (p) {
+			snprintf(linebuf, PLENTY_LONG,
+				"%s:%s:%ld:%ld:%s:%ld:%ld:%s:%s:%s\n",
+					p->pw_name,
+					p->pw_passwd,
+					(long) p->pw_uid,
+					(long) p->pw_gid,
+					p->pw_class,
+					(long) p->pw_change,
+					(long) p->pw_expire,
+					p->pw_gecos,
+					p->pw_dir,
+					p->pw_shell);
+		} else {
+			goto error_out;
+		}
+	} else {
+		started_at = ftell(fp);
+		if (started_at == -1) {
+			goto error_out;
+		}
+		s = fgets(linebuf, PLENTY_LONG, fp);
+		if (!s) {
+			goto error_out;
+		}
 	}
 	/* fgets will have stored a '\0' if there was no error; if there
 	 * was an error, though, linebuf was initialized to all zeroes so
@@ -179,6 +225,10 @@ pseudo_fgetpwent_r(FILE *fp, struct passwd *pbuf, char *buf, size_t buflen, stru
 	if (len > buflen) {
 		error = ERANGE;
 		goto error_out;
+	}
+	if (linebuf[len - 1] == '\n') {
+		linebuf[len - 1] = '\0';
+		--len;
 	}
 	memcpy(buf, linebuf, len);
 
