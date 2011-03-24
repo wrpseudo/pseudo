@@ -11,9 +11,6 @@ int __xmknod(int ver, const char *path, mode_t mode, dev_t *dev); /* flags=AT_SY
 int __xmknodat(int ver, int dirfd, const char *path, mode_t mode, dev_t *dev); /* flags=AT_SYMLINK_NOFOLLOW */
 int fcntl(int fd, int cmd, ...{struct flock *lock});
 # just so we know the inums of symlinks
-# primarily for use with chroot()
-ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
-ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
 char *canonicalize_file_name(const char *filename);
 int eaccess(const char *path, int mode);
 # we use "pathname" to avoid canonicalizing paths, because these functions are

@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2010 Wind River Systems; see
+ * Copyright (c) 2010-2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -14,7 +14,7 @@
 		errno = ENOENT;
 		return -1;
 	}
-	return fgetpwent_r(pseudo_pwd, pwbuf, buf, buflen, pwbufp);
+	rc = fgetpwent_r(pseudo_pwd, pwbuf, buf, buflen, pwbufp);
 
 /*	return rc;
  * }

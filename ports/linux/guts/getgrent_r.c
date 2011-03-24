@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2010 Wind River Systems; see
+ * Copyright (c) 2010-2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -15,13 +15,6 @@
 		return -1;
 	}
 	rc = fgetgrent_r(pseudo_grp, gbuf, buf, buflen, gbufp);
-	if (rc == 0 && *gbufp) {
-		if (*gbufp == gbuf) {
-			pseudo_debug(3, "found group: %d/%s\n", gbuf->gr_gid, gbuf->gr_name);
-		} else {
-			pseudo_debug(1, "found group (%d), but it's wrong?", gbuf->gr_gid);
-		}
-	}
 
 /*	return rc;
  * }

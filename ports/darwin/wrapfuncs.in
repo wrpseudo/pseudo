@@ -3,11 +3,8 @@ int open(const char *path, int flags, ...{int mode}); /* flags=0 */
 int stat(const char *path, struct stat *buf); /* inode64=1 */
 int lstat(const char *path, struct stat *buf); /* flags=AT_SYMLINK_NOFOLLOW, inode64=1 */
 int fstat(int fd, struct stat *buf); /* inode64=1 */
-int lchown(const char *path, uid_t owner, gid_t group); /* flags=AT_SYMLINK_NOFOLLOW */
 int fcntl(int fd, int cmd, ...{struct flock *lock});
 # just so we know the inums of symlinks
-# primarily for use with chroot()
-ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
 # for emulation of passwd utilities
 int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
 # we use "pathname" to avoid canonicalizing paths, because these functions are
