@@ -67,7 +67,10 @@ pseudo_fgetgrent_r(FILE *fp, struct group *gbuf, char *buf, size_t buflen, struc
 		goto error_out;
 
 	if (fp == pseudo_host_etc_group_file) {
-		struct group *g = getgrent();
+		struct group *g;
+		pseudo_antimagic();
+		g = getgrent();
+		pseudo_magic();
 		if (g) {
 			char *s = linebuf;
 			s += snprintf(linebuf, PLENTY_LONG,
@@ -190,7 +193,11 @@ pseudo_fgetpwent_r(FILE *fp, struct passwd *pbuf, char *buf, size_t buflen, stru
 		goto error_out;
 
 	if (fp == pseudo_host_etc_passwd_file) {
-		struct passwd *p = getpwent();
+		struct passwd *p;
+
+		pseudo_antimagic();
+		p = getpwent();
+		pseudo_magic();
 		if (p) {
 			snprintf(linebuf, PLENTY_LONG,
 				"%s:%s:%ld:%ld:%s:%ld:%ld:%s:%s:%s\n",
