@@ -2,6 +2,7 @@
 	* (seebs) more work on OS X port.
 	* (seebs) include errno in the verbose debug output
 	* (seebs) fix darwin fcntl.
+	* (seebs) fix *xattr for darwin (they take more arguments)
 
 2011-02-18:
 	* (seebs) moving things to Unix port, cleanup for Darwin
