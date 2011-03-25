@@ -164,8 +164,7 @@ pseudo_server_start(int daemonize) {
 		pseudo_new_pid();
 		fclose(stdin);
 		fclose(stdout);
-		if (!pseudo_logfile(PSEUDO_LOGFILE))
-			fclose(stderr);
+		pseudo_logfile(PSEUDO_LOGFILE);
 	} else {
 		/* Write the pid if we don't daemonize */
 		pseudo_server_write_pid(getpid());

@@ -1371,6 +1371,19 @@ pseudo_logfile(char *defname) {
 	if (fd == -1) {
 		pseudo_diag("help: can't open log file %s: %s\n", pseudo_path, strerror(errno));
 	} else {
+		/* try to force fd to 2.  We do this because glibc's malloc
+		 * debug unconditionally writes to fd 2, and we don't want
+		 * a client process ending op on fd 2, or server debugging
+		 * becomes a nightmare.
+		 */
+		if (fd != 2) {
+			int newfd;
+			close(2);
+			newfd = dup2(fd, 2);
+			if (newfd != -1) {
+				fd = newfd;
+			}
+		}
 		pseudo_util_debug_fd = fd;
 	}
 	free(pseudo_path);
