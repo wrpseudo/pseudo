@@ -1,0 +1,56 @@
+int creat(const char *path, mode_t mode);
+char *getcwd(char *buf, size_t size);
+char *getwd(char *buf);
+int close(int fd);
+int fchmod(int fd, mode_t mode);
+int fchown(int fd, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group); /* flags=AT_SYMLINK_NOFOLLOW */
+int dup2(int oldfd, int newfd);
+int dup(int fd);
+int chdir(const char *path);
+int fchdir(int dirfd);
+int access(const char *path, int mode);
+FTS *fts_open(char * const *path_argv, int options, int (*compar)(const FTSENT **, const FTSENT **)); /* inode64=1 */
+int ftw(const char *path, int (*fn)(const char *, const struct stat *, int), int nopenfd);
+int nftw(const char *path, int (*fn)(const char *, const struct stat *, int, struct FTW *), int nopenfd, int flag);
+int glob(const char *pattern, int flags, int (*errfunc)(const char *, int), glob_t *pglob);
+int lutimes(const char *path, const struct timeval *tv);
+char *mkdtemp(char *template);
+char *mktemp(char *template);
+long pathconf(const char *path, int name);
+char *realpath(const char *name, char *resolved_name);
+int remove(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
+DIR *opendir(const char *path);
+char *tempnam(const char *template, const char *pfx);
+char *tmpnam(char *s);
+int truncate(const char *path, off_t length);
+int utime(const char *path, const struct utimbuf *buf);
+int utimes(const char *path, const struct timeval *times);
+# needed because libc stdio does horrible things with inline asm syscalls
+FILE *fopen(const char *path, const char *mode);
+int fclose(FILE *fp);
+FILE *freopen(const char *path, const char *mode, FILE *stream);
+int chroot(const char *path);
+int acct(const char *path);
+int chmod(const char *path, mode_t mode);
+int chown(const char *path, uid_t owner, gid_t group);
+int fchmodat(int dirfd, const char *path, mode_t mode, int flags);
+int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flags);
+int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkdirat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkfifo(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkfifoat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
+int mknod(const char *path, mode_t mode, dev_t dev); /* flags=AT_SYMLINK_NOFOLLOW */
+int mknodat(int dirfd, const char *path, mode_t mode, dev_t dev); /* flags=AT_SYMLINK_NOFOLLOW */
+int mkstemp(char *template); /* flags=AT_SYMLINK_NOFOLLOW */
+int rename(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int rmdir(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
+int symlink(const char *oldname, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int symlinkat(const char *oldname, int dirfd, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int unlink(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
+int unlinkat(int dirfd, const char *path, int rflags); /* flags=AT_SYMLINK_NOFOLLOW */
+# primarily for use with chroot()
+ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
+ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */

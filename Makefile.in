@@ -24,7 +24,7 @@ SQLITE=@SQLITE@
 BITS=@BITS@
 MARK64=@MARK64@
 RPATH=@RPATH@
-VERSION=0.3
+VERSION=1.0
 
 LIB=lib$(MARK64)
 BIN=bin
@@ -46,8 +46,6 @@ GUTS=$(filter-out "$(GLOB_PATTERN)",$(wildcard $(GLOB_PATTERN)))
 
 SOURCES=$(wildcard *.c)
 OBJS=$(subst .c,.o,$(SOURCES))
-
-USE_64=wrapfuncs64.in
 
 SHOBJS=pseudo_tables.o pseudo_util.o
 DBOBJS=pseudo_db.o
@@ -113,7 +111,9 @@ $(LIBPSEUDO): $(LIB) $(WRAPOBJS) pseudo_client.o pseudo_ipc.o $(SHOBJS)
 		pseudo_client.o pseudo_ipc.o \
 		$(WRAPOBJS) $(SHOBJS) $(CLIENT_LDFLAGS)
 
-%.o: %.c
+# *everything* now relies on stuff that's generated in the
+# wrapper process.
+%.o: %.c pseudo_wrapfuncs.h
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(CFLAGS_PSEUDO) $<
 
 $(OBJS): pseudo_tables.h
@@ -127,8 +127,8 @@ pseudo_server.o: pseudo_server.h
 tables: enums/*.in maketables templatefile.py $(TABLES)
 	./maketables enums/*.in
 
-wrappers: wrapfuncs.in $(USE_64) makewrappers templatefile.py $(TEMPLATES)
-	./makewrappers wrapfuncs.in $(USE_64)
+wrappers: makewrappers templatefile.py $(TEMPLATES) ports/*/wrapfuncs.in
+	./makewrappers
 
 .SECONDARY: tables wrappers
 
@@ -154,6 +154,7 @@ clean:
 		pseudo_wrapfuncs.h pseudo_wrapfuncs.c \
 		pseudo_wrapper_table.c \
 		pseudo_tables.c pseudo_tables.h \
+		pseudo_ports.h port_wrappers.c \
 		offsets32 offsets64
 
 distclean: clean

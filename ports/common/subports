@@ -1,0 +1,8 @@
+#!/bin/sh
+case $(uname -s) in
+Linux)	echo "linux";;
+Darwin)	echo "darwin";;
+*)	echo >&2 "Unknown result from uname -s: %(uname -s). Aborting."
+	exit 1
+	;;
+esac

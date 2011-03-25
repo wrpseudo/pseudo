@@ -64,5 +64,12 @@ extern pseudo_msg_t *pseudo_msg_dupheader(pseudo_msg_t *);
 extern pseudo_msg_t *pseudo_msg_new(size_t, const char *);
 extern int pseudo_msg_send(int fd, pseudo_msg_t *, size_t, const char *);
 
-void pseudo_msg_stat(pseudo_msg_t *msg, const struct stat64 *buf);
-void pseudo_stat_msg(struct stat64 *buf, const pseudo_msg_t *msg);
+void pseudo_msg_stat(pseudo_msg_t *msg, const PSEUDO_STATBUF *buf);
+void pseudo_stat_msg(PSEUDO_STATBUF *buf, const pseudo_msg_t *msg);
+#if PSEUDO_STATBUF_64
+void pseudo_stat_msg_plain(struct stat *buf, const pseudo_msg_t *msg);
+void pseudo_msg_stat_plain(pseudo_msg_t *msg, const struct stat *buf);
+#else
+#define pseudo_stat_msg_plain pseudo_stat_msg
+#define pseudo_msg_stat_plain pseudo_msg_stat
+#endif

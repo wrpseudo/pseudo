@@ -1,0 +1,7 @@
+int execlp(const char *file, const char *arg, ...); /* hand_wrapped=1 */
+int execl(const char *file, const char *arg, ...); /* hand_wrapped=1 */
+int execle(const char *file, const char *arg, ...); /* hand_wrapped=1 */
+int execv(const char *file, char *const *argv); /* hand_wrapped=1 */
+int execve(const char *file, char *const *argv, char *const *envp); /* hand_wrapped=1 */
+int execvp(const char *file, char *const *argv); /* hand_wrapped=1 */
+int fork(void); /* hand_wrapped=1 */

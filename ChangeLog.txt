@@ -1,6 +1,20 @@
 2011-03-25:
 	* (seebs) don't try to search path when you don't have one
+	* (seebs) merge in ports branch
 
+2011-03-24:
+	* (seebs) more work on OS X port.
+	* (seebs) include errno in the verbose debug output
+	* (seebs) fix darwin fcntl.
+	* (seebs) fix *xattr for darwin (they take more arguments)
+
+2011-02-18:
+	* (seebs) moving things to Unix port, cleanup for Darwin
+
+2011-02-14:
+	* (seebs) first pass on splitting out ports
+	* (seebs) various cleanup
+ 
 2011-02-10:
 	* (seebs) pseudo_client_shutdown(), and the pseudo server, have to
 	  be smart enough to make the local state directory in case the

@@ -17,10 +17,13 @@
 #
 """convert wrapfuncs.in to wrapper function stubs and tables"""
 
+import datetime
 import glob
 import sys
 import re
-import datetime
+import os.path
+import string
+import subprocess
 from templatefile import TemplateFile
 
 class ArgumentList:
@@ -134,7 +137,7 @@ class Argument:
             self.vararg = False
 
         # try for a function pointer
-        match = re.match('(.*)\(\*([a-zA-Z0-9_]*)\)\((.*)\)', text)
+        match = re.match('(.*)\(\*([a-zA-Z0-9$_]*)\)\((.*)\)', text)
         if match:
             self.function_pointer = True
             self.args = match.group(3)
@@ -142,7 +145,7 @@ class Argument:
             self.name = match.group(2).rstrip()
         else:
             # plain declaration
-            match = re.match('(.*[ *])\(?\*?([a-zA-Z0-9_]*)\)?', text)
+            match = re.match('(.*[ *])\(?\*?([a-zA-Z0-9$_]*)\)?', text)
             # there may not be a match, say in the special case
             # where an arg is '...'
             if match:
@@ -194,7 +197,7 @@ class Argument:
 
 class Function:
     """A function signature and additional data about how the function works"""
-    def __init__(self, line):
+    def __init__(self, port, line):
         # table of known default values:
         default_values = {
             'gid_t': '0',
@@ -206,8 +209,14 @@ class Function:
     
         self.dirfd = 'AT_FDCWD'
         self.flags = '0'
+        self.port = port
+        self.directory = ''
+	# On Darwin, some functions are SECRETLY converted to foo$INODE64
+	# when called.  So we have to look those up for real_*
+	self.inode64 = None
+        self.real_func = None
         self.paths_to_munge = []
-        self.nowrappers = None
+        self.hand_wrapped = None
         # used for the copyright date when creating stub functions
         self.date = datetime.date.today().year
     
@@ -264,6 +273,28 @@ class Function:
                 value = value.rstrip()
                 setattr(self, key, value)
     
+    def maybe_inode64(self):
+        if self.inode64 and os.uname()[0] == 'Darwin':
+	    return "$INODE64"
+	else:
+	    return ""
+
+    def end_maybe_skip(self):
+        if self.hand_wrapped:
+            return """/* Hand-written wrapper for this function. */
+#endif
+"""
+        else:
+            return ""
+
+    def maybe_skip(self):
+        if self.hand_wrapped:
+            return """/* Hand-written wrapper for this function. */
+#if 0
+"""
+        else:
+            return ""
+
     def comment(self):
         """declare self (in a comment)"""
         return self.decl(comment = True)
@@ -307,6 +338,18 @@ class Function:
         for path in self.paths_to_munge:
             free_paths.append("free((void *) %s);" % path)
         return "\n\t\t\t".join(free_paths)
+
+    def real_predecl(self):
+    	if self.real_func:
+	    return self.decl().replace(self.name, self.real_func, 1) + ";"
+	else:
+	    return ""
+
+    def real_init(self):
+    	if self.real_func:
+	    return self.real_func
+	else:
+	    return "NULL"
 
     def rc_return(self):
         """return rc (or just return)"""
@@ -357,6 +400,133 @@ class Function:
             pretty += ' (%s)' % self.comments
         return pretty
 
+class Port:
+    """
+A Port is a set of function declarations and code providing
+details specific to a specific host environment, such as Linux.
+Ports can override each other, and each port can indicate
+additional ports to include.
+"""
+
+    def __init__(self, port, sources):
+        self.name = port
+        self.subports = []
+        self.preports = []
+
+        if os.path.exists(self.portfile("pseudo_wrappers.c")):
+            self.wrappers = self.portfile("pseudo_wrappers.c")
+        else:
+            self.wrappers = None
+
+        if os.path.exists(self.portfile("portdefs.h")):
+            self.portdef_file = self.portfile("portdefs.h")
+        else:
+            self.portdef_file = None
+
+        if os.path.exists(self.portfile("wrapfuncs.in")):
+            self.funcs = process_wrapfuncs(port)
+        else:
+            self.funcs = {}
+
+        for source in sources:
+            source.emit('port', self)
+
+        if os.path.exists(self.portfile("preports")):
+            subport_proc = subprocess.Popen([self.portfile("preports"), self.name], stdout=subprocess.PIPE)
+            portlist = subport_proc.communicate()[0]
+            retcode = subport_proc.poll()
+            if retcode:
+                raise Exception("preports script failed for port %s" % self.name)
+
+            for preport in string.split(portlist):
+                next = Port(preport, sources)
+                self.preports.append(next)
+
+        if os.path.exists(self.portfile("subports")):
+            subport_proc = subprocess.Popen([self.portfile("subports"), self.name], stdout=subprocess.PIPE)
+            portlist = subport_proc.communicate()[0]
+            retcode = subport_proc.poll()
+            if retcode:
+                raise Exception("subports script failed for port %s" % self.name)
+
+            for subport in string.split(portlist):
+                next = Port(subport, sources)
+                self.subports.append(next)
+
+    def functions(self):
+        mergedfuncs = {}
+        for pre in self.preports:
+            prefuncs = pre.functions()
+            for name in prefuncs.keys():
+                if name in mergedfuncs:
+                    print "Warning: %s from %s overriding %s" % (name, pre.name, mergedfuncs[name].port)
+                mergedfuncs[name] = prefuncs[name]
+        for name in self.funcs.keys():
+            if name in mergedfuncs:
+                print "Warning: %s from %s overriding %s" % (name, self.name, mergedfuncs[name].port)
+            mergedfuncs[name] = self.funcs[name]
+        for sub in self.subports:
+            subfuncs = sub.functions()
+            for name in subfuncs.keys():
+                if name in mergedfuncs:
+                    print "Warning: %s from %s overriding %s" % (name, sub.name, mergedfuncs[name].port)
+                mergedfuncs[name] = subfuncs[name]
+        return mergedfuncs
+
+    def define(self):
+        return '#define PSEUDO_PORT_%s 1' % string.upper(self.name).replace('/', '_')
+
+    def portdefs(self):
+        if self.portdef_file:
+            return '#include "%s"' % self.portdef_file
+        else:
+            return '/* no portdefs for %s */' % self.name
+
+    def include(self):
+        if self.wrappers:
+            return '#include "%s"' % self.wrappers
+        else:
+            return '/* no #include for %s */' % self.name
+
+    def portfile(self, name):
+        return "ports/%s/%s" % (self.name, name)
+
+    def __getitem__(self, key):
+        """Make this object look like a dict for Templates to use"""
+        try:
+            attr = getattr(self, key)
+        except AttributeError:
+            return None
+
+        if callable(attr):
+            return attr()
+        else:
+            return attr
+
+
+def process_wrapfuncs(port):
+    """Process a wrapfuncs.in file, generating a list of prototypes."""
+    filename = "ports/%s/wrapfuncs.in" % port
+    funcs = {}
+    directory = os.path.dirname(filename)
+    sys.stdout.write("%s: " % filename)
+    funclist = open(filename)
+    for line in funclist:
+        line = line.rstrip()
+        if line.startswith('#') or not line:
+            continue
+        try:
+            func = Function(port, line)
+            func.directory = directory
+            funcs[func.name] = func
+            sys.stdout.write(".")
+        except Exception, e:
+            print "Parsing failed:", e
+            exit(1)
+    funclist.close()
+    print ""
+    return funcs
+
 def main():
     """Read in function definitions, write out files based on templates."""
     funcs = []
@@ -377,30 +547,24 @@ def main():
             print "Invalid or malformed template %s.  Aborting." % path
             exit(1)
 
-    for filename in sys.argv[1:]:
-        # parse the list of functions
-        sys.stdout.write("%s: " % filename)
-        funclist = open(filename)
-        for line in funclist:
-            line = line.rstrip()
-            if line.startswith('#') or not line:
-                continue
-            try:
-                func = Function(line)
-                funcs.append(func)
-                sys.stdout.write(".")
-            except Exception, e:
-                print "Parsing failed:", e
-                exit(1)
-        funclist.close()
-        print ""
+    try:
+        port = Port('common', sources)
+
+    except KeyError:
+        print "Unknown uname -s result: '%s'." % uname_s
+        print "Known system types are:"
+        print "%-20s %-10s %s" % ("uname -s", "port name", "description")
+        for key in host_ports:
+            print "%-20s %-10s %s" % (key, host_ports[key],
+                                      host_descrs[host_ports[key]])
 
     # the per-function stuff
     print "Writing functions...",
-    for func in funcs:
+    all_funcs = port.functions()
+    for name in sorted(all_funcs.keys()):
         # populate various tables and files with each function
         for source in sources:
-            source.emit('body', func)
+            source.emit('body', all_funcs[name])
     print "done.  Cleaning up."
     
     for source in sources:
