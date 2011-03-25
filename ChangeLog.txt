@@ -1,3 +1,6 @@
+2011-03-25:
+	* (seebs) don't try to search path when you don't have one
+
 2011-02-10:
 	* (seebs) pseudo_client_shutdown(), and the pseudo server, have to
 	  be smart enough to make the local state directory in case the
