@@ -27,8 +27,8 @@ names (such as libpseudo<suffix>.so).  This was used in the WR environment
 to create libpseudo-<host_libc_md5sum>.so, to ensure that libpseudo was
 rebuilt if the host libc changed.
 
-This code is not particularly portable -- it's never been tried on anything
-but Linux, although it runs on a pretty broad range of Linux systems.
+This code is not particularly portable, but works on Linux and also
+on 64-bit Intel Darwin systems.
 
 Limited user documentation is provided in the given man page files (these
 are not currently installed, merely provided in the source directory), and
@@ -39,9 +39,6 @@ FUTURE DIRECTIONS:
 
 * The chroot() functionality is incomplete, though now sufficient for
   the real-world use cases we've tried.
-* We have no immediate plans to make pseudo work on other targets, but
-  are not opposed to accepting patches to do so.  (It isn't even CLOSE
-  on OS X, largely because of the Linux-specific _STAT_VER stuff.)
 * I have no intention of converting to autoconf.  It is the wrong tool
   for the job.
 
