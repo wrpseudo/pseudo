@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2010 Wind River Systems, Inc.
+# Copyright (c) 2008-2011 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -211,9 +211,9 @@ class Function:
         self.flags = '0'
         self.port = port
         self.directory = ''
-	# On Darwin, some functions are SECRETLY converted to foo$INODE64
-	# when called.  So we have to look those up for real_*
-	self.inode64 = None
+        # On Darwin, some functions are SECRETLY converted to foo$INODE64
+        # when called.  So we have to look those up for real_*
+        self.inode64 = None
         self.real_func = None
         self.paths_to_munge = []
         self.hand_wrapped = None
@@ -275,9 +275,9 @@ class Function:
     
     def maybe_inode64(self):
         if self.inode64 and os.uname()[0] == 'Darwin':
-	    return "$INODE64"
-	else:
-	    return ""
+            return "$INODE64"
+        else:
+            return ""
 
     def end_maybe_skip(self):
         if self.hand_wrapped:
@@ -340,16 +340,16 @@ class Function:
         return "\n\t\t\t".join(free_paths)
 
     def real_predecl(self):
-    	if self.real_func:
-	    return self.decl().replace(self.name, self.real_func, 1) + ";"
-	else:
-	    return ""
+        if self.real_func:
+            return self.decl().replace(self.name, self.real_func, 1) + ";"
+        else:
+            return ""
 
     def real_init(self):
-    	if self.real_func:
-	    return self.real_func
-	else:
-	    return "NULL"
+        if self.real_func:
+            return self.real_func
+        else:
+            return "NULL"
 
     def rc_return(self):
         """return rc (or just return)"""

@@ -16,7 +16,7 @@ class TemplateFile:
 
         # empty footer if none specified:
         self.sections['footer'] = []
-	# empty per-port if none specified:
+        # empty per-port if none specified:
         self.sections['port'] = []
 
         # lines appended to body by default
@@ -47,10 +47,10 @@ class TemplateFile:
                 current.append(line)
         self.template.close()
         for section, data in self.sections.items():
-	    if len(data) > 0:
+            if len(data) > 0:
                 self.sections[section] = Template("\n".join(data))
-	    else:
-		self.sections[section] = None
+            else:
+                self.sections[section] = None
 
         # You need a file if this isn't a file-per-item
         if not self.file_per_item:
@@ -92,20 +92,20 @@ class TemplateFile:
         """Emit a template, with optional interpolation of an item."""
         if template == "copyright":
             # hey, at least it's not a global variable, amirite?
-	    self.get_file(item)
-	    if self.file:
+            self.get_file(item)
+            if self.file:
                 self.file.write(TemplateFile.copyright)
         elif template in self.sections:
             templ = self.sections[template]
-	    if templ:
-	        self.get_file(item)
-		if self.file:
+            if templ:
+                self.get_file(item)
+                if self.file:
                     self.file.write(templ.safe_substitute(item))
                     self.file.write("\n")
         else:
             print "Warning: Unknown template '%s'." % template
 
         if self.file_per_item:
-	    if self.file:
+            if self.file:
                 self.file.close()
             self.file = None
