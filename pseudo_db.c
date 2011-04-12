@@ -529,11 +529,13 @@ get_dbs(void) {
 	int err = 0;
 	int i;
 	for (i = 0; db_infos[i].db; ++i) {
-		if (get_db(&db_infos[i]))
+		if (get_db(&db_infos[i])) {
+			pseudo_diag("Error getting '%s' database.\n",
+				db_infos[i].pathname);
 			err = 1;
-		
+		}
 	}
-	return !err;
+	return err;
 }
 
 /* put a prepared log entry into the database */
@@ -544,7 +546,7 @@ pdb_log_traits(pseudo_query_t *traits) {
 	int rc;
 
 	if (!log_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 1;
 	}
 	e = calloc(sizeof(*e), 1);
@@ -642,7 +644,7 @@ pdb_log_entry(log_entry *e) {
 	int rc;
 
 	if (!log_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 1;
 	}
 
@@ -740,7 +742,7 @@ pdb_log_msg(pseudo_sev_t severity, pseudo_msg_t *msg, const char *program, const
 	}
 
 	if (!log_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 1;
 	}
 
@@ -874,7 +876,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 	static buffer *sql;
 
 	if (!log_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return NULL;
 	}
 
@@ -1262,7 +1264,7 @@ pdb_link_file(pseudo_msg_t *msg) {
 		    " VALUES (?, ?, ?, ?, ?, ?, ?, 0);";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!insert) {
@@ -1307,7 +1309,7 @@ pdb_unlink_file_dev(pseudo_msg_t *msg) {
 	char *sql = "DELETE FROM files WHERE dev = ? AND ino = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!sql_delete) {
@@ -1340,7 +1342,7 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 		"WHERE path = 'NAMELESS FILE' and dev = ? AND ino = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!update) {
@@ -1374,7 +1376,7 @@ pdb_may_unlink_file(pseudo_msg_t *msg, int deleting) {
 	char *sql_mark_file = "UPDATE files SET deleting = ? WHERE path = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!mark_file) {
@@ -1418,7 +1420,7 @@ pdb_cancel_unlink_file(pseudo_msg_t *msg) {
 	char *sql_mark_file = "UPDATE files SET deleting = 0 WHERE path = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!mark_file) {
@@ -1458,7 +1460,7 @@ pdb_did_unlink_files(int deleting) {
 	char *sql_delete_exact = "DELETE FROM files WHERE deleting = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!delete_exact) {
@@ -1492,7 +1494,7 @@ pdb_did_unlink_file(char *path, int deleting) {
 	char *sql_delete_exact = "DELETE FROM files WHERE path = ? AND deleting = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!delete_exact) {
@@ -1527,7 +1529,7 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 	char *sql_delete_exact = "DELETE FROM files WHERE path = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!delete_exact) {
@@ -1573,7 +1575,7 @@ pdb_unlink_contents(pseudo_msg_t *msg) {
 				"(path > (? || '/') AND path < (? || '0'));";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!delete_sub) {
@@ -1622,7 +1624,7 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 			       "WHERE (path > (? || '/') AND path < (? || '0'));";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!update_exact) {
@@ -1691,7 +1693,7 @@ pdb_renumber_all(dev_t from, dev_t to) {
 		    " WHERE dev = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!update) {
@@ -1732,7 +1734,7 @@ pdb_update_inode(pseudo_msg_t *msg) {
 		    " WHERE path = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!update) {
@@ -1784,7 +1786,7 @@ pdb_update_file(pseudo_msg_t *msg) {
 		    " WHERE dev = ? AND ino = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!update) {
@@ -1824,7 +1826,7 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 	char *sql = "SELECT * FROM files WHERE path = ? AND dev = ? AND ino = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!select) {
@@ -1875,7 +1877,7 @@ pdb_find_file_path(pseudo_msg_t *msg) {
 	char *sql = "SELECT * FROM files WHERE path = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 1;
 	}
 	if (!select) {
@@ -1932,7 +1934,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 	char *response;
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!select) {
@@ -1981,7 +1983,7 @@ pdb_find_file_dev(pseudo_msg_t *msg) {
 	char *sql = "SELECT * FROM files WHERE dev = ? AND ino = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!select) {
@@ -2030,7 +2032,7 @@ pdb_find_file_ino(pseudo_msg_t *msg) {
 	char *sql = "SELECT * FROM files WHERE ino = ?;";
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 	if (!select) {
@@ -2074,7 +2076,7 @@ pdb_files(void) {
 	pdb_file_list l;
 
 	if (!file_db && get_dbs()) {
-		pseudo_diag("database error.\n");
+		pseudo_diag("%s: database error.\n", __func__);
 		return 0;
 	}
 

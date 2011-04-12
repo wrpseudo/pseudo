@@ -1,3 +1,6 @@
+2011-04-12:
+	* (seebs) merge in some database fixes from master.
+
 2011-03-25:
 	* (seebs) don't try to search path when you don't have one
 
