@@ -919,6 +919,8 @@ base_path(int dirfd, const char *path, int leave_last) {
 
 	if (!path)
 		return NULL;
+	if (!*path)
+		return strdup("");
 
 	if (path[0] != '/') {
 		if (dirfd != -1 && dirfd != AT_FDCWD) {
