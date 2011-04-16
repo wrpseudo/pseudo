@@ -1,5 +1,3 @@
-static int (*real_clone)(int (*)(void *), void *, int, void *) = NULL;
-
 int
 wrap_clone(int (*fn)(void *), void *child_stack, int flags, void *arg) {
 	/* unused */

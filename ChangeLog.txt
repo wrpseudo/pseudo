@@ -1,3 +1,7 @@
+2011-04-16:
+	* (seebs) remove duplicate definition of real_clone() from
+	  the oldclone port.
+
 2011-04-13:
 	* (seebs) base_path of an empty string should be an empty string,
 	  not $pwd.
