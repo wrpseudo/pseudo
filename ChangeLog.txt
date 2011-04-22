@@ -1,3 +1,11 @@
+2011-04-21:
+	* (seebs) don't use strerror in wrappers, because it can
+	  lead to malloc deadlocks if part of setting up a malloc
+	  operation falls into strerror which uses locale... Curse
+	  you, Fedora 13.  You and your perfectly reasonable and
+	  standards-conforming behavior which happened to inconvenience
+	  me.
+
 2011-04-16:
 	* (seebs) remove duplicate definition of real_clone() from
 	  the oldclone port.

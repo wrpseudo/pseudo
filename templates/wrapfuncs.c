@@ -60,7 +60,13 @@ ${name}(${decl_args}) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
+#if 0
+/* This can cause hangs on some recentish systems which use locale
+ * stuff for strerror...
+ */
 	pseudo_debug(4, "completed: $name (maybe: %s)\n", strerror(save_errno));
+#endif
+	pseudo_debug(4, "completed: $name (errno: %d)\n", save_errno);
 	errno = save_errno;
 	${rc_return}
 }
