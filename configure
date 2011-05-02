@@ -71,7 +71,7 @@ do
 		esac
 		;;
 	*)
-		usage
+		echo >&2 "warning: Unrecognized option '$arg'"
 		;;
 	esac
 done
