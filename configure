@@ -19,14 +19,16 @@
 #
 # not a real configure script...
 opt_prefix=
+opt_libdir=
 opt_suffix=
-opt_bits=32
+opt_bits=
 opt_sqlite=/usr
 
 usage()
 {
 	echo >&2 "usage:"
 	echo >&2 "  configure --prefix=..."
+	echo >&2 " 	      [--libdir=...]"
 	echo >&2 " 	      [--suffix=...]"
 	echo >&2 "            [--with-sqlite=...]"
 	echo >&2 "            [--with-rpath=...|--without-rpath]"
@@ -40,6 +42,9 @@ do
 	--)	shift; break ;;
 	--prefix=*)
 		opt_prefix=${arg#--prefix=}
+		;;
+	--libdir=*)
+		opt_libdir=${arg#--libdir=}
 		;;
 	--with-sqlite=*)
 		opt_sqlite=${arg#--with-sqlite=}
@@ -75,6 +80,14 @@ if [ -z "$opt_prefix" ]; then
   usage
 fi
 
+if [ -n "$opt_bits" ] && [ -n "$opt_libdir" ]; then
+    echo >&2 "Can not specify both --libdir and --bits"
+    exit 1
+fi
+if [ -z "$opt_libdir" ]; then
+    opt_libdir=$opt_prefix/lib$opt_mark64
+fi
+
 if [ ! -f "${opt_sqlite}/include/sqlite3.h" ]; then
     echo >&2 "SQLite3 headers not found in at ${opt_sqlite}/include/sqlite3.h. Please check that SQLite3 and SQLite3 headers are installed."
     exit 1
@@ -93,6 +106,7 @@ fi
 
 sed -e '
   s,@PREFIX@,'"$opt_prefix"',g
+  s,@LIBDIR@,'"$opt_libdir"',g
   s,@SUFFIX@,'"$opt_suffix"',g
   s,@SQLITE@,'"$opt_sqlite"',g
   s!@RPATH@!'"$opt_rpath"'!g
