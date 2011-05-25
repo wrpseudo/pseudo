@@ -48,7 +48,7 @@ extern FILE *pseudo_grp_open(void);
 extern void pseudo_pwd_close(void);
 extern void pseudo_grp_close(void);
 extern int pseudo_pwd_lck_open(void);
-extern void pseudo_pwd_lck_close(void);
+extern int pseudo_pwd_lck_close(void);
 extern FILE *pseudo_pwd;
 extern FILE *pseudo_grp;
 

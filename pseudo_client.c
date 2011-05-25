@@ -377,7 +377,7 @@ pseudo_pwd_lck_open(void) {
 	return pseudo_pwd_lck_fd;
 }
 
-void
+int
 pseudo_pwd_lck_close(void) {
 	if (pseudo_pwd_lck_fd != -1) {
 		close(pseudo_pwd_lck_fd);
@@ -387,6 +387,9 @@ pseudo_pwd_lck_close(void) {
 			pseudo_pwd_lck_name = 0;
 		}
 		pseudo_pwd_lck_fd = -1;
+		return 0;
+	} else {
+		return -1;
 	}
 }
 

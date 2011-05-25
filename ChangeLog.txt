@@ -1,3 +1,6 @@
+2011-05-25:
+	* (seebs) fix for ulckpwdf()
+
 2011-04-21:
 	* (seebs) don't use strerror in wrappers, because it can
 	  lead to malloc deadlocks if part of setting up a malloc

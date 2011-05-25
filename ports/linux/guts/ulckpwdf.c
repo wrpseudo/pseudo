@@ -8,8 +8,7 @@
  */
 
 	/* lock is cleared automatically on close */
-	pseudo_pwd_lck_close();
-	rc = 0;
+	rc = pseudo_pwd_lck_close();
 
 /*	return rc;
  * }
