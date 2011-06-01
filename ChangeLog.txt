@@ -1,3 +1,8 @@
+2011-05-31:
+	* (seebs) Don't mask in 0100 to filesystem modes for things which
+	  are not actually directories, because this breaks the special
+	  logic in euidaccess for X_OK.
+
 2011-05-25:
 	* (seebs) fix for ulckpwdf()
 

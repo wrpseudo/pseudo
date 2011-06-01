@@ -31,10 +31,11 @@
 		return -1;
 	}
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-	rc = real_open(path, O_CREAT | O_WRONLY | O_EXCL, PSEUDO_FS_MODE(mode));
+	rc = real_open(path, O_CREAT | O_WRONLY | O_EXCL,
+		PSEUDO_FS_MODE(mode, 0));
 #else
 	rc = real_openat(dirfd, path, O_CREAT | O_WRONLY | O_EXCL,
-		PSEUDO_FS_MODE(mode));
+		PSEUDO_FS_MODE(mode, 0));
 #endif
 	if (rc == -1) {
 		return -1;

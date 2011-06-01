@@ -16,7 +16,7 @@
 	}
 	buf.st_mode = (buf.st_mode & ~07777) | (mode & 07777);
 	msg = pseudo_client_op_plain(OP_FCHMOD, 0, fd, -1, 0, &buf);
-	real_fchmod(fd, PSEUDO_FS_MODE(mode));
+	real_fchmod(fd, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)));
 	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;

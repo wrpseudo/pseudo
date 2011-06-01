@@ -11,9 +11,9 @@
 		errno = ENOSYS;
 		return -1;
 	}
-	rc = real_mkdir(path, PSEUDO_FS_MODE(mode));
+	rc = real_mkdir(path, PSEUDO_FS_MODE(mode, 1));
 #else
-	rc = real_mkdirat(dirfd, path, PSEUDO_FS_MODE(mode));
+	rc = real_mkdirat(dirfd, path, PSEUDO_FS_MODE(mode, 1));
 #endif
 	if (rc != -1) {
 		struct stat buf;

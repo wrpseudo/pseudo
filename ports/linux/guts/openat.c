@@ -30,13 +30,15 @@
 		errno = save_errno;
 	}
 
-	/* because we are not actually root, secretly mask in 0700 to the
-	 * underlying mode
+	/* because we are not actually root, secretly mask in 0600 to the
+	 * underlying mode.  The ", 0" is because the only time mode matters
+	 * is if a file is going to be created, in which case it's
+	 * not a directory.
 	 */
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-	rc = real_open(path, flags, PSEUDO_FS_MODE(mode));
+	rc = real_open(path, flags, PSEUDO_FS_MODE(mode, 0));
 #else
-	rc = real_openat(dirfd, path, flags, PSEUDO_FS_MODE(mode));
+	rc = real_openat(dirfd, path, flags, PSEUDO_FS_MODE(mode, 0));
 #endif
 	save_errno = errno;
 

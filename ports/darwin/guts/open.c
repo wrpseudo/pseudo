@@ -6,7 +6,7 @@
  *	int rc = -1;
  */
 
-	struct stat buf;
+	struct stat buf = { 0 };
 	int existed = 1;
 	int save_errno;
 
@@ -20,10 +20,12 @@
 		errno = save_errno;
 	}
 
-	/* because we are not actually root, secretly mask in 0700 to the
-	 * underlying mode
+	/* because we are not actually root, secretly mask in 0600 to the
+	 * underlying mode.  The ", 0" is because the only time mode matters
+	 * is if a file is going to be created, in which case it's
+	 * not a directory.
 	 */
-	rc = real_open(path, flags, PSEUDO_FS_MODE(mode));
+	rc = real_open(path, flags, PSEUDO_FS_MODE(mode, 0));
 	save_errno = errno;
 
 	if (rc != -1) {

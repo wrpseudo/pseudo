@@ -47,9 +47,9 @@
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	/* note:  if path was a symlink, and AT_NOFOLLOW_SYMLINKS was
 	 * specified, we already bailed previously. */
-	real_chmod(path, PSEUDO_FS_MODE(mode));
+	real_chmod(path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)));
 #else
-	real_fchmodat(dirfd, path, PSEUDO_FS_MODE(mode), flags);
+	real_fchmodat(dirfd, path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)), flags);
 #endif
 	/* we ignore a failure from underlying fchmod, because pseudo
 	 * may believe you are permitted to change modes that the filesystem
