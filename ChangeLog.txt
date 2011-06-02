@@ -1,6 +1,8 @@
 2011-06-02:
 	* (seebs) intercept system() so the pseudo environment is
 	  properly set for it.
+	* (seebs) call this "1.1" since the cumulative result of all
+	  of these changes is pretty big.
 
 2011-05-31:
 	* (seebs) Don't mask in 0100 to filesystem modes for things which
