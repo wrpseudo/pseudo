@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <dlfcn.h>
 
 /* used for various specific function arguments */
