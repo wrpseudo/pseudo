@@ -1,6 +1,9 @@
 2011-06-06:
 	* (seebs) revise system() handler substantially.  It now
 	  pollutes the environment but works.
+	* (seebs) Call it "1.1.1" so the nice folks doing Yocto
+	  can have an official branch and not need to use git.
+	* (seebs) add "tarball" make target.
 
 2011-06-02:
 	* (seebs) intercept system() so the pseudo environment is

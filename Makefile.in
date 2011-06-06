@@ -25,7 +25,7 @@ SQLITE=@SQLITE@
 BITS=@BITS@
 MARK64=@MARK64@
 RPATH=@RPATH@
-VERSION=1.1
+VERSION=1.1.1
 
 LIB=$(shell basename $(LIBDIR))
 BIN=bin
@@ -168,3 +168,16 @@ distclean: clean
 nuke: distclean
 	case "$(PREFIX)" in "`pwd`"/*) rm -rf "$(PREFIX)";; esac
 	@echo "WARNING: Removed $(PREFIX)."
+
+tarball:
+	@test -d .git || ( echo >&2 "Tarball can only be made from git tree."; exit 1)
+	rm -rf pseudo-$(VERSION)
+	mkdir -p pseudo-$(VERSION)
+	( parent=$(PWD); \
+	  cd pseudo-$(VERSION) && \
+	  git clone $$parent && \
+	  mv pseudo/* . && \
+	  rm -rf pseudo/.git* && \
+	  rmdir pseudo \
+	)
+	tar czf pseudo-$(VERSION).tgz pseudo-$(VERSION)
