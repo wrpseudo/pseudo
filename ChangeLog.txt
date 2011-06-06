@@ -1,3 +1,7 @@
+2011-06-06:
+	* (seebs) revise system() handler substantially.  It now
+	  pollutes the environment but works.
+
 2011-06-02:
 	* (seebs) intercept system() so the pseudo environment is
 	  properly set for it.

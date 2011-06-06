@@ -13,26 +13,8 @@
 	if (!command)
 		return 1;
 
-	pid = wrap_fork();
-
-	if (pid) {
-		int status;
-		waitpid(pid, &status, 0);
-		if (WIFEXITED(status)) {
-			rc = WEXITSTATUS(status);
-		} else {
-			/* we naively assume that either it exited or
-			 * got killed by a signal...
-			 */
-			rc = WTERMSIG(status) + 128;
-		}
-	} else {
-		/* this involves ANOTHER fork, but it's much, much,
-		 * simpler than trying to get all the details right.
-		 */
-		rc = real_system(command);
-		exit(rc);
-	}
+	pseudo_setupenv();
+	rc = real_system(command);
 
 /*	return rc;
  * }
