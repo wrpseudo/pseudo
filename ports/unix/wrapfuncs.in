@@ -18,7 +18,7 @@ int lutimes(const char *path, const struct timeval *tv);
 char *mkdtemp(char *template);
 char *mktemp(char *template);
 long pathconf(const char *path, int name);
-char *realpath(const char *name, char *resolved_name);
+char *realpath(const char *name, char *resolved_name); /* version="GLIBC_2.3" */
 int remove(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
 DIR *opendir(const char *path);
 char *tempnam(const char *template, const char *pfx);

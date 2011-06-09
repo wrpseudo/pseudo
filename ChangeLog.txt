@@ -1,3 +1,8 @@
+2011-06-08:
+	* (seebs) Get the modern realpath from glibc instead of the old
+	  one inexplicably proferred by RTLD_NEXT.  Fixes realpath(path, NULL)
+	  when PSEUDO_DISABLED=1.
+
 2011-06-06:
 	* (seebs) revise system() handler substantially.  It now
 	  pollutes the environment but works.

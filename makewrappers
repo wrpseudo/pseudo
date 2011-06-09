@@ -211,6 +211,7 @@ class Function:
         self.flags = '0'
         self.port = port
         self.directory = ''
+	self.version = 'NULL'
         # On Darwin, some functions are SECRETLY converted to foo$INODE64
         # when called.  So we have to look those up for real_*
         self.inode64 = None

@@ -90,6 +90,42 @@ pseudo_reinit_libpseudo(void) {
 	_libpseudo_init();
 }
 
+static void
+pseudo_init_one_wrapper(pseudo_function *func) {
+	int (*f)(void);
+	char *e;
+	if (*func->real != NULL) {
+		/* already initialized */
+		return;
+	}
+	dlerror();
+
+#if PSEUDO_PORT_LINUX
+	if (func->version)
+		f = dlvsym(RTLD_NEXT, func->name, func->version);
+	/* fall through to the general case, if that failed */
+	if (!f)
+#endif
+	f = dlsym(RTLD_NEXT, func->name);
+	if (f) {
+		*func->real = f;
+	} else {
+		e = dlerror();
+#ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
+		char *s = func->name;
+		s += strlen(s) - 2;
+		/* *at() don't have to exist */
+		if (!strcmp(s, "at")) {
+			continue;
+		}
+#else
+		if (e != NULL) {
+			pseudo_diag("No real function for %s: %s\n", func->name, e);
+		}
+#endif
+	}
+}
+
 void
 pseudo_init_wrappers(void) {
 	int i;
@@ -103,29 +139,7 @@ pseudo_init_wrappers(void) {
 	 */
 	if (!done) {
 		for (i = 0; pseudo_functions[i].name; ++i) {
-			if (*pseudo_functions[i].real == NULL) {
-				int (*f)(void);
-				char *e;
-				dlerror();
-				f = dlsym(RTLD_NEXT, pseudo_functions[i].name);
-				if (f) {
-					*pseudo_functions[i].real = f;
-				} else {
-					e = dlerror();
-#ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-					char *s = pseudo_functions[i].name;
-					s += strlen(s) - 2;
-					/* *at() don't have to exist */
-					if (!strcmp(s, "at")) {
-						continue;
-					}
-#else
-					if (e != NULL) {
-						pseudo_diag("No real function for %s: %s\n", pseudo_functions[i].name, e);
-					}
-#endif
-				}
-			}
+			pseudo_init_one_wrapper(&pseudo_functions[i]);
 		}
 		done = 1;
 	}
