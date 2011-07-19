@@ -1,5 +1,6 @@
 2011-07-19:
 	* (seebs) initialize a variable in that "realpath" code.
+	* (seebs) call it 1.1.2.
 
 2011-06-08:
 	* (seebs) Get the modern realpath from glibc instead of the old
