@@ -92,7 +92,8 @@ pseudo_reinit_libpseudo(void) {
 
 static void
 pseudo_init_one_wrapper(pseudo_function *func) {
-	int (*f)(void);
+	int (*f)(void) = (int (*)(void)) NULL;
+
 	char *e;
 	if (*func->real != NULL) {
 		/* already initialized */
