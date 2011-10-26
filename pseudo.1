@@ -576,13 +576,6 @@ than it is otherwise.  This is probably because nearly every operation
 communication with the server, and probably some kind of database
 activity.
 
-The 
-.IR clone(2)
-wrapper unconditionallity restores the system environment.  It also invokes
-the checks to see if the user has requested pseudo to be disabled or unloaded.
-Due to the semantics of clone, this causes both the parent and child processes
-to be disabled or unloaded.
-
 .SH SEE ALSO
 fakeroot(1), ld.so(8), pseudolog(1), sqlite3(1)
 .SH FURTHER READING

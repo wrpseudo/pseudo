@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2008-2010 Wind River Systems; see
+ * Copyright (c) 2008-2011 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -8,18 +8,23 @@
  */
 	/* because clone() doesn't actually continue in this function, we
 	 * can't check the return and fix up environment variables in the
-	 * child.  Instead, we have to temporarily do any fixup, then possibly
-	 * undo it later.  UGH!
+	 * child.  Instead, we have to create an intermediate function,
+	 * wrap_clone_child, which does this fix up.
 	 */
-	pseudo_debug(1, "client resetting for clone(2) call\n");
-	pseudo_setupenv();
-	if (!pseudo_get_value("PSEUDO_UNLOAD")) {
-		pseudo_reinit_libpseudo();
-	} else {
-		pseudo_dropenv();
-	}
+
+	struct clone_args * myargs = malloc(sizeof(struct clone_args));
+
+	myargs->fn = fn;
+	myargs->flags = flags;
+	myargs->arg = arg;
+
 	/* call the real syscall */
-	rc = (*real_clone)(fn, child_stack, flags, arg);
+	rc = (*real_clone)(wrap_clone_child, child_stack, flags, myargs, pid);
+
+	/* If we're not sharing memory, we need to free myargs in the parent */
+	if (!(flags & CLONE_VM))
+		free(myargs);
+
 /*	...
  *	return rc;
  * }

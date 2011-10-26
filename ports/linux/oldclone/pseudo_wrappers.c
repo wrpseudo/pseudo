@@ -1,13 +1,40 @@
-int
+static int
 wrap_clone(int (*fn)(void *), void *child_stack, int flags, void *arg) {
 	/* unused */
 	return 0;
 }
 
+struct clone_args {
+	int (*fn)(void *);
+	int flags;
+	void *arg;
+};
+
+int wrap_clone_child(void *args) {
+	struct clone_args *clargs = args;
+
+	int (*fn)(void *) = clargs->fn;
+	int flags = clargs->flags;
+	void *arg = clargs->arg;
+
+	/* We always free in the client */
+	free(clargs);
+
+	if (!(flags & CLONE_VM)) {
+		pseudo_setupenv();
+		if (!pseudo_get_value("PSEUDO_UNLOAD")) {
+			pseudo_reinit_libpseudo();
+		} else {
+			pseudo_dropenv();
+		}
+	}
+
+	return fn(arg);
+}
+
 int
 clone(int (*fn)(void *), void *child_stack, int flags, void *arg) {
 	sigset_t saved;
-	va_list ap;
 	pid_t *pid;
 	struct user_desc *tls;
 	pid_t *ctid;
@@ -30,11 +57,6 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg) {
 
 	int save_errno;
 	int save_disabled = pseudo_disabled;
-	/* because clone() doesn't actually continue in this function, we
-	 * can't check the return and fix up environment variables in the
-	 * child.  Instead, we have to temporarily do any fixup, then possibly
-	 * undo it later.  UGH!
-	 */
 
 #include "guts/clone.c"
 
