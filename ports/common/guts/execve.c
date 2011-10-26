@@ -19,12 +19,9 @@
 		free(path_guess);
         }
 
-	if (!pseudo_get_value("PSEUDO_RELOADED"))
-		new_environ = pseudo_setupenvp(envp);
-	else {
-		new_environ = pseudo_setupenvp(envp);
+	new_environ = pseudo_setupenvp(envp);
+	if (pseudo_get_value("PSEUDO_UNLOAD"))
 		new_environ = pseudo_dropenvp(new_environ);
-	}
 
 	/* if exec() fails, we may end up taking signals unexpectedly...
 	 * not much we can do about that.

@@ -14,7 +14,7 @@ libpseudo execution flow:
 			setup pseudo_functions
 			setup pseudo_logfile
 		pseudo_client.c: pseudo_init_client()
-			setup PSEUDO_DISBLED
+			setup PSEUDO_DISABLED
 			setup pseudo_prefix_dir_fd
 			setup pseudo_localstate_dir_fd
 			setup PSEUDO_NOSYMLINKEXP
@@ -28,26 +28,35 @@ libpseudo execution flow:
 		pseudo_check_wrappers():
 			pseudo_reinit_libpseudo if necessary
 		call wrap_exec*()
-			if !PSEUDO_RELOADED
-				pseudo_setupenv()
-			else
-				pseudo_setupenv()
+			pseudo_setupenv()
+			if PSEUDO_UNLOAD
 				pseudo_dropenv()
 			real_exec*()
 
 	fork()
+		pseudo_check_wrappers():
+			pseudo_reinit_libpseudo if necessary
+		call wrap_fork()
+			real_fork()
+			if (child)
+				pseudo_setupenv()
+				if !PSEUDO_UNLOAD
+					pseudo_reinit_libpseudo()
+						_libpseudo_init()
+				else
+					pseudo_dropenv()
+
 	clone()
 		pseudo_check_wrappers():
 			pseudo_reinit_libpseudo if necessary
-		call wrap_exec*()
-			if !PSEUDO_RELOADED
-				pseudo_setupenv()
+		call wrap_clone()
+			pseudo_setupenv()
+			if !PSEUDO_UNLOAD
 				pseudo_reinit_libpseudo()
 					_libpseudo_init()
 			else
-				pseudo_setupenv()
 				pseudo_dropenv()
-			real_*()
+			real_clone()
 
 	... normal function wrappers ... (templates/wrapfuncs.c):
 		pseudo_check_wrappers() || !real_*

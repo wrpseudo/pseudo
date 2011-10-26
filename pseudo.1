@@ -408,8 +408,9 @@ client library does not modify the behavior of called functions, though it
 continues to intercept them and block signals while processing them.  This
 variable is reevaluated on every call to
 .IR fork(2) ,\  clone(2)
-or related functions. If the value starts with a lowercase or uppercase s,
-the pseudo client disables all server spawning and communications, but still
+or related functions. If the value starts with a lowercase or uppercase
+.I s
+, the pseudo client disables all server spawning and communications, but still
 operates locally. This means that no filesystem mode or permissions changes
 are actually recorded or reported, but functions like
 .I chown()
@@ -506,15 +507,6 @@ This variable is automatically set by the
 .I pseudo
 program when it is used as a launcher.
 .TP 8
-.B PSEUDO_RELOADED
-This purely internal variable is used to track state while trying
-to re-execute to get rid of the
-.B LD_PRELOAD
-value when spawning a server.  (The
-.I pseudo
-server itself cannot function running in the
-.I pseudo environment.)
-.TP 8
 .B PSEUDO_TAG
 If this variable is set in a client's environment, its value is
 communicated to the server at the beginning of each client session,
@@ -525,6 +517,24 @@ associated with them; the tag value is per-client, not per-server.
 .BR PSEUDO_UIDS ,\  PSEUDO_GIDS
 These variables are used internally to pass information about the current
 emulated user and group identity from one process to another.
+.TP 8
+.B PSEUDO_UNLOAD
+This variable is reevaluated on every call to
+.IR fork(2) ,\ exec(3)
+or related functions.  If the variable exists
+.RI libpseudo.so
+will be removed from
+.B LD_PRELOAD
+and 
+.B PSEUDO_DISABLED 
+behavior will also be triggered.  For processes
+that simply 
+.IR fork(2),
+the behavior will be the same as if 
+.B PSEUDO_DISABLED
+was set.  For new processes, after a call to
+.IR exec(3)\ or\ system(3)
+pseudo will not be loaded in the new process.
 .TP 8
 .B SHELL
 If set, this will be used when
@@ -565,6 +575,13 @@ than it is otherwise.  This is probably because nearly every operation
 (other than reads and writes) involves at least one round-trip network
 communication with the server, and probably some kind of database
 activity.
+
+The 
+.IR clone(2)
+wrapper unconditionallity restores the system environment.  It also invokes
+the checks to see if the user has requested pseudo to be disabled or unloaded.
+Due to the semantics of clone, this causes both the parent and child processes
+to be disabled or unloaded.
 
 .SH SEE ALSO
 fakeroot(1), ld.so(8), pseudolog(1), sqlite3(1)

@@ -63,8 +63,8 @@ static struct pseudo_variables pseudo_env[] = {
 	{ "PSEUDO_TAG", 10, NULL },
 	{ "PSEUDO_ENOSYS_ABORT", 19, NULL },
 	{ "PSEUDO_NOSYMLINKEXP", 19, NULL },
-	{ "PSEUDO_RELOADED", 15, NULL },
 	{ "PSEUDO_DISABLED", 15, NULL },
+	{ "PSEUDO_UNLOAD", 13, NULL },
 	{ NULL, 0, NULL } /* Magic terminator */
 };
 

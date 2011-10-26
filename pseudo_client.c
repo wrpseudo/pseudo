@@ -161,6 +161,20 @@ pseudo_init_client(void) {
 		pseudo_set_value("PSEUDO_DISABLED", "0");
 	}
 
+	/* in child processes, PSEUDO_UNLOAD may become set to
+	 * some truthy value, in which case we're being asked to
+	 * remove pseudo from the LD_PRELOAD. We need to make sure
+	 * this value gets loaded into the internal variables.
+	 *
+	 * If we've been told to unload, but are still available
+	 * we need to act as if unconditionally disabled.
+	 */
+	env = getenv("PSEUDO_UNLOAD");
+	if (env) {
+		pseudo_set_value("PSEUDO_UNLOAD", env);
+		pseudo_disabled=1;
+	}
+
 	/* Setup global items needed for pseudo to function... */
 	if (!pseudo_inited) {
 		/* Ensure that all of the values are reset */
@@ -641,7 +655,7 @@ client_spawn_server(void) {
 		}
 		/* and now, execute the server */
 
-		pseudo_set_value("PSEUDO_RELOADED", "YES");
+		pseudo_set_value("PSEUDO_UNLOAD", "YES");
 		pseudo_setupenv();
 		pseudo_dropenv(); /* drop PRELINK_LIBRARIES */
 

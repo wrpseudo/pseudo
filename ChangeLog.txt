@@ -1,3 +1,10 @@
+2011-10-20:
+	* (mhatle) change from internal PSEUDO_RELOADED to external
+	  PSEUDO_UNLOAD environment variable.  Enable external programs
+	  to have a safe and reliable way to unload pseudo on the next
+	  exec*.  PSEUDO_UNLOAD also will disable pseudo if we're in a
+	  fork/clone situation in the same way PSEUDO_DISABLED=1 would.
+
 2011-07-19:
 	* (seebs) initialize a variable in that "realpath" code.
 

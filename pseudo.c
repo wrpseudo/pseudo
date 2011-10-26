@@ -106,21 +106,29 @@ main(int argc, char *argv[]) {
 
 	if (ld_env && strstr(ld_env, "libpseudo")) {
 		pseudo_debug(2, "can't run daemon with libpseudo in %s\n", PRELINK_LIBRARIES);
-		s = pseudo_get_value("PSEUDO_RELOADED");
+		s = pseudo_get_value("PSEUDO_UNLOAD");
 		if (s) {
 			pseudo_diag("I can't seem to make %s go away.  Sorry.\n", PRELINK_LIBRARIES);
 			pseudo_diag("%s: %s\n", PRELINK_LIBRARIES, ld_env);
 			exit(EXIT_FAILURE);
 		}
 		free(s);
-		pseudo_set_value("PSEUDO_RELOADED", "YES");
+		pseudo_set_value("PSEUDO_UNLOAD", "YES");
 		pseudo_setupenv();
 		pseudo_dropenv(); /* Drop PRELINK_LIBRARIES */
 
 		execv(argv[0], argv);
 		exit(EXIT_FAILURE);
 	}
-	pseudo_set_value("PSEUDO_RELOADED", NULL);
+
+	/* Be sure to clean PSEUDO_UNLOAD so if we're asked to run any
+	 * programs pseudo will be active in the process...
+	 * (note: pseudo_set_value doesn't muck w/ the environment, thus
+	 *  the need for the unsetenv, which is safe because "pseudo"
+	 *  is the executable in this case!)
+	 */
+	pseudo_set_value("PSEUDO_UNLOAD", NULL);
+	unsetenv("PSEUDO_UNLOAD");
 
 	/* we need cwd to canonicalize paths */
 	pseudo_client_getcwd();
