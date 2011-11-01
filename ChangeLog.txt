@@ -1,3 +1,7 @@
+2011-11-01:
+	* (mhatle) Stop valgrind from reporting use of uninitialized
+	  memory from pseudo_client:client_ping()
+
 2011-10-26:
 	* (mhatle) update clone wrapper to add an intermediate function
 	  to avoid setting environment variables in the parent.

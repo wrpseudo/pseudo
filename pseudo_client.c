@@ -674,6 +674,8 @@ client_ping(void) {
 	char tagbuf[pseudo_path_max()];
 	char *tag = pseudo_get_value("PSEUDO_TAG");
 
+	memset(&ping, 0, sizeof(ping));
+
 	ping.type = PSEUDO_MSG_PING;
 	ping.op = OP_NONE;
 
