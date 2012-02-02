@@ -21,6 +21,7 @@ long pathconf(const char *path, int name);
 char *realpath(const char *name, char *resolved_name); /* version="GLIBC_2.3" */
 int remove(const char *path); /* flags=AT_SYMLINK_NOFOLLOW */
 DIR *opendir(const char *path);
+int closedir(DIR *dirp);
 char *tempnam(const char *template, const char *pfx);
 char *tmpnam(char *s);
 int truncate(const char *path, off_t length);

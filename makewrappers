@@ -211,12 +211,13 @@ class Function:
         self.flags = '0'
         self.port = port
         self.directory = ''
-	self.version = 'NULL'
+        self.version = 'NULL'
         # On Darwin, some functions are SECRETLY converted to foo$INODE64
         # when called.  So we have to look those up for real_*
         self.inode64 = None
         self.real_func = None
         self.paths_to_munge = []
+        self.specific_dirfds = {}
         self.hand_wrapped = None
         # used for the copyright date when creating stub functions
         self.date = datetime.date.today().year
@@ -239,6 +240,7 @@ class Function:
         # * If the arg has a name ending in 'path', we will canonicalize it.
         # * If the arg is named 'dirfd' or 'flags', it becomes the default
         #   values for the dirfd and flags arguments when canonicalizing.
+        # * If the name ends in dirfd, we do the same fancy stuff.
         # * Note that the "comments" field (/* ... */ after the decl) can
         #   override the dirfd/flags values.
         self.args = ArgumentList(bits.group(2))
@@ -246,11 +248,13 @@ class Function:
             # ignore varargs, they never get these special treatments
             if arg.vararg:
                 pass
-            elif arg.name == 'dirfd':
+            elif arg.name.endswith('dirfd'):
+                if len(arg.name) > 5:
+                    self.specific_dirfds[arg.name[:-5]] = True
                 self.dirfd = 'dirfd'
             elif arg.name == 'flags':
                 self.flags = 'flags'
-            elif arg.name[-4:] == 'path':
+            elif arg.name.endswith('path'):
                 self.paths_to_munge.append(arg.name)
     
         # pick default values
@@ -325,9 +329,12 @@ class Function:
         """create/allocate canonical paths"""
         alloc_paths = []
         for path in self.paths_to_munge:
+	    prefix = path[:-4]
+	    if prefix not in self.specific_dirfds:
+                prefix = ''
             alloc_paths.append(
-                "%s = pseudo_root_path(__func__, __LINE__, %s, %s, %s);" %
-                (path, self.dirfd, path, self.flags))
+                "%s = pseudo_root_path(__func__, __LINE__, %s%s, %s, %s);" %
+                (path, prefix, self.dirfd, path, self.flags))
         return "\n\t\t\t".join(alloc_paths)
 
     def free_paths(self):

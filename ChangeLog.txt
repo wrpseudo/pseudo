@@ -1,3 +1,11 @@
+2012-02-02:
+	* (seebs) stash dir name for DIR * from opendir using dirfd.
+	* (seebs) add closedir.
+	* (seebs) add initial pass at renameat()
+	* (seebs) update makewrappers with smarter *dirfd handling.
+	* (seebs) in base_path, don't try to strlen the result if
+	  fd_path() returns NULL.
+
 2011-11-02:
 	* (seebs) Call this 1.2 because the UNLOAD change is moderately
 	  significant, and so's the clone change.

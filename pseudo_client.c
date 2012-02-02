@@ -988,6 +988,8 @@ base_path(int dirfd, const char *path, int leave_last) {
 		if (dirfd != -1 && dirfd != AT_FDCWD) {
 			if (dirfd >= 0) {
 				basepath = fd_path(dirfd);
+			}
+			if (basepath) {
 				baselen = strlen(basepath);
 			} else {
 				pseudo_diag("got *at() syscall for unknown directory, fd %d\n", dirfd);
@@ -1128,7 +1130,10 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	if (path) {
 		pseudo_debug(2, " %s", path);
 	}
-	if (fd != -1) {
+	/* for OP_RENAME in renameat, "fd" is also used for the
+	 * second dirfd.
+	 */
+	if (fd != -1 && op != OP_RENAME) {
 		pseudo_debug(2, " [fd %d]", fd);
 	}
 	if (buf) {
