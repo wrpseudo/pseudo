@@ -329,8 +329,8 @@ class Function:
         """create/allocate canonical paths"""
         alloc_paths = []
         for path in self.paths_to_munge:
-	    prefix = path[:-4]
-	    if prefix not in self.specific_dirfds:
+            prefix = path[:-4]
+            if prefix not in self.specific_dirfds:
                 prefix = ''
             alloc_paths.append(
                 "%s = pseudo_root_path(__func__, __LINE__, %s%s, %s, %s);" %
