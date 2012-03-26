@@ -1,3 +1,6 @@
+2012-03-26:
+	* (seebs) Add popen() call to set up environment.
+
 2012-02-06:
 	* (seebs) Merge O_LARGEFILE into flags, not mode (thanks to Lei
 	  Liu at Wind River for the fix).
