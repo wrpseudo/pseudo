@@ -27,7 +27,7 @@ MARK64=@MARK64@
 RPATH=@RPATH@
 VERSION=1.2
 
-LIB=$(shell basename $(LIBDIR))
+LIB=@LIB@
 BIN=bin
 LOCALSTATE=var/pseudo
 BINDIR=$(PREFIX)/$(BIN)

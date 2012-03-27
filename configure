@@ -80,12 +80,16 @@ if [ -z "$opt_prefix" ]; then
   usage
 fi
 
-if [ -n "$opt_bits" ] && [ -n "$opt_libdir" ]; then
-    echo >&2 "Can not specify both --libdir and --bits"
-    exit 1
-fi
 if [ -z "$opt_libdir" ]; then
     opt_libdir=$opt_prefix/lib$opt_mark64
+fi
+
+# We need to find the libdir relative to the prefix, this is required
+# by the code in pseudo-utils.c that handles relocation.
+opt_lib=${opt_libdir#$opt_prefix/}
+if [ "$opt_lib" = "$opt_libdir" ]; then
+    echo >&2 "libdir must be relative to prefix."
+    exit 1
 fi
 
 if [ ! -f "${opt_sqlite}/include/sqlite3.h" ]; then
@@ -107,6 +111,7 @@ fi
 sed -e '
   s,@PREFIX@,'"$opt_prefix"',g
   s,@LIBDIR@,'"$opt_libdir"',g
+  s,@LIB@,'"$opt_lib"',g
   s,@SUFFIX@,'"$opt_suffix"',g
   s,@SQLITE@,'"$opt_sqlite"',g
   s!@RPATH@!'"$opt_rpath"'!g
