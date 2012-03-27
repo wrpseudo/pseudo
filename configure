@@ -31,10 +31,13 @@ usage()
 	echo >&2 " 	      [--libdir=...]"
 	echo >&2 " 	      [--suffix=...]"
 	echo >&2 "            [--with-sqlite=...]"
+	echo >&2 "            [--enable-static-sqlite]"
 	echo >&2 "            [--with-rpath=...|--without-rpath]"
 	echo >&2 "            [--bits=32|64]"
 	exit 1
 }
+
+sqlite_ldarg=-lsqlite3
 
 for arg
 do
@@ -45,6 +48,9 @@ do
 		;;
 	--libdir=*)
 		opt_libdir=${arg#--libdir=}
+		;;
+	--enable-static-sqlite)
+		sqlite_ldarg='$(SQLITE)/lib/libsqlite3.a'
 		;;
 	--with-sqlite=*)
 		opt_sqlite=${arg#--with-sqlite=}
@@ -114,6 +120,7 @@ sed -e '
   s,@LIB@,'"$opt_lib"',g
   s,@SUFFIX@,'"$opt_suffix"',g
   s,@SQLITE@,'"$opt_sqlite"',g
+  s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g
   s!@RPATH@!'"$opt_rpath"'!g
   s,@MARK64@,'"$opt_mark64"',g
   s,@BITS@,'"$opt_bits"',g

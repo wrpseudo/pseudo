@@ -1,6 +1,7 @@
 2012-03-27:
 	* (seebs) Merge in:
 	* (mhatle) Improve configuration compatibility with OE-Core.
+	* (seebs) Provide option to statically link libsqlite.
 
 2012-03-26:
 	* (seebs) Add popen() call to set up environment.
