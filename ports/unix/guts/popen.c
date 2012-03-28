@@ -5,7 +5,6 @@
  * FILE *popen(const char *command, const char *mode)
  *	FILE *rc = NULL;
  */
-
 	/* on at least some systems, popen() calls fork and exec
 	 * in ways that avoid our usual enforcement of the environment.
 	 */

@@ -6,6 +6,11 @@
  *	int rc = -1;
  */
 
+	/* NOTE THAT THIS IS NEVER USED!
+	 * We implement all execl() in terms of execv()
+	 * so this call is not used.
+	 */
+
 	rc = real_execle(file, arg, ap);
 
 /*	return rc;

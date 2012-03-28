@@ -1,3 +1,10 @@
+2012-03-28:
+	* (seebs) Cleanup unused variables, stray semicolons, add
+	  comments to some unused functions which exist because the
+	  wrapper generator makes them anyway.
+	* (seebs) Make system() drop environment if PSEUDO_UNLOAD is
+	  set.
+
 2012-03-27:
 	* (seebs) Merge in:
 	* (mhatle) Improve configuration compatibility with OE-Core.

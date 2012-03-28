@@ -1055,7 +1055,7 @@ char *
 pseudo_get_bindir(void) {
 	char *s = pseudo_get_value("PSEUDO_BINDIR");
 	if (!s) {
-		char *pseudo_bindir = pseudo_prefix_path(PSEUDO_BINDIR);;
+		char *pseudo_bindir = pseudo_prefix_path(PSEUDO_BINDIR);
 		if (pseudo_bindir) {
 			pseudo_set_value("PSEUDO_BINDIR", pseudo_bindir);
 			s = pseudo_bindir;
