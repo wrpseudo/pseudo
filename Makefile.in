@@ -1,7 +1,7 @@
 #
 # Makefile.in/Makefile, build rules for pseudo
 #
-# Copyright (c) 2008-2010 Wind River Systems, Inc.
+# Copyright (c) 2008-2012 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -23,6 +23,7 @@ LIBDIR=@LIBDIR@
 SUFFIX=@SUFFIX@
 SQLITE=@SQLITE@
 BITS=@BITS@
+COMPILE_BITS=@COMPILE_BITS@
 MARK64=@MARK64@
 RPATH=@RPATH@
 VERSION=1.3
@@ -34,10 +35,7 @@ BINDIR=$(PREFIX)/$(BIN)
 LOCALSTATEDIR=$(PREFIX)/$(LOCALSTATE)
 
 CFLAGS_BASE=-pipe -std=gnu99 -Wall -W -Wextra
-CFLAGS_CODE=-fPIC -D_LARGEFILE64_SOURCE -D_ATFILE_SOURCE
-ifneq ($(BITS),)
-    CFLAGS_CODE += -m$(BITS)
-endif
+CFLAGS_CODE=-fPIC -D_LARGEFILE64_SOURCE -D_ATFILE_SOURCE $(COMPILE_BITS)
 CFLAGS_DEFS=-DPSEUDO_PREFIX='"$(PREFIX)"' -DPSEUDO_SUFFIX='"$(SUFFIX)"' -DPSEUDO_BINDIR='"$(BIN)"' -DPSEUDO_LIBDIR='"$(LIB)"' -DPSEUDO_LOCALSTATEDIR='"$(LOCALSTATE)"' -DPSEUDO_VERSION='"$(VERSION)"'
 CFLAGS_DEBUG=-O2 -g
 CFLAGS_SQL=-L$(SQLITE)/lib -I$(SQLITE)/include $(RPATH)

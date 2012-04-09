@@ -2,7 +2,7 @@
 #
 # configure, simulation of autoconf script, much simplified
 #
-# Copyright (c) 2008-2010 Wind River Systems, Inc.
+# Copyright (c) 2008-2012 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -21,9 +21,13 @@
 opt_prefix=
 opt_libdir=
 opt_suffix=
+opt_arch=x86
 opt_bits=
 opt_sqlite=/usr
 opt_rpath=
+
+compile_x86_32=-m32
+compile_x86_64=-m64
 
 usage()
 {
@@ -34,6 +38,7 @@ usage()
 	echo >&2 "            [--with-sqlite=...]"
 	echo >&2 "            [--enable-static-sqlite]"
 	echo >&2 "            [--with-rpath=...|--without-rpath]"
+	echo >&2 "            [--arch=x86|arm|'']"
 	echo >&2 "            [--bits=32|64]"
 	exit 1
 }
@@ -74,6 +79,9 @@ do
 	--suffix=*)
 		opt_suffix=${arg#--suffix=}
 		;;
+	--arch=*)
+		opt_arch=${arg#--arch=}
+		;;
 	--bits=*)
 		opt_bits=${arg#--bits=}
 		case $opt_bits in
@@ -88,6 +96,16 @@ do
 		;;
 	esac
 done
+
+case $opt_arch in
+'' | x86 | arm )
+	;;
+*)	echo >&2 "Untested arch $opt_arch."
+	;;
+esac
+
+# Some targets want something like -m64.
+eval compile_bits=\$compile_${opt_arch}_${opt_bits}
 
 if $use_maybe_rpath && [ -n "$maybe_rpath" ]; then
 	echo >&2 "Adding default RPATH for sqlite."
@@ -132,8 +150,10 @@ sed -e '
   s,@LIB@,'"$opt_lib"',g
   s,@SUFFIX@,'"$opt_suffix"',g
   s,@SQLITE@,'"$opt_sqlite"',g
+  s,@COMPILE_BITS@,'"$compile_bits"',g
   s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g
   s!@RPATH@!'"$opt_rpath"'!g
   s,@MARK64@,'"$opt_mark64"',g
+  s,@ARCH@,'"$opt_arch"',g
   s,@BITS@,'"$opt_bits"',g
 ' < Makefile.in > Makefile

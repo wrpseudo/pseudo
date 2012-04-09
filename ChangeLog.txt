@@ -1,5 +1,7 @@
 2012-04-09:
 	* (seebs) Improvements to rpath logic for sqlite, etc.
+	* (seebs) Improvements to the logic for picking options
+	  like -m32, -m64 (which is to say, on ARM:  Don't.)
 
 2012-03-28:
 	* (seebs) Cleanup unused variables, stray semicolons, add
