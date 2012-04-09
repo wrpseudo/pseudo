@@ -1,3 +1,6 @@
+2012-04-09:
+	* (seebs) Improvements to rpath logic for sqlite, etc.
+
 2012-03-28:
 	* (seebs) Cleanup unused variables, stray semicolons, add
 	  comments to some unused functions which exist because the

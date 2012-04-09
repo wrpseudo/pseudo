@@ -23,6 +23,7 @@ opt_libdir=
 opt_suffix=
 opt_bits=
 opt_sqlite=/usr
+opt_rpath=
 
 usage()
 {
@@ -39,6 +40,9 @@ usage()
 
 sqlite_ldarg=-lsqlite3
 
+maybe_rpath=
+use_maybe_rpath=true
+
 for arg
 do
 	case $arg in
@@ -51,18 +55,21 @@ do
 		;;
 	--enable-static-sqlite)
 		sqlite_ldarg='$(SQLITE)/lib/libsqlite3.a'
+		use_maybe_rpath=false
 		;;
 	--with-sqlite=*)
 		opt_sqlite=${arg#--with-sqlite=}
 		# assign new value if unset
-		: ${opt_rpath=-Wl,-R\$(SQLITE)/lib}
+		maybe_rpath='-Wl,-R$(SQLITE)/lib'
 		;;
 	--without-rpath)
 		opt_rpath=''
+		use_maybe_rpath=false
 		;;
 	--with-rpath=*)
 	        rpath=${arg#--with-rpath=}
 		opt_rpath=${rpath:+-Wl,-R$rpath}
+		use_maybe_rpath=false
 		;;
 	--suffix=*)
 		opt_suffix=${arg#--suffix=}
@@ -81,6 +88,11 @@ do
 		;;
 	esac
 done
+
+if $use_maybe_rpath && [ -n "$maybe_rpath" ]; then
+	echo >&2 "Adding default RPATH for sqlite."
+	opt_rpath="${opt_rpath+${opt_rpath} }${maybe_rpath}"
+fi
 
 if [ -z "$opt_prefix" ]; then
   usage
@@ -107,7 +119,7 @@ read t1 t2 SQLITE3_VERSION << EOF
   `grep "#define SQLITE_VERSION_NUMBER " ${opt_sqlite}/include/sqlite3.h`
 EOF
 
-echo "SQLite header for version ${SQLITE3_VERSION} found."
+echo "SQLite header for version ${SQLITE3_VERSION} found in ${opt_sqlite}."
 
 if [ "${SQLITE3_VERSION}" -lt "03006000" ]; then
     echo >&2 "Pseudo requires SQLite version 3, 3.6.x or later."
