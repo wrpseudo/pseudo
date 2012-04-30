@@ -1,3 +1,6 @@
+2012-04-30:
+	* (seebs) Update README about new upstream.
+
 2012-04-09:
 	* (seebs) Improvements to rpath logic for sqlite, etc.
 	* (seebs) Improvements to the logic for picking options

@@ -1,5 +1,17 @@
 pseudo -- an analogue to sudo
 
+IMPORTANT NOTE:
+
+As of this writing, the official home for pseudo's git repository has
+changed to:
+	git://git.yoctoproject.org/pseudo
+
+The old site at:
+	https://github.com/wrpseudo/pseudo
+
+is no longer the "real" master, although I'll probably try to keep it in
+sync.
+
 OVERVIEW:
 
 The pseudo utility offers a way to run commands in a virtualized "root"
