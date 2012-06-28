@@ -1,3 +1,6 @@
+2012-06-27:
+        * (seebs) Fix chroot coredump with long root path.
+
 2012-04-30:
 	* (seebs) Update README about new upstream.
 

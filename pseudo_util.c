@@ -597,9 +597,13 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
 	}
 	pathlen = strlen(path);
 	newpathlen = pathlen;
-	if (baselen && path[0] != '/') {
+        /* If the path starts with /, we don't care about base, UNLESS
+         * rootlen is non-zero, in which case we're doing a chroot thing
+         * and will actually need to append some components.
+         */
+	if (baselen && (path[0] != '/' || rootlen)) {
 		newpathlen += baselen + 2;
-	}
+        }
 	/* allow a bit of slush.  overallocating a bit won't
 	 * hurt.  rounding to 256's in the hopes that it makes life
 	 * easier for the library.
@@ -611,7 +615,7 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
 		return 0;
 	}
 	current = newpath;
-	if (baselen) {
+	if (baselen && (path[0] != '/' || rootlen)) {
 		memcpy(current, base, baselen);
 		current += baselen;
 	}
