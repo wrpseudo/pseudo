@@ -23,6 +23,7 @@ opt_libdir=
 opt_suffix=
 opt_arch=x86
 opt_bits=
+opt_arch=x86
 opt_sqlite=/usr
 opt_rpath=
 
@@ -31,16 +32,16 @@ compile_x86_64=-m64
 
 usage()
 {
-	echo >&2 "usage:"
-	echo >&2 "  configure --prefix=..."
-	echo >&2 " 	      [--libdir=...]"
-	echo >&2 " 	      [--suffix=...]"
-	echo >&2 "            [--with-sqlite=...]"
-	echo >&2 "            [--enable-static-sqlite]"
-	echo >&2 "            [--with-rpath=...|--without-rpath]"
-	echo >&2 "            [--arch=x86|arm|'']"
-	echo >&2 "            [--bits=32|64]"
-	exit 1
+    echo >&2 "usage:"
+    echo >&2 "  configure --prefix=..."
+    echo >&2 "           [--libdir=...]"
+    echo >&2 "           [--suffix=...]"
+    echo >&2 "           [--with-sqlite=...]"
+    echo >&2 "           [--enable-static-sqlite]"
+    echo >&2 "           [--with-rpath=...|--without-rpath]"
+    echo >&2 "           [--cflags='']"
+    echo >&2 "           [--bits=32|64]"
+    exit 1
 }
 
 sqlite_ldarg=-lsqlite3
@@ -50,70 +51,80 @@ use_maybe_rpath=true
 
 for arg
 do
-	case $arg in
-	--)	shift; break ;;
-	--prefix=*)
-		opt_prefix=${arg#--prefix=}
-		;;
-	--libdir=*)
-		opt_libdir=${arg#--libdir=}
-		;;
-	--enable-static-sqlite)
-		sqlite_ldarg='$(SQLITE)/lib/libsqlite3.a'
-		use_maybe_rpath=false
-		;;
-	--with-sqlite=*)
-		opt_sqlite=${arg#--with-sqlite=}
-		# assign new value if unset
-		maybe_rpath='-Wl,-R$(SQLITE)/lib'
-		;;
-	--without-rpath)
-		opt_rpath=''
-		use_maybe_rpath=false
-		;;
-	--with-rpath=*)
-	        rpath=${arg#--with-rpath=}
-		opt_rpath=${rpath:+-Wl,-R$rpath}
-		use_maybe_rpath=false
-		;;
-	--suffix=*)
-		opt_suffix=${arg#--suffix=}
-		;;
-	--arch=*)
-		opt_arch=${arg#--arch=}
-		;;
-	--bits=*)
-		opt_bits=${arg#--bits=}
-		case $opt_bits in
-		64)	opt_mark64=64;;
-		32)	opt_mark64=;;
-		*)	echo >&2 "Unknown bit size $opt_bits (only 32 and 64 known)."
-			;;
-		esac
-		;;
-	*)
-		echo >&2 "warning: Unrecognized option '$arg'"
-		;;
-	esac
+    case $arg in
+    --)    shift; break ;;
+    --prefix=*)
+        opt_prefix=${arg#--prefix=}
+        ;;
+    --libdir=*)
+        opt_libdir=${arg#--libdir=}
+        ;;
+    --enable-static-sqlite)
+        sqlite_ldarg='$(SQLITE)/lib/libsqlite3.a'
+        use_maybe_rpath=false
+        ;;
+    --with-sqlite=*)
+        opt_sqlite=${arg#--with-sqlite=}
+        # assign new value if unset
+        maybe_rpath='-Wl,-R$(SQLITE)/lib'
+        ;;
+    --without-rpath)
+        opt_rpath=''
+        use_maybe_rpath=false
+        ;;
+    --with-rpath=*)
+        rpath=${arg#--with-rpath=}
+        opt_rpath=${rpath:+-Wl,-R$rpath}
+        use_maybe_rpath=false
+        ;;
+    --suffix=*)
+        opt_suffix=${arg#--suffix=}
+        ;;
+    --arch=*)
+        echo >&2 "WARNING: The --arch option is now deprecated. Use --cflags."
+        opt_arch=${arg#--arch=}
+        ;;
+    --cflags=*)
+        opt_cflags=${arg#--cflags=}
+        ;;
+    --bits=*)
+        opt_bits=${arg#--bits=}
+        case $opt_bits in
+        64)    opt_mark64=64;;
+        32)    opt_mark64=;;
+        *)     echo >&2 "Unknown bit size $opt_bits (only 32 and 64 known)."
+               ;;
+        esac
+        ;;
+    *)
+        echo >&2 "warning: Unrecognized option '$arg'"
+        ;;
+    esac
 done
 
 case $opt_arch in
 '' | x86 | arm )
-	;;
-*)	echo >&2 "Untested arch $opt_arch."
-	;;
+    ;;
+*)    echo >&2 "Untested arch $opt_arch."
+    ;;
 esac
 
-# Some targets want something like -m64.
-eval compile_bits=\$compile_${opt_arch}_${opt_bits}
+if [ "${opt_cflags-UNSET}" = "UNSET" ]; then
+    # Some targets want something like -m64.
+    eval arch_flags=\$compile_${opt_arch}_${opt_bits}
+    echo >&2 "WARNING: Guessing architecture CFLAGS '${arch_flags-<unset>}'."
+    echo >&2 "If you need specific flags, use --cflags."
+else
+    eval arch_flags=\$opt_cflags
+fi
 
 if $use_maybe_rpath && [ -n "$maybe_rpath" ]; then
-	echo >&2 "Adding default RPATH for sqlite."
-	opt_rpath="${opt_rpath+${opt_rpath} }${maybe_rpath}"
+    echo >&2 "Adding default RPATH for sqlite."
+    opt_rpath="${opt_rpath+${opt_rpath} }${maybe_rpath}"
 fi
 
 if [ -z "$opt_prefix" ]; then
-  usage
+    usage
 fi
 
 if [ -z "$opt_libdir" ]; then
@@ -150,10 +161,11 @@ sed -e '
   s,@LIB@,'"$opt_lib"',g
   s,@SUFFIX@,'"$opt_suffix"',g
   s,@SQLITE@,'"$opt_sqlite"',g
-  s,@COMPILE_BITS@,'"$compile_bits"',g
+  s,@ARCH_FLAGS@,'"$arch_flags"',g
   s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g
   s!@RPATH@!'"$opt_rpath"'!g
   s,@MARK64@,'"$opt_mark64"',g
   s,@ARCH@,'"$opt_arch"',g
   s,@BITS@,'"$opt_bits"',g
+  s,@CFLAGS@,'"$opt_cflags"',g
 ' < Makefile.in > Makefile
