@@ -1,5 +1,6 @@
 2012-07-20:
 	* (seebs) Add --cflags, deprecate --arch.
+	* (seebs) tag 1.4 (since this should now work on arbitrary targets)
 
 2012-06-28:
         * (seebs) Tag 1.3.1.
