@@ -1,3 +1,6 @@
+2012-07-24:
+	* (seebs) Fix a couple of bitrots from the update.
+
 2012-07-20:
 	* (seebs) Add --cflags, deprecate --arch.
 	* (seebs) tag 1.4 (since this should now work on arbitrary targets)

@@ -23,7 +23,6 @@ opt_libdir=
 opt_suffix=
 opt_arch=x86
 opt_bits=
-opt_arch=x86
 opt_sqlite=/usr
 opt_rpath=
 
@@ -115,7 +114,7 @@ if [ "${opt_cflags-UNSET}" = "UNSET" ]; then
     echo >&2 "WARNING: Guessing architecture CFLAGS '${arch_flags-<unset>}'."
     echo >&2 "If you need specific flags, use --cflags."
 else
-    eval arch_flags=\$opt_cflags
+    arch_flags=$opt_cflags
 fi
 
 if $use_maybe_rpath && [ -n "$maybe_rpath" ]; then
@@ -167,5 +166,4 @@ sed -e '
   s,@MARK64@,'"$opt_mark64"',g
   s,@ARCH@,'"$opt_arch"',g
   s,@BITS@,'"$opt_bits"',g
-  s,@CFLAGS@,'"$opt_cflags"',g
 ' < Makefile.in > Makefile
