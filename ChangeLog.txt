@@ -1,3 +1,7 @@
+2012-07-27:
+	* (seebs) Convert from .tgz to tar.bz2 since that's handier for
+	  Yocto.
+
 2012-07-24:
 	* (seebs) Fix a couple of bitrots from the update.
 

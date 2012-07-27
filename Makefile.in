@@ -178,4 +178,4 @@ tarball:
 	  rm -rf pseudo/.git* && \
 	  rmdir pseudo \
 	)
-	tar czf pseudo-$(VERSION).tgz pseudo-$(VERSION)
+	tar cjf pseudo-$(VERSION).tar.bz2 pseudo-$(VERSION)
