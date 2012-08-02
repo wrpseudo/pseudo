@@ -1,12 +1,12 @@
 /* 
- * Copyright (c) 2010 Wind River Systems; see
+ * Copyright (c) 2010, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static char *
  * wrap_mkdtemp(char *template) {
  *	char * rc = NULL;
  */
-	struct stat buf;
+	PSEUDO_STATBUF buf;
  	int save_errno;
 	size_t len;
 	char *tmp_template;
@@ -29,8 +29,8 @@
 	if (rc != NULL) {
 		save_errno = errno;
 
-		if (real_stat(rc, &buf) != -1) {
-			pseudo_client_op_plain(OP_CREAT, 0, -1, -1, tmp_template, &buf);
+		if (base_stat(rc, &buf) != -1) {
+			pseudo_client_op(OP_CREAT, 0, -1, -1, tmp_template, &buf);
 		} else {
 			pseudo_debug(1, "mkdtemp (path %s) succeeded, but fstat failed (%s).\n",
 				rc, strerror(errno));

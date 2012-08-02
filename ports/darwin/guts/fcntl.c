@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Wind River Systems; see
+ * Copyright (c) 2011, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * int fcntl(int fd, int cmd, ... { struct flock *lock })
@@ -7,8 +7,6 @@
  */
 	int save_errno;
 	long long flag = 0;
-	void *ptr = 0;
-	off_t off = 0;
 
 	va_start(ap, cmd);
 	flag = va_arg(ap, long long);

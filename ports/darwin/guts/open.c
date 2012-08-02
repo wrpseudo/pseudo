@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2011 Wind River Systems; see
+ * Copyright (c) 2011, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * int open(const char *path, int flags, ... { int mode })
  *	int rc = -1;
  */
 
-	struct stat buf = { 0 };
+	struct stat buf = { };
 	int existed = 1;
 	int save_errno;
 

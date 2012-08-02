@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2008-2010 Wind River Systems; see
+ * Copyright (c) 2008-2010, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -7,7 +7,7 @@
  *	int rc = -1;
  */
  	pseudo_msg_t *msg;
-	struct stat buf;
+	PSEUDO_STATBUF buf;
 	int save_errno;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
@@ -16,12 +16,12 @@
 		return -1;
 	}
 	if (flags & AT_SYMLINK_NOFOLLOW) {
-		rc = real_lstat(path, &buf);
+		rc = base_lstat(path, &buf);
 	} else {
-		rc = real_stat(path, &buf);
+		rc = base_stat(path, &buf);
 	}
 #else
-	rc = real___fxstatat(_STAT_VER, dirfd, path, &buf, flags);
+	rc = base_fstatat(dirfd, path, &buf, flags);
 #endif
 	if (rc == -1) {
 		return rc;
@@ -36,7 +36,7 @@
 	/* purely for debugging purposes:  check whether file
 	 * is already in database.
 	 */
-	msg = pseudo_client_op_plain(OP_STAT, 0, -1, -1, path, &buf);
+	msg = pseudo_client_op(OP_STAT, 0, -1, -1, path, &buf);
 	if (!msg || msg->result != RESULT_SUCCEED) {
 		pseudo_debug(2, "chmodat to 0%o on %d/%s, ino %llu, new file.\n",
 			mode, dirfd, path, (unsigned long long) buf.st_ino);
@@ -57,7 +57,7 @@
 	 */
 
 	buf.st_mode = (buf.st_mode & ~07777) | (mode & 07777);
-	msg = pseudo_client_op_plain(OP_CHMOD, 0, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_CHMOD, 0, -1, dirfd, path, &buf);
 	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;

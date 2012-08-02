@@ -1,12 +1,12 @@
 /* 
- * Copyright (c) 2008-2010 Wind River Systems; see
+ * Copyright (c) 2008-2010, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
  * wrap_symlinkat(const char *oldname, int dirfd, const char *newpath) {
  *	int rc = -1;
  */
- 	struct stat buf;
+ 	PSEUDO_STATBUF buf;
 	char *roldname = 0;
 
 	if (oldname[0] == '/' && pseudo_chroot_len && !pseudo_nosymlinkexp) {
@@ -30,9 +30,9 @@
 		return rc;
 	}
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-	rc = real_lstat(newpath, &buf);
+	rc = base_lstat(newpath, &buf);
 #else
-	rc = real___fxstatat(_STAT_VER, dirfd, newpath, &buf, AT_SYMLINK_NOFOLLOW);
+	rc = base_fstatat(dirfd, newpath, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 	if (rc == -1) {
 		int save_errno = errno;
@@ -43,7 +43,7 @@
 		return rc;
 	}
 	/* just record the entry */
-	pseudo_client_op_plain(OP_SYMLINK, 0, -1, dirfd, newpath, &buf);
+	pseudo_client_op(OP_SYMLINK, 0, -1, dirfd, newpath, &buf);
 
 	free(roldname);
 

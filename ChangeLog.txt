@@ -1,3 +1,9 @@
+2012-08-02:
+	* (seebs) fix some Darwin-specific bitrot for clang/llvm.
+        * (seebs) Drop the _plain thing, convert unix/guts/* to use
+          PSEUDO_STATBUF.
+        * (seebs) Tag 1.4.1.
+
 2012-07-27:
 	* (seebs) Convert from .tgz to tar.bz2 since that's handier for
 	  Yocto.

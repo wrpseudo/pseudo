@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2008-2010 Wind River Systems; see
+ * Copyright (c) 2008-2010, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -7,7 +7,7 @@
  *	int rc = -1;
  */
  	pseudo_msg_t *msg;
- 	struct stat buf;
+ 	PSEUDO_STATBUF buf;
 
 	rc = real_link(oldpath, newpath);
 	if (rc == 0) {
@@ -19,16 +19,16 @@
 		 * files they link to.  This is contraPOSIX, but
 		 * it's apparently useful.
 		 */
-		real_lstat(oldpath, &buf);
+		base_lstat(oldpath, &buf);
 		/* a link should copy the existing database entry, if
 		 * there is one.  OP_LINK is also used to insert unseen
 		 * files, though, so it can't be implicit.
 		 */
-		msg = pseudo_client_op_plain(OP_STAT, 0, -1, -1, oldpath, &buf);
+		msg = pseudo_client_op(OP_STAT, 0, -1, -1, oldpath, &buf);
 		if (msg) {
-			pseudo_stat_msg_plain(&buf, msg);
+			pseudo_stat_msg(&buf, msg);
 		}
-		pseudo_client_op_plain(OP_LINK, 0, -1, -1, newpath, &buf);
+		pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &buf);
 	}
 
 /*	return rc;

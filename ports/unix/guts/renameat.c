@@ -7,7 +7,7 @@
  *	int rc = -1;
  */
  	pseudo_msg_t *msg;
- 	struct stat oldbuf, newbuf;
+ 	PSEUDO_STATBUF oldbuf, newbuf;
 	int oldrc, newrc;
 	int save_errno;
 	int old_db_entry = 0;
@@ -31,18 +31,18 @@
 	save_errno = errno;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-	newrc = real_lstat(newpath, &newbuf);
-	oldrc = real_lstat(oldpath, &oldbuf);
+	newrc = base_lstat(newpath, &newbuf);
+	oldrc = base_lstat(oldpath, &oldbuf);
 #else
-	oldrc = real___fxstatat(_STAT_VER, olddirfd, oldpath, &oldbuf, AT_SYMLINK_NOFOLLOW);
-	newrc = real___fxstatat(_STAT_VER, newdirfd, newpath, &newbuf, AT_SYMLINK_NOFOLLOW);
+	oldrc = base_fstatat(olddirfd, oldpath, &oldbuf, AT_SYMLINK_NOFOLLOW);
+	newrc = base_fstatat(newdirfd, newpath, &newbuf, AT_SYMLINK_NOFOLLOW);
 #endif
 
 	errno = save_errno;
 
 	/* newpath must be removed. */
 	/* as with unlink, we have to mark that the file may get deleted */
-	msg = pseudo_client_op_plain(OP_MAY_UNLINK, 0, -1, newdirfd, newpath, newrc ? NULL : &newbuf);
+	msg = pseudo_client_op(OP_MAY_UNLINK, 0, -1, newdirfd, newpath, newrc ? NULL : &newbuf);
 	if (msg && msg->result == RESULT_SUCCEED)
 		old_db_entry = 1;
 	rc = real_renameat(olddirfd, oldpath, newdirfd, newpath);
@@ -52,10 +52,10 @@
 			/* since we failed, that wasn't really unlinked -- put
 			 * it back.
 			 */
-			pseudo_client_op_plain(OP_CANCEL_UNLINK, 0, -1, newdirfd, newpath, &newbuf);
+			pseudo_client_op(OP_CANCEL_UNLINK, 0, -1, newdirfd, newpath, &newbuf);
 		} else {
 			/* confirm that the file was removed */
-			pseudo_client_op_plain(OP_DID_UNLINK, 0, -1, newdirfd, newpath, &newbuf);
+			pseudo_client_op(OP_DID_UNLINK, 0, -1, newdirfd, newpath, &newbuf);
 		}
 	}
 	if (rc == -1) {
@@ -98,12 +98,12 @@
 		}
 		pseudo_debug(1, "creating new '%s' [%llu] to rename\n",
 			oldpath, (unsigned long long) oldbuf.st_ino);
-		pseudo_client_op_plain(OP_LINK, 0, -1, olddirfd, oldpath, &oldbuf);
+		pseudo_client_op(OP_LINK, 0, -1, olddirfd, oldpath, &oldbuf);
 	}
 	/* special case: use 'fd' for olddirfd, because
 	 * we know it has no other meaning for RENAME
 	 */
-	pseudo_client_op_plain(OP_RENAME, 0, olddirfd, newdirfd, newpath, &oldbuf, oldpath);
+	pseudo_client_op(OP_RENAME, 0, olddirfd, newdirfd, newpath, &oldbuf, oldpath);
 
 	errno = save_errno;
 /*	return rc;

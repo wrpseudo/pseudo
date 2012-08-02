@@ -1,7 +1,7 @@
 /*
  * pseudo_wrappers.c, shared code for wrapper functions
  *
- * Copyright (c) 2008-2011 Wind River Systems, Inc.
+ * Copyright (c) 2008-2012 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -117,7 +117,7 @@ pseudo_init_one_wrapper(pseudo_function *func) {
 		s += strlen(s) - 2;
 		/* *at() don't have to exist */
 		if (!strcmp(s, "at")) {
-			continue;
+			return;
 		}
 #else
 		if (e != NULL) {

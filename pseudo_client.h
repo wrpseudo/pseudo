@@ -19,9 +19,15 @@
  */
 extern pseudo_msg_t *pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const PSEUDO_STATBUF *buf, ...);
 #if PSEUDO_STATBUF_64
-extern pseudo_msg_t *pseudo_client_op_plain(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat *buf, ...);
+#define base_lstat lstat64
+#define base_fstat fstat64
+#define base_stat stat64
+#define base_fstatat(dirfd, path, buf, flags) real___fxstatat64(_STAT_VER, dirfd, path, buf, flags)
 #else
-#define pseudo_client_op_plain pseudo_client_op
+#define base_lstat lstat
+#define base_fstat fstat
+#define base_stat stat
+#define base_fstatat(dirfd, path, buf, flags) real___fxstatat(_STAT_VER, dirfd, path, buf, flags)
 #endif
 extern void pseudo_antimagic(void);
 extern void pseudo_magic(void);

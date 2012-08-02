@@ -7,16 +7,16 @@
  */
 
  	pseudo_msg_t *msg;
-	struct stat buf;
+	PSEUDO_STATBUF buf;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
 		errno = ENOSYS;
 		return -1;
 	}
-	rc = real_stat(path, &buf);
+	rc = base_stat(path, &buf);
 #else
-	rc = real___fxstatat(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
+	rc = base_fstatat(dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 	if (rc != -1) {
 		/* if we can stat the file, you can't mknod it */
@@ -33,7 +33,7 @@
 	if (rc == -1) {
 		return -1;
 	}
-	real_fstat(rc, &buf);
+	base_fstat(rc, &buf);
 	/* mknod does not really open the file.  We don't have
 	 * to use wrap_close because we've never exposed this file
 	 * descriptor to the client code.
@@ -44,7 +44,7 @@
 	buf.st_mode = (PSEUDO_DB_MODE(buf.st_mode, mode) & 07777) |
 			(mode & ~07777);
 	buf.st_rdev = dev;
-	msg = pseudo_client_op_plain(OP_MKNOD, 0, -1, dirfd, path, &buf);
+	msg = pseudo_client_op(OP_MKNOD, 0, -1, dirfd, path, &buf);
 	if (msg && msg->result != RESULT_SUCCEED) {
 		errno = EPERM;
 		rc = -1;

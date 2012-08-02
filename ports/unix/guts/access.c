@@ -1,17 +1,17 @@
 /* 
- * Copyright (c) 2010 Wind River Systems; see
+ * Copyright (c) 2010, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
  * wrap_access(const char *path, int mode) {
  *	int rc = -1;
  */
-	struct stat buf;
+	PSEUDO_STATBUF buf;
 
 	/* note:  no attempt to handle the case where user isn't
 	 * root.
 	 */
-	rc = real_stat(path, &buf);
+	rc = base_stat(path, &buf);
 	if (rc == -1)
 		return rc;
 

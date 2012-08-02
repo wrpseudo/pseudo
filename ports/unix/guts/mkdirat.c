@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2008-2010 Wind River Systems; see
+ * Copyright (c) 2008-2010, 2012 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -16,16 +16,16 @@
 	rc = real_mkdirat(dirfd, path, PSEUDO_FS_MODE(mode, 1));
 #endif
 	if (rc != -1) {
-		struct stat buf;
+		PSEUDO_STATBUF buf;
 		int stat_rc;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-		stat_rc = real_lstat(path, &buf);
+		stat_rc = base_lstat(path, &buf);
 #else
-		stat_rc = real___fxstatat(_STAT_VER, dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
+		stat_rc = base_fstatat(dirfd, path, &buf, AT_SYMLINK_NOFOLLOW);
 #endif
 		if (stat_rc != -1) {
-			pseudo_client_op_plain(OP_MKDIR, 0, -1, dirfd, path, &buf);
+			pseudo_client_op(OP_MKDIR, 0, -1, dirfd, path, &buf);
 		} else {
 			pseudo_debug(1, "mkdir of %s succeeded, but stat failed: %s\n",
 				path, strerror(errno));

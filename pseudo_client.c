@@ -1025,27 +1025,6 @@ base_path(int dirfd, const char *path, int leave_last) {
 	return newpath;
 }
 
-#if PSEUDO_STATBUF_64
-pseudo_msg_t *
-pseudo_client_op_plain(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const struct stat *buf, ...) {
-	char *oldpath = NULL;
-	PSEUDO_STATBUF buf64;
-
-	if (op == OP_RENAME) {
-		va_list ap;
-		va_start(ap, buf);
-		oldpath = va_arg(ap, char *);
-		va_end(ap);
-	}
-	if (buf) {
-		pseudo_stat64_from32(&buf64, buf);
-		return pseudo_client_op(op, access, fd, dirfd, path, &buf64, oldpath);
-	} else {
-		return pseudo_client_op(op, access, fd, dirfd, path, NULL, oldpath);
-	}
-}
-#endif
-
 pseudo_msg_t *
 pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path, const PSEUDO_STATBUF *buf, ...) {
 	pseudo_msg_t *result = 0;
