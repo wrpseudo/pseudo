@@ -1,3 +1,9 @@
+2012-08-09:
+	* (seebs) base_stat should be real_stat64, not stat64
+	* (seebs) add stat64/lstat64/fstat64 wrappers to Linux (not
+	  previously needed because the libc versions call stuff we
+	  already wrap).
+
 2012-08-02:
 	* (seebs) fix some Darwin-specific bitrot for clang/llvm.
         * (seebs) Drop the _plain thing, convert unix/guts/* to use
