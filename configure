@@ -37,6 +37,7 @@ usage()
     echo >&2 "           [--suffix=...]"
     echo >&2 "           [--with-sqlite=...]"
     echo >&2 "           [--enable-static-sqlite]"
+    echo >&2 "           [--with-static-sqlite=...]"
     echo >&2 "           [--with-rpath=...|--without-rpath]"
     echo >&2 "           [--cflags='']"
     echo >&2 "           [--bits=32|64]"
@@ -58,14 +59,19 @@ do
     --libdir=*)
         opt_libdir=${arg#--libdir=}
         ;;
+    --with-static-sqlite=*)
+        opt_sqlite_ldarg=${arg#--with-static-sqlite=}
+        sqlite_ldarg=$opt_sqlite_ldarg
+        use_maybe_rpath=false
+        ;;
     --enable-static-sqlite)
-        sqlite_ldarg='$(SQLITE)/lib/libsqlite3.a'
+        sqlite_ldarg='$(SQLITE)/$(LIB)/libsqlite3.a'
         use_maybe_rpath=false
         ;;
     --with-sqlite=*)
         opt_sqlite=${arg#--with-sqlite=}
         # assign new value if unset
-        maybe_rpath='-Wl,-R$(SQLITE)/lib'
+        maybe_rpath='-Wl,-R$(SQLITE)/$(LIB)'
         ;;
     --without-rpath)
         opt_rpath=''
