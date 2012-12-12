@@ -93,14 +93,15 @@ extern char *pseudo_version;
  * terms of each other, and for instance, open(...) is the same as
  * openat(AT_FDCWD, ...).  If no AT_FDCWD is provided, any value that can't
  * be a valid file descriptor will do.  Using -2 because -1 could be
- * mistaken for a failed syscall return.  Similarly, any value which isn't
- * zero will do to fake AT_SYMLINK_NOFOLLOW.  Finally, if this happened,
- * we set our own flag we can use to indicate that dummy implementations
- * of the _at functions are needed.
+ * mistaken for a failed syscall return.  AT_SYMLINK_NOFOLLOW has to be
+ * non-zero; AT_SYMLINK_FOLLOW has to be non-zero and different.  Finally,
+ * if this happened, we set our own flag we can use to indicate that dummy
+ * implementations of the _at functions are needed.
  */
 #ifndef AT_FDCWD
 #define AT_FDCWD -2
 #define AT_SYMLINK_NOFOLLOW 1
+#define AT_SYMLINK_FOLLOW 2
 #define PSEUDO_NO_REAL_AT_FUNCTIONS
 #endif
 

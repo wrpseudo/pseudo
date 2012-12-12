@@ -6,6 +6,8 @@
           the documentation and behavior of link(2) to reflect host
           OS semantics: Linux will hardlink symlinks, Darwin will only
           hardlink their targets.
+	* (seebs) make linkat() implementation compile/run on Darwin,
+	  fix header bitrot for Mountain Lion.
 
 2012-08-09:
 	* (seebs) base_stat should be real_stat64, not stat64
