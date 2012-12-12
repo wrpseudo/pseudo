@@ -1,3 +1,12 @@
+2012-12-12:
+        * (seebs) Remove extra tab from the path alloc code in
+          makewrappers. (Which has no effect since I changed my mind about
+          the implementation which would have made it show up.)
+        * (seebs) linkat() implementation. as a side effect, clear up
+          the documentation and behavior of link(2) to reflect host
+          OS semantics: Linux will hardlink symlinks, Darwin will only
+          hardlink their targets.
+
 2012-08-09:
 	* (seebs) base_stat should be real_stat64, not stat64
 	* (seebs) add stat64/lstat64/fstat64 wrappers to Linux (not

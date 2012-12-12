@@ -113,4 +113,12 @@ extern char *pseudo_version;
 #define O_LARGEFILE 0
 #endif
 
+/* Does link(2) let you create hard links to symlinks? Of course not. Who
+ * would ever do that? Well, Linux did, and possibly as a result, linkat()
+ * does by default too; if you are on a host with the historical Unix
+ * behavior of following symlinks to find the link target, you will want
+ * to set this to AT_SYMLINK_FOLLOW. Darwin does.
+ */
+#define PSEUDO_LINK_SYMLINK_BEHAVIOR 0
+
 #include "pseudo_ports.h"

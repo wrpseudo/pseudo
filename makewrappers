@@ -335,7 +335,7 @@ class Function:
             alloc_paths.append(
                 "%s = pseudo_root_path(__func__, __LINE__, %s%s, %s, %s);" %
                 (path, prefix, self.dirfd, path, self.flags))
-        return "\n\t\t\t".join(alloc_paths)
+        return "\n\t\t".join(alloc_paths)
 
     def free_paths(self):
         """free any allocated paths"""
@@ -345,7 +345,7 @@ class Function:
         # has been overwritten.
         for path in self.paths_to_munge:
             free_paths.append("free((void *) %s);" % path)
-        return "\n\t\t\t".join(free_paths)
+        return "\n\t\t".join(free_paths)
 
     def real_predecl(self):
         if self.real_func:

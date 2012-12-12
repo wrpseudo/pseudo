@@ -8,3 +8,6 @@ extern int pseudo_host_etc_passwd_fd;
 extern int pseudo_host_etc_group_fd;
 extern FILE *pseudo_host_etc_passwd_file;
 extern FILE *pseudo_host_etc_group_file;
+/* Darwin ALWAYS follows symlinks for link(2) */
+#undef PSEUDO_LINK_SYMLINK_BEHAVIOR
+#define PSEUDO_LINK_SYMLINK_BEHAVIOR AT_SYMLINK_FOLLOW

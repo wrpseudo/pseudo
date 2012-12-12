@@ -6,30 +6,14 @@
  * wrap_link(const char *oldpath, const char *newpath) {
  *	int rc = -1;
  */
- 	pseudo_msg_t *msg;
- 	PSEUDO_STATBUF buf;
-
-	rc = real_link(oldpath, newpath);
-	if (rc == 0) {
-		/* link(2) will not overwrite; if it succeeded, we know
-		 * that there was no previous file with this name, so we
-		 * shove it into the database.
-		 */
-		/* On linux, link(2) links to symlinks, not to the
-		 * files they link to.  This is contraPOSIX, but
-		 * it's apparently useful.
-		 */
-		base_lstat(oldpath, &buf);
-		/* a link should copy the existing database entry, if
-		 * there is one.  OP_LINK is also used to insert unseen
-		 * files, though, so it can't be implicit.
-		 */
-		msg = pseudo_client_op(OP_STAT, 0, -1, -1, oldpath, &buf);
-		if (msg) {
-			pseudo_stat_msg(&buf, msg);
-		}
-		pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &buf);
-	}
+        /* since 2.6.18 or so, linkat supports AT_SYMLINK_FOLLOW, which
+         * provides the behavior link() has on most non-Linux systems,
+         * but the default is not to follow symlinks. Better yet, it
+         * does NOT support AT_SYMLINK_NOFOLLOW! So define this in
+         * your port's portdefs.h or hope the default works for you.
+         */
+        rc = wrap_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath,
+                         PSEUDO_LINK_SYMLINK_BEHAVIOR);
 
 /*	return rc;
  * }
