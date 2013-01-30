@@ -1,6 +1,10 @@
 2013-01-30:
         * (seebs) Subtle tweaks to avoid GLIBC_2.7 dependencies which
           can cause trouble trying to copy libpseudo.so to older hosts.
+        * (seebs) add "with-sqlite-lib" to simplify cases where sqlite's
+          libdir computation differs from what we otherwise want; for
+          instance, with bitbake, we often end up wanting $lib = lib64,
+          but $sqlite_lib = lib.
 
 2012-12-13:
         * (seebs) tag 1.4.2.

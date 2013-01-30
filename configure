@@ -2,7 +2,7 @@
 #
 # configure, simulation of autoconf script, much simplified
 #
-# Copyright (c) 2008-2012 Wind River Systems, Inc.
+# Copyright (c) 2008-2013 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -36,6 +36,7 @@ usage()
     echo >&2 "           [--libdir=...]"
     echo >&2 "           [--suffix=...]"
     echo >&2 "           [--with-sqlite=...]"
+    echo >&2 "           [--with-sqlite-lib=...]"
     echo >&2 "           [--enable-static-sqlite]"
     echo >&2 "           [--with-static-sqlite=...]"
     echo >&2 "           [--with-rpath=...|--without-rpath]"
@@ -65,13 +66,18 @@ do
         use_maybe_rpath=false
         ;;
     --enable-static-sqlite)
-        sqlite_ldarg='$(SQLITE)/$(LIB)/libsqlite3.a'
+        sqlite_ldarg='$(SQLITE)/$(SQLITE_LIB)/libsqlite3.a'
         use_maybe_rpath=false
         ;;
     --with-sqlite=*)
         opt_sqlite=${arg#--with-sqlite=}
         # assign new value if unset
-        maybe_rpath='-Wl,-R$(SQLITE)/$(LIB)'
+        maybe_rpath='-Wl,-R$(SQLITE)/$(SQLITE_LIB)'
+        ;;
+    --with-sqlite-lib=*)
+        opt_sqlite_lib=${arg#--with-sqlite-lib=}
+        # assign new value if unset
+        maybe_rpath='-Wl,-R$(SQLITE)/$(SQLITE_LIB)'
         ;;
     --without-rpath)
         opt_rpath=''
@@ -144,6 +150,10 @@ if [ "$opt_lib" = "$opt_libdir" ]; then
     exit 1
 fi
 
+if [ -z "$opt_sqlite_lib" ]; then
+    opt_sqlite_lib=$opt_lib
+fi
+
 if [ ! -f "${opt_sqlite}/include/sqlite3.h" ]; then
     echo >&2 "SQLite3 headers not found in at ${opt_sqlite}/include/sqlite3.h. Please check that SQLite3 and SQLite3 headers are installed."
     exit 1
@@ -168,6 +178,7 @@ sed -e '
   s,@SQLITE@,'"$opt_sqlite"',g
   s,@ARCH_FLAGS@,'"$arch_flags"',g
   s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g
+  s,@SQLITE_LIB@,'"$opt_sqlite_lib"',g
   s!@RPATH@!'"$opt_rpath"'!g
   s,@MARK64@,'"$opt_mark64"',g
   s,@ARCH@,'"$opt_arch"',g
