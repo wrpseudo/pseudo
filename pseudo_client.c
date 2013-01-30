@@ -1,7 +1,7 @@
 /*
  * pseudo_client.c, pseudo client library code
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -17,6 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <signal.h>
 #include <stdarg.h>

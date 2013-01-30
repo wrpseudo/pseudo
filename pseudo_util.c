@@ -1,7 +1,7 @@
 /*
  * pseudo_util.c, miscellaneous utility functions
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -1244,11 +1244,7 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 				continue;
 			snprintf(filename, pseudo_path_max(), "%s/etc/%s",
 				s, file);
-			if (flags & O_CREAT) {
-				rc = open(filename, flags, 0600);
-			} else {
-				rc = open(filename, flags);
-			}
+			rc = open(filename, flags, 0600);
 			if (rc >= 0) {
 				if (realname)
 					strcpy(realname, filename);
@@ -1275,11 +1271,7 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 	snprintf(filename, pseudo_path_max(), "/etc/%s", file);
 	pseudo_debug(2, "falling back on <%s> for <%s>\n",
 		filename, file);
-	if (flags & O_CREAT) {
-		rc = open(filename, flags, 0600);
-	} else {
-		rc = open(filename, flags);
-	}
+	rc = open(filename, flags, 0600);
 	if (rc >= 0 && realname)
 		strcpy(realname, filename);
 	return rc;
