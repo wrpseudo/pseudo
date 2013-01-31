@@ -1,3 +1,7 @@
+2013-01-31:
+        * (seebs) tag 1.4.3 (to avoid any problems with the changes since
+          1.4.2 and old tarballs)
+
 2013-01-30:
         * (seebs) Subtle tweaks to avoid GLIBC_2.7 dependencies which
           can cause trouble trying to copy libpseudo.so to older hosts.
