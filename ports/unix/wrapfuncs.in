@@ -37,7 +37,7 @@ int chmod(const char *path, mode_t mode);
 int chown(const char *path, uid_t owner, gid_t group);
 int fchmodat(int dirfd, const char *path, mode_t mode, int flags);
 int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flags);
-int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int link(const char *oldname, const char *newname); /* flags=AT_SYMLINK_NOFOLLOW */
 int linkat(int olddirfd, const char *oldname, int newdirfd, const char *newname, int flags);
 int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
 int mkdirat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
