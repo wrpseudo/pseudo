@@ -1,7 +1,7 @@
 #
 # Makefile.in/Makefile, build rules for pseudo
 #
-# Copyright (c) 2008-2012 Wind River Systems, Inc.
+# Copyright (c) 2008-2013 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -27,7 +27,7 @@ BITS=@BITS@
 ARCH_FLAGS=@ARCH_FLAGS@
 MARK64=@MARK64@
 RPATH=@RPATH@
-VERSION=1.4.4
+VERSION=1.4.5
 
 LIB=@LIB@
 BIN=bin

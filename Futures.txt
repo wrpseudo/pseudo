@@ -33,3 +33,8 @@ vague implementation thoughts:
 
 * Test cases
   - boy, do we need test cases!
+
+* Clean up *at() functions
+  - The *at() function implementations are gratuitously complicated,
+    I believe because they predate the auto-canonicalization that came
+    with the rewritten pseudo wrappers.

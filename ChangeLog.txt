@@ -1,3 +1,8 @@
+2013-02-13:
+        * (seebs) calling link while chrooted could in some cases result
+          in the root path not being prepended at all. One more try!
+        * (seebs) 1.4.5.
+
 2013-02-12:
         * (seebs) calling link while chrooted could in some cases result
           in the root path being double-appended.
