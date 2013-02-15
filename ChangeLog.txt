@@ -1,3 +1,8 @@
+2013-02-15:
+	* (seebs) Add support for in-memory DB. This, plus upcoming
+	  fsync-related changes, are expected to be big enough to justify
+	  calling this 1.5.
+
 2013-02-13:
         * (seebs) calling link while chrooted could in some cases result
           in the root path not being prepended at all. One more try!

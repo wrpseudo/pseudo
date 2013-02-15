@@ -416,6 +416,8 @@ pseudo_server_loop(void) {
 			 */
 			if (active_clients == 1) {
 				loop_timeout -= LOOP_DELAY;
+                                /* maybe flush database to disk */
+                                pdb_maybe_backup();
 				if (loop_timeout <= 0) {
 					pseudo_debug(1, "no more clients, got bored.\n");
 					die_peacefully = 1;

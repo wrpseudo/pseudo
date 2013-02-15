@@ -25,6 +25,7 @@ opt_arch=x86
 opt_bits=
 opt_sqlite=/usr
 opt_rpath=
+opt_memory=
 
 compile_x86_32=-m32
 compile_x86_64=-m64
@@ -35,6 +36,7 @@ usage()
     echo >&2 "  configure --prefix=..."
     echo >&2 "           [--libdir=...]"
     echo >&2 "           [--suffix=...]"
+    echo >&2 "           [--enable-memory-db]"
     echo >&2 "           [--with-sqlite=...]"
     echo >&2 "           [--with-sqlite-lib=...]"
     echo >&2 "           [--enable-static-sqlite]"
@@ -69,6 +71,12 @@ do
         sqlite_ldarg='$(SQLITE)/$(SQLITE_LIB)/libsqlite3.a'
         use_maybe_rpath=false
         ;;
+    --enable-memory-db=no)
+        opt_memory=false
+        ;;
+    --enable-memory-db=yes | --enable-memory-db)
+        opt_memory=true
+	;;
     --with-sqlite=*)
         opt_sqlite=${arg#--with-sqlite=}
         # assign new value if unset
@@ -170,6 +178,29 @@ if [ "${SQLITE3_VERSION}" -lt "03006000" ]; then
     exit 1
 fi
 
+if [ -z "$opt_memory" ]; then
+    if [ "${SQLITE3_VERSION}" -lt "03007000" ]; then
+        echo "Disabling in-memory database by default (sqlite too old)."
+	opt_memory=false
+    else
+        echo "Enabling in-memory database by default."
+	opt_memory=true
+    fi
+fi
+
+if $opt_memory; then
+    if [ "${SQLITE3_VERSION}" -lt "03007000" ]; then
+	cat >&2 <<EOF
+WARNING: sqlite prior to 3.7 has been known to perform exceedingly poorly
+with the in-memory database option. You asked for it, you get it, but if
+you get horrible performance, try turning it off.
+EOF
+    fi
+    SQLITE_MEMORY="-DUSE_MEMORY_DB"
+else
+    SQLITE_MEMORY=""
+fi
+
 sed -e '
   s,@PREFIX@,'"$opt_prefix"',g
   s,@LIBDIR@,'"$opt_libdir"',g
@@ -179,6 +210,7 @@ sed -e '
   s,@ARCH_FLAGS@,'"$arch_flags"',g
   s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g
   s,@SQLITE_LIB@,'"$opt_sqlite_lib"',g
+  s,@SQLITE_MEMORY@,'"$SQLITE_MEMORY"',g
   s!@RPATH@!'"$opt_rpath"'!g
   s,@MARK64@,'"$opt_mark64"',g
   s,@ARCH@,'"$opt_arch"',g
