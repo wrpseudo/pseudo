@@ -1,23 +1,23 @@
-op: OP
-chdir
-chmod
-chown
-chroot
-close
-creat
-dup
-fchmod
-fchown
-fstat
-link
-mkdir
-mknod
-open
-rename
-stat
-unlink
-symlink
-exec
-may-unlink
-did-unlink
-cancel-unlink
+op: OP; int wait = 0
+chdir, 0
+chmod, 0
+chown, 0
+chroot, 0
+close, 0
+creat, 0
+dup, 0
+fchmod, 0
+fchown, 0
+fstat, 1
+link, 0
+mkdir, 0
+mknod, 1
+open, 0
+rename, 0
+stat, 1
+unlink, 0
+symlink, 0
+exec, 0
+may-unlink, 1
+did-unlink, 0
+cancel-unlink, 0

@@ -876,14 +876,18 @@ pseudo_client_request(pseudo_msg_t *msg, size_t len, const char *path) {
 			}
 		} while (rc != 0);
 		pseudo_debug(5, "sent!\n");
-		response = pseudo_msg_receive(connect_fd);
-		if (!response) {
-			++tries;
-			if (tries > 3) {
-				pseudo_debug(1, "can't get responses.\n");
-				return 0;
-			}
-		}
+                if (msg->type != PSEUDO_MSG_FASTOP) {
+                        response = pseudo_msg_receive(connect_fd);
+                        if (!response) {
+                                ++tries;
+                                if (tries > 3) {
+                                        pseudo_debug(1, "can't get responses.\n");
+                                        return 0;
+                                }
+                        }
+                } else {
+                        return 0;
+                }
 	} while (response == 0);
 	if (response->type != PSEUDO_MSG_ACK) {
 		pseudo_debug(2, "got non-ack response %d\n", response->type);
@@ -1225,6 +1229,8 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	}
 	if (do_request) {
 		struct timeval tv1, tv2;
+                if (!pseudo_op_wait(msg.op))
+                        msg.type = PSEUDO_MSG_FASTOP;
 		pseudo_debug(4, "sending request [ino %llu]\n", (unsigned long long) msg.ino);
 		gettimeofday(&tv1, NULL);
 		if (pseudo_local_only) {

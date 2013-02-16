@@ -1,7 +1,7 @@
 /*
  * pseudo.c, main pseudo utility program
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -933,6 +933,7 @@ pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag) 
 		return 0;
 		break;
 	case PSEUDO_MSG_OP:
+	case PSEUDO_MSG_FASTOP:
 		return pseudo_op(msg, program, tag);
 		break;
 	case PSEUDO_MSG_ACK:		/* FALLTHROUGH */

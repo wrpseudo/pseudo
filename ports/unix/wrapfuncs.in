@@ -63,7 +63,7 @@ FILE *popen(const char *command, const char *mode); /* hand_wrapped=1 */
 # during filesystem assembly.
 int fsync(int fd); /* async_skip=0 */
 int fdatasync(int fd); /* async_skip=0 */
-void sync(void); /* async_skip=0 */
+void sync(void); /* async_skip= */
 int syncfs(int fd); /* async_skip=0 */
 int sync_file_range(int fd, off64_t offset, off64_t nbytes, unsigned int flags); /* async_skip=0 */
 int msync(void *addr, size_t length, int flags); /* async_skip=0 */

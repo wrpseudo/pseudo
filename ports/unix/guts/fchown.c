@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2008-2010, 2012 Wind River Systems; see
+ * Copyright (c) 2008-2010, 2012, 2013 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -8,7 +8,7 @@
  */
  	pseudo_msg_t *msg;
 	PSEUDO_STATBUF buf;
-	int save_errno;
+	int save_errno = errno;
 
 	if (base_fstat(fd, &buf) == -1) {
 		save_errno = errno;
@@ -41,14 +41,10 @@
 	}
 	pseudo_debug(2, "fchown, fd %d: %d:%d -> %d:%d\n",
 		fd, owner, group, buf.st_uid, buf.st_gid);
-	msg = pseudo_client_op(OP_FCHOWN, 0, fd, -1, 0, &buf);
-	if (msg && msg->result != RESULT_SUCCEED) {
-		errno = EPERM;
-		rc = -1;
-	} else {
-		/* just pretend we worked */
-		rc = 0;
-	}
+	pseudo_client_op(OP_FCHOWN, 0, fd, -1, 0, &buf);
+        /* pretend we worked, errno should be unchanged */
+        errno = save_errno;
+        rc = 0;
 
 /*	return rc;
  * }

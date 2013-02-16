@@ -1,7 +1,7 @@
 /*
  * pseudo_server.c, pseudo's server-side logic and message handling
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2010, 2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -76,7 +76,7 @@ quit_now(int signal) {
 	die_forcefully = 1;
 }
 
-static int messages = 0;
+static int messages = 0, responses = 0;
 static struct timeval message_time = { .tv_sec = 0 };
 
 static void pseudo_server_loop(void);
@@ -268,6 +268,7 @@ serve_client(int i) {
 	in = pseudo_msg_receive(clients[i].fd);
 	if (in) {
 		char *response_path = 0;
+                int send_response = 1;
 		pseudo_debug(4, "got a message (%d): %s\n", in->type, (in->pathlen ? in->path : "<no path>"));
 		/* handle incoming ping */
 		if (in->type == PSEUDO_MSG_PING && !clients[i].pid) {
@@ -303,6 +304,8 @@ serve_client(int i) {
 		 * pseudo_server_response.
 		 */
 		if (in->type != PSEUDO_MSG_SHUTDOWN) {
+                        if (in->type == PSEUDO_MSG_FASTOP)
+                                send_response = 0;
 			if (pseudo_server_response(in, clients[i].program, clients[i].tag)) {
 				in->type = PSEUDO_MSG_NAK;
 			} else {
@@ -343,10 +346,14 @@ serve_client(int i) {
 				die_peacefully = 1;
 			}
 		}
-		if ((rc = pseudo_msg_send(clients[i].fd, in, -1, response_path)) != 0)
-			pseudo_debug(1, "failed to send response to client %d [%d]: %d (%s)\n",
-				i, (int) clients[i].pid, rc, strerror(errno));
-		rc = in->op;
+                if (send_response) {
+                        if ((rc = pseudo_msg_send(clients[i].fd, in, -1, response_path)) != 0) {
+                                pseudo_debug(1, "failed to send response to client %d [%d]: %d (%s)\n",
+                                        i, (int) clients[i].pid, rc, strerror(errno));
+                        }
+                } else {
+                        rc = 1;
+                }
 		free(response_path);
 		return rc;
 	} else {
@@ -423,10 +430,11 @@ pseudo_server_loop(void) {
 					die_peacefully = 1;
 				} else {
 					/* display this if not exiting */
-					pseudo_debug(1, "%d messages handled in %.4f seconds\n",
+					pseudo_debug(1, "%d messages handled in %.4f seconds, %d responses\n",
 						messages,
 						(double) message_time.tv_sec +
-						(double) message_time.tv_usec / 1000000.0);
+						(double) message_time.tv_usec / 1000000.0,
+                                                responses);
 				}
 			}
 		} else if (rc > 0) {
@@ -439,11 +447,13 @@ pseudo_server_loop(void) {
 					close_client(i);
 				} else if (FD_ISSET(clients[i].fd, &reads)) {
 					struct timeval tv1, tv2;
-					int op;
+                                        int rc;
 					gettimeofday(&tv1, NULL);
-					op = serve_client(i);
+					rc = serve_client(i);
 					gettimeofday(&tv2, NULL);
 					++messages;
+                                        if (rc == 0)
+                                                ++responses;
 					message_time.tv_sec += (tv2.tv_sec - tv1.tv_sec);
 					message_time.tv_usec += (tv2.tv_usec - tv1.tv_usec);
 					if (message_time.tv_usec < 0) {
