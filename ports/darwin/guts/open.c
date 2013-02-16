@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012 Wind River Systems; see
+ * Copyright (c) 2011-2013 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * int open(const char *path, int flags, ... { int mode })
@@ -9,6 +9,9 @@
 	struct stat buf = { };
 	int existed = 1;
 	int save_errno;
+#ifdef PSEUDO_FORCE_ASYNCH
+        flags &= ~O_SYNC;
+#endif
 
 	/* if a creation has been requested, check whether file exists */
 	if (flags & O_CREAT) {

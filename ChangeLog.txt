@@ -1,3 +1,8 @@
+2013-02-16:
+	* (seebs) Add wrapper setting which automatically returns a fixed
+	  value from some wrappers. Add fixed-value wrappers for all the
+	  *sync() functions. These are all contingent on --enable-force-async.
+
 2013-02-15:
 	* (seebs) Add support for in-memory DB. This, plus upcoming
 	  fsync-related changes, are expected to be big enough to justify

@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2008-2010 Wind River Systems; see
+ * Copyright (c) 2008-2010, 2013 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * static int
@@ -16,6 +16,25 @@
 		return -1;
 	}
 #endif
+
+#ifdef PSEUDO_FORCE_ASYNCH
+        /* Yes, I'm aware that every Linux system I've seen has
+         * DSYNC and RSYNC being the same value as SYNC.
+         */
+
+        flags &= ~(O_SYNC
+#ifdef O_DIRECT
+                | O_DIRECT
+#endif
+#ifdef O_DSYNC
+                | O_DSYNC
+#endif
+#ifdef O_RSYNC
+                | O_RSYNC
+#endif
+        );
+#endif
+
 	/* if a creation has been requested, check whether file exists */
 	if (flags & O_CREAT) {
 		save_errno = errno;

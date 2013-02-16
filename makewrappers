@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2011 Wind River Systems, Inc.
+# Copyright (c) 2008-2011,2013 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -219,6 +219,7 @@ class Function:
         self.paths_to_munge = []
         self.specific_dirfds = {}
         self.hand_wrapped = None
+        self.async_skip = None
         # used for the copyright date when creating stub functions
         self.date = datetime.date.today().year
     
@@ -299,6 +300,16 @@ class Function:
 """
         else:
             return ""
+
+    def maybe_async_skip(self):
+        if self.async_skip:
+	    return """/* This function is not called if pseudo is configured --enable-force-async */
+#ifdef PSEUDO_FORCE_ASYNC
+	return %s;
+#endif
+""" % self.async_skip
+        else:
+	    return ""
 
     def comment(self):
         """declare self (in a comment)"""

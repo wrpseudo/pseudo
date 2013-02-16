@@ -23,6 +23,8 @@ ${name}(${decl_args}) {
 	${variadic_decl}
 	${rc_decl}
 
+${maybe_async_skip}
+
 	if (!pseudo_check_wrappers() || !real_$name) {
 		/* rc was initialized to the "failure" value */
 		pseudo_enosys("${name}");

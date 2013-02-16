@@ -58,3 +58,12 @@ ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLIN
 ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
 int system(const char *command);
 FILE *popen(const char *command, const char *mode); /* hand_wrapped=1 */
+# Based on experiments by Richard Purdie: Allow pseudo to eliminate
+# sync-type operations globally, mostly relevant for performance reasons
+# during filesystem assembly.
+int fsync(int fd); /* async_skip=0 */
+int fdatasync(int fd); /* async_skip=0 */
+void sync(void); /* async_skip=0 */
+int syncfs(int fd); /* async_skip=0 */
+int sync_file_range(int fd, off64_t offset, off64_t nbytes, unsigned int flags); /* async_skip=0 */
+int msync(void *addr, size_t length, int flags); /* async_skip=0 */
