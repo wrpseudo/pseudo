@@ -431,6 +431,7 @@ additional ports to include.
         self.name = port
         self.subports = []
         self.preports = []
+	print port
 
         if os.path.exists(self.portfile("pseudo_wrappers.c")):
             self.wrappers = self.portfile("pseudo_wrappers.c")

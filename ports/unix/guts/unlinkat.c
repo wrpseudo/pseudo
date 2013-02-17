@@ -9,7 +9,7 @@
 	pseudo_msg_t *msg;
 	int save_errno;
 	PSEUDO_STATBUF buf;
-	int old_db_entry;
+	int old_db_entry = 0;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
