@@ -305,7 +305,8 @@ class Function:
         if self.async_skip:
 	    return """/* This function is not called if pseudo is configured --enable-force-async */
 #ifdef PSEUDO_FORCE_ASYNC
-	return %s;
+	if (!pseudo_allow_fsync)
+		return %s;
 #endif
 """ % self.async_skip
         else:

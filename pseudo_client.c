@@ -68,6 +68,7 @@ size_t pseudo_chroot_len = 0;
 char *pseudo_cwd_rel = NULL;
 /* used for PSEUDO_DISABLED */
 int pseudo_disabled = 0;
+int pseudo_allow_fsync = 0;
 static int pseudo_local_only = 0;
 
 static char **fd_paths = NULL;
@@ -161,6 +162,25 @@ pseudo_init_client(void) {
 		}
 	} else {
 		pseudo_set_value("PSEUDO_DISABLED", "0");
+	}
+
+	/* ALLOW_FSYNC is here because some crazy hosts will otherwise
+	 * report incorrect values for st_size/st_blocks. I can sort of
+	 * understand st_blocks, but bogus values for st_size? Not cool,
+	 * dudes, not cool.
+	 */
+	env = getenv("PSEUDO_ALLOW_FSYNC");
+	if (!env) {
+		env = pseudo_get_value("PSEUDO_ALLOW_FSYNC");
+	} else {
+		pseudo_set_value("PSEUDO_ALLOW_FSYNC", env);
+	}
+	if (env) {
+		pseudo_allow_fsync = 1;
+		pseudo_diag("pseudo_allow_fsync: %s => 1\n", env);
+	} else {
+		pseudo_allow_fsync = 0;
+		pseudo_diag("pseudo_allow_fsync: null => 0\n");
 	}
 
 	/* in child processes, PSEUDO_UNLOAD may become set to

@@ -1,5 +1,8 @@
 2013-02-26:
 	* (seebs) When built -DNDEBUG, completely drop pseudo_debug calls.
+	* (seebs) Add PSEUDO_ALLOW_FSYNC to allow temporary re-enabling of
+	  fsync to work around filesystem bugs.
+	* (seebs) call that 1.5.1.
 
 2013-02-17:
 	* (seebs) Fix uninitialized variable in unlink, fix force-fsync for
