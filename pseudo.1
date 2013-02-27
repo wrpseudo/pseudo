@@ -418,6 +418,16 @@ will still report success, even though nothing happens. This function is
 intended for debugging of issues which are complicated by the server's
 involvement.
 .TP 8
+.B PSEUDO_ALLOW_FSYNC
+If this variable is set, pseudo will allow
+.I fsync()
+and related system calls, even it was configured with the
+.I --enable-force-async
+option. Otherwise, that option results in all such calls being
+discarded silently, even when
+.B PSEUDO_DISABLED
+is set. The value specified doesn't matter.
+.TP 8
 .B PSEUDO_ENOSYS_ABORT
 If this variable is set, the
 .I pseudo

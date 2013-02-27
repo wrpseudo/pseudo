@@ -1,5 +1,6 @@
 2013-02-27:
 	* (seebs) Oh, hey, what if I took out my debug messages?
+	* (seebs) update docs a bit to reduce bitrot
 
 2013-02-26:
 	* (seebs) When built -DNDEBUG, completely drop pseudo_debug calls.

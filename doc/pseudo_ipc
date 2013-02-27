@@ -35,16 +35,17 @@ is not thread-safe; this is part of (but not all of) the reason that there's
 mutex stuff in the wrappers.  (The other part is the "antimagic" being
 able to blow things up.)
 
-type is one of PING, OP, SHUTDOWN, ACK, or NAK.  The client only sends PING or
-OP.  The server should always send ACK.  When run with '-S', the pseudo
-program runs as a client, sending a SHUTDOWN message to a server -- but only
-if it can find one, it does not start a new one.  In this case, the server
-could respond with a NAK, in which case it sends a message in which "path"
-is a list of space-separated PIDs of currently-living clients, for the program
-to print out in an error message.  The server will not shut down while there
-are living clients.  (The request, though, causes it to shut down immediately
-when there are no more clients, rather than waiting for the timeout
-period.)
+type is one of PING, OP, FASTOP, SHUTDOWN, ACK, or NAK.  The client
+only sends PING, OP, or FASTOP.  FASTOP takes no response, otherwise the
+server should always send ACK.  When run with '-S', the pseudo program
+runs as a client, sending a SHUTDOWN message to a server -- but only if
+it can find one, it does not start a new one.  In this case, the server
+could respond with a NAK, in which case it sends a message in which
+"path" is a list of space-separated PIDs of currently-living clients,
+for the program to print out in an error message.  The server will
+not shut down while there are living clients.  (The request, though,
+causes it to shut down immediately when there are no more clients,
+rather than waiting for the timeout period.)
 
 result is the result of a particular operation.  It applies only in replies
 to OP messages.

@@ -27,6 +27,16 @@ Configure options:
 	    --with-sqlite=/path/to/sqlite/dir
 	    --bits={32,64}
 	    --suffix=<text>
+	    --enable-static-sqlite
+	    --with-sqlite-lib
+	    --libdir=...
+	    --enable-memory-db
+	    --enable-force-async
+	    --with-sqlite-lib=...
+	    --enable-static-sqlite
+	    --with-static-sqlite=...
+	    --with-rpath=...|--without-rpath
+	    --cflags=''
 
 There is no default prefix.  The default for sqlite is /usr, and for
 bits is 32.  You need a reasonably modern sqlite3 -- it has to have
@@ -45,6 +55,14 @@ on 64-bit Intel Darwin systems.
 Limited user documentation is provided in the given man page files (these
 are not currently installed, merely provided in the source directory), and
 some documentation on internals is provided in the doc/ directory.
+
+The memory-db option uses an in-memory SQLite database, which is flushed
+to disk on failures. It's disabled by default with SQLite 3.6 and earlier
+due to performance weirdness.
+
+The --enable-force-async option causes wrappers for fsync() and friends to
+all return "success" instantly unless PSEUDO_ALLOW_FSYNC was set in the
+environment when the client initialized (usually after a fork or exec).
 
 
 FUTURE DIRECTIONS:
