@@ -1,7 +1,7 @@
 /*
  * pseudo.h, shared definitions and structures for pseudo
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2010, 2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -39,8 +39,11 @@ extern int pseudo_disabled;
 extern int pseudo_debug_real(int, char *, ...) __attribute__ ((format (printf, 2, 3)));
 #define pseudo_debug pseudo_debug_real
 #else
-/* oh no, mister compiler, please don't optimize me away! */
-static inline void pseudo_debug(int level, char *text, ...) { }
+/* this used to be a static inline function, but that meant that arguments
+ * were still evaluated for side effects. We don't want that. The ...
+ * is a C99ism, also supported by GNU C.
+ */
+#define pseudo_debug(...) 0
 #endif
 extern int pseudo_diag(char *, ...) __attribute__ ((format (printf, 1, 2)));
 void pseudo_new_pid(void);

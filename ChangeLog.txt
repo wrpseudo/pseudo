@@ -1,3 +1,6 @@
+2013-02-26:
+	* (seebs) When built -DNDEBUG, completely drop pseudo_debug calls.
+
 2013-02-17:
 	* (seebs) Fix uninitialized variable in unlink, fix force-fsync for
 	  Darwin (off64_t is not a distinct type there).
