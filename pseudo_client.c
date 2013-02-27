@@ -177,10 +177,8 @@ pseudo_init_client(void) {
 	}
 	if (env) {
 		pseudo_allow_fsync = 1;
-		pseudo_diag("pseudo_allow_fsync: %s => 1\n", env);
 	} else {
 		pseudo_allow_fsync = 0;
-		pseudo_diag("pseudo_allow_fsync: null => 0\n");
 	}
 
 	/* in child processes, PSEUDO_UNLOAD may become set to
