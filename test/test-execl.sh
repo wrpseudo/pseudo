@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cat > execl_test.c << EOF
 #include <unistd.h>
 int main() {

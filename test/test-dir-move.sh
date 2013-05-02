@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 mkdir d1
 touch d1/f1
 mv d1 d2

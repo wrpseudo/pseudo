@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 env -i A=A B=B C=C env | grep -q "PSEUDO_"
 

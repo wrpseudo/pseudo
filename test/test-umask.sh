@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 mode() {
 	ls -l "$1" | awk '{ print $1 }'

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Test if we re-invoke pseudo that chroot still works
 

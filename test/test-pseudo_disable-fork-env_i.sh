@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Verify normal operation...
 uid=`env -i id -u`

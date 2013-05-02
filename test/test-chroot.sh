@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Return vals: 2 - invalid arg list
 #              1 - chroot failed

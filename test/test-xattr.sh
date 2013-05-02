@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Return vals: 2 - Unable to run xattr commands
 #              1 - Invalid return value
