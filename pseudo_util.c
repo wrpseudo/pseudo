@@ -746,7 +746,7 @@ pseudo_dropenvp(char * const *envp) {
 /* add pseudo stuff to the environment.
  */
 void
-pseudo_setupenv() {
+pseudo_setupenv(void) {
 	size_t i = 0;
 
 	pseudo_debug(PDBGF_CLIENT, "setting up pseudo environment.\n");
