@@ -19,7 +19,7 @@
 	myargs->arg = arg;
 
 	/* call the real syscall */
-	rc = (*real_clone)(wrap_clone_child, child_stack, flags, myargs, pid);
+	rc = (*real_clone)(wrap_clone_child, child_stack, flags, myargs);
 
 	/* If we're not sharing memory, we need to free myargs in the parent */
 	if (!(flags & CLONE_VM))

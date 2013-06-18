@@ -35,9 +35,6 @@ int wrap_clone_child(void *args) {
 int
 clone(int (*fn)(void *), void *child_stack, int flags, void *arg) {
 	sigset_t saved;
-	pid_t *pid;
-	struct user_desc *tls;
-	pid_t *ctid;
 
 	int rc = -1;
 
