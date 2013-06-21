@@ -56,13 +56,30 @@ static int pseudo_db_check(int fix);
 void
 usage(int status) {
 	FILE *f = status ? stderr : stdout;
-	fputs("Usage: pseudo [-dflv] [-P prefix] [-rR root] [-t timeout] [command]\n", f);
+	fputs("Usage: pseudo [-dflv] [-x flags] [-P prefix] [-rR root] [-t timeout] [command]\n", f);
 	fputs("       pseudo -h\n", f);
-	fputs("       pseudo [-dflv] [-P prefix] [-BC] -i path\n", f);
-	fputs("       pseudo [-dflv] [-P prefix] [-BC] -m from -M to\n", f);
-	fputs("       pseudo [-dflv] [-P prefix] -C\n", f);
-	fputs("       pseudo [-dflv] [-P prefix] -S\n", f);
-	fputs("       pseudo [-dflv] [-P prefix] -V\n", f);
+	fputs("       pseudo [-dflv] [-x flags] [-P prefix] [-BC] -i path\n", f);
+	fputs("       pseudo [-dflv] [-x flags] [-P prefix] [-BC] -m from -M to\n", f);
+	fputs("       pseudo [-dflv] [-x flags] [-P prefix] -C\n", f);
+	fputs("       pseudo [-dflv] [-x flags] [-P prefix] -S\n", f);
+	fputs("       pseudo [-dflv] [-x flags] [-P prefix] -V\n", f);
+	fputs("Debugging flags:\n", f);
+	for (int i = 1; i < PDBG_MAX; i += 2) {
+		unsigned char symbolics[2];
+		const char *descriptions[2];
+		symbolics[1] = pseudo_debug_type_symbolic(i);
+		symbolics[2] = pseudo_debug_type_symbolic(i + 1);
+		descriptions[1] = pseudo_debug_type_description(i);
+		descriptions[2] = pseudo_debug_type_description(i + 1);
+		if (symbolics[2]) {
+			fprintf(f, "       %c %-32s  %c %-32s\n",
+				symbolics[1], descriptions[1],
+				symbolics[2], descriptions[2]);
+		} else {
+			fprintf(f, "       %c %-32s\n",
+				symbolics[1], descriptions[1]);
+		}
+	}
 	exit(status);
 }
 
@@ -105,11 +122,11 @@ main(int argc, char *argv[]) {
 	pseudo_init_util();
 
 	if (ld_env && strstr(ld_env, "libpseudo")) {
-		pseudo_debug(2, "can't run daemon with libpseudo in %s\n", PRELINK_LIBRARIES);
+		pseudo_debug(PDBGF_SERVER, "can't run daemon with libpseudo in %s\n", PRELINK_LIBRARIES);
 		s = pseudo_get_value("PSEUDO_UNLOAD");
 		if (s) {
-			pseudo_diag("I can't seem to make %s go away.  Sorry.\n", PRELINK_LIBRARIES);
-			pseudo_diag("%s: %s\n", PRELINK_LIBRARIES, ld_env);
+			pseudo_diag("pseudo: I can't seem to make %s go away.  Sorry.\n", PRELINK_LIBRARIES);
+			pseudo_diag("pseudo: %s: %s\n", PRELINK_LIBRARIES, ld_env);
 			exit(EXIT_FAILURE);
 		}
 		free(s);
@@ -137,7 +154,7 @@ main(int argc, char *argv[]) {
 	 * wrong.  The + suppresses this annoying behavior, but may not
 	 * be compatible with sane option libraries.
 	 */
-	while ((o = getopt(argc, argv, "+BCdfhi:lm:M:p:P:r:R:St:vV")) != -1) {
+	while ((o = getopt(argc, argv, "+BCdfhi:lm:M:p:P:r:R:St:vVx:")) != -1) {
 		switch (o) {
 		case 'B': /* rebuild database */
 			opt_B = 1;
@@ -234,6 +251,9 @@ main(int argc, char *argv[]) {
 			printf("Set PSEUDO_PREFIX to run with a different prefix.\n");
 			exit(0);
 			break;
+		case 'x': /* debug flags */
+			pseudo_debug_set(optarg);
+			break;
 		case '?':
 		default:
 			pseudo_diag("unknown/invalid argument (option '%c').\n", optopt);
@@ -241,6 +261,7 @@ main(int argc, char *argv[]) {
 			break;
 		}
 	}
+	pseudo_debug_flags_finalize();
 	/* Options are processed, preserve them... */
 	pseudo_set_value("PSEUDO_OPTS", opts);
 
@@ -346,14 +367,14 @@ main(int argc, char *argv[]) {
 			}
 		}
 		if (argc > optind) {
-			pseudo_debug(2, "running command: %s\n",
+			pseudo_debug(PDBGF_INVOKE, "running command: %s\n",
 				argv[optind]);
 			argc -= optind;
 			argv += optind;
 		} else {
 			static char *newargv[2];
 			argv = newargv;
-			pseudo_debug(2, "running shell.\n");
+			pseudo_debug(PDBGF_INVOKE, "running shell.\n");
 			argv[0] = getenv("SHELL");
 			if (!argv[0])
 				argv[0] = "/bin/sh";
@@ -401,7 +422,7 @@ main(int argc, char *argv[]) {
 	 */
 	pseudo_new_pid();
 
-	pseudo_debug(3, "opening lock.\n");
+	pseudo_debug(PDBGF_SERVER, "opening lock.\n");
 	lockpath = pseudo_localstatedir_path(NULL);
 	if (!lockpath) {
 		pseudo_diag("Couldn't allocate a file path.\n");
@@ -432,18 +453,18 @@ main(int argc, char *argv[]) {
 		}
 	}
 
-	pseudo_debug(3, "acquiring lock.\n");
+	pseudo_debug(PDBGF_SERVER, "acquiring lock.\n");
 	if (flock(lockfd, LOCK_EX | LOCK_NB) < 0) {
 		if (errno == EACCES || errno == EAGAIN) {
-			pseudo_debug(1, "Existing server has lock.  Exiting.\n");
+			pseudo_debug(PDBGF_SERVER, "Existing server has lock.  Exiting.\n");
 		} else {
-			pseudo_diag("Error obtaining lock: %s\n", strerror(errno));
+			pseudo_diag("pseudo: Error obtaining lock: %s\n", strerror(errno));
 		}
 		exit(0);
 	} else {
-		pseudo_debug(2, "Acquired lock.\n");
+		pseudo_debug(PDBGF_SERVER, "Acquired lock.\n");
 	}
-	pseudo_debug(3, "serving (%s)\n", opt_d ? "daemon" : "foreground");
+	pseudo_debug(PDBGF_SERVER, "serving (%s)\n", opt_d ? "daemon" : "foreground");
 	return pseudo_server_start(opt_d);
 }
 
@@ -473,12 +494,12 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	case OP_FCHMOD:		/* FALLTHROUGH */
 	case OP_FSTAT:
 		prefer_ino = 1;
-		pseudo_debug(2, "%s %llu [%s]: ", pseudo_op_name(msg->op),
+		pseudo_debug(PDBGF_OP, "%s %llu [%s]: ", pseudo_op_name(msg->op),
 			(unsigned long long) msg->ino,
 			msg->pathlen ? msg->path : "no path");
 		break;
 	default:
-		pseudo_debug(2, "%s %s [%llu]: ", pseudo_op_name(msg->op),
+		pseudo_debug(PDBGF_OP, "%s %s [%llu]: ", pseudo_op_name(msg->op),
 			msg->pathlen ? msg->path : "no path",
 			(unsigned long long) msg->ino);
 		break;
@@ -491,7 +512,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	if (msg->pathlen && msg->op == OP_RENAME) {
 		/* In a rename there are two paths, null seperate in msg->path */
 		oldpath = msg->path + strlen(msg->path) + 1;
-		pseudo_debug(2, "rename: path %s, oldpath %s\n",
+		pseudo_debug(PDBGF_OP | PDBGF_FILE, "rename: path %s, oldpath %s\n",
 			msg->path, oldpath);
 	}
 
@@ -526,7 +547,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				found_path = 1;
 			} else {
 				if (msg->op != OP_RENAME && msg->op != OP_LINK) {
-					pseudo_debug(3, "(new?) ");
+					pseudo_debug(PDBGF_FILE, "(new?) ");
 				}
 			}
 		}
@@ -539,7 +560,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		}
 	}
 
-	pseudo_debug(3, "incoming: '%s'%s [%llu]%s\n",
+	pseudo_debug(PDBGF_OP, "incoming: '%s'%s [%llu]%s\n",
 		msg->pathlen ? msg->path : "no path",
 		found_path ? "+" : "-",
 		(unsigned long long) msg_header.ino,
@@ -561,7 +582,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				 * as deleted.
 				 */
 				if (by_path.deleting != 0) {
-					pseudo_debug(1, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
+					pseudo_debug(PDBGF_FILE, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
 						msg->path);
 					pdb_did_unlink_file(msg->path, by_path.deleting);
 				} else {
@@ -609,12 +630,12 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		 * at leisure.
 		 */
 		if (msg->pathlen && !path_by_ino) {
-			pseudo_debug(2, "db path missing: ino %llu, request '%s'.\n",
+			pseudo_debug(PDBGF_FILE, "db path missing: ino %llu, request '%s'.\n",
 				(unsigned long long) msg_header.ino, msg->path);
 			pdb_update_file_path(msg);
 		} else if (!msg->pathlen && path_by_ino) {
 			/* harmless */
-			pseudo_debug(2, "req path missing: ino %llu, db '%s'.\n",
+			pseudo_debug(PDBGF_FILE, "req path missing: ino %llu, db '%s'.\n",
 				(unsigned long long) msg_header.ino, path_by_ino);
 		} else if (msg->pathlen && path_by_ino) {
 			/* this suggests a database error, except in LINK
@@ -650,7 +671,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				 * already.
 				 */
 				if (by_ino.deleting != 0) {
-					pseudo_debug(1, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
+					pseudo_debug(PDBGF_FILE, "inode mismatch for '%s' -- old one was marked for deletion, deleting.\n",
 						msg->path);
 					pdb_did_unlink_file(path_by_ino, by_ino.deleting);
 				} else {
@@ -664,7 +685,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			}
 		} else {
 			/* I don't think I've ever seen this one. */
-			pseudo_debug(1, "warning: ino %llu in db (mode 0%o, owner %d), no path known.\n",
+			pseudo_debug(PDBGF_FILE, "warning: ino %llu in db (mode 0%o, owner %d), no path known.\n",
 				(unsigned long long) msg_header.ino,
 				(int) by_ino.mode, (int) by_ino.uid);
 		}
@@ -737,7 +758,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		break;
 	case OP_CHMOD:		/* FALLTHROUGH */
 	case OP_FCHMOD:
-		pseudo_debug(2, "mode 0%o ", (int) msg->mode);
+		pseudo_debug(PDBGF_OP, "mode 0%o ", (int) msg->mode);
 		/* if the inode is known, update it */
 		if (found_ino) {
 			/* obtain the existing data, merge with mode */
@@ -757,13 +778,13 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		}
 		/* if the path is not known, link it */
 		if (!found_path) {
-			pseudo_debug(2, "(new) ");
+			pseudo_debug(PDBGF_FILE, "(new) ");
 			pdb_link_file(msg);
 		}
 		break;
 	case OP_CHOWN:		/* FALLTHROUGH */
 	case OP_FCHOWN:
-		pseudo_debug(2, "owner %d:%d ", (int) msg_header.uid, (int) msg_header.gid);
+		pseudo_debug(PDBGF_OP, "owner %d:%d ", (int) msg_header.uid, (int) msg_header.gid);
 		/* if the inode is known, update it */
 		if (found_ino) {
 			/* obtain the existing data, merge with mode */
@@ -797,7 +818,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		} else {
 			msg->result = RESULT_FAIL;
 		}
-		pseudo_debug(3, "%s, ino %llu (old mode 0%o): mode 0%o\n",
+		pseudo_debug(PDBGF_OP | PDBGF_VERBOSE, "%s, ino %llu (old mode 0%o): mode 0%o\n",
 			pseudo_op_name(msg->op), (unsigned long long) msg->ino,
 			(int) msg_header.mode, (int) msg->mode);
 		break;
@@ -811,7 +832,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		 * underlying file data in the client.
 		 */
 		if (found_path) {
-			pseudo_debug(2, "replace %slink: path %s, old ino %llu, mode 0%o, new ino %llu, mode 0%o\n",
+			pseudo_debug(PDBGF_OP | PDBGF_FILE, "replace %slink: path %s, old ino %llu, mode 0%o, new ino %llu, mode 0%o\n",
 				msg->op == OP_SYMLINK ? "sym" : "",
 				msg->path, (unsigned long long) msg->ino,
 				(int) msg->mode,
@@ -819,7 +840,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 				(int) msg_header.mode);
 			pdb_unlink_file(msg);
 		} else {
-			pseudo_debug(2, "new %slink: path %s, ino %llu, mode 0%o\n",
+			pseudo_debug(PDBGF_OP | PDBGF_FILE, "new %slink: path %s, ino %llu, mode 0%o\n",
 				msg->op == OP_SYMLINK ? "sym" : "",
 				msg->path,
 				(unsigned long long) msg_header.ino,
@@ -827,12 +848,12 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		}
 		if (found_ino) {
 			if (msg->op == OP_SYMLINK) {
-				pseudo_debug(2, "symlink: ignoring existing file %llu ['%s']\n",
+				pseudo_debug(PDBGF_OP | PDBGF_FILE, "symlink: ignoring existing file %llu ['%s']\n",
 					(unsigned long long) by_ino.ino,
 					path_by_ino ? path_by_ino : "no path");
 			} else {
 				*msg = by_ino;
-				pseudo_debug(2, "link: copying data from existing file %llu ['%s']\n",
+				pseudo_debug(PDBGF_OP | PDBGF_FILE, "link: copying data from existing file %llu ['%s']\n",
 					(unsigned long long) by_ino.ino,
 					path_by_ino ? path_by_ino : "no path");
 			}
@@ -878,7 +899,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		 * This should cease to be needed once symlinks are tracked.
 		 */
 		if (msg_header.nlink == 1 && found_ino) {
-			pseudo_debug(2, "link count 1, unlinking anything with ino %llu.\n",
+			pseudo_debug(PDBGF_FILE | PDBGF_OP, "link count 1, unlinking anything with ino %llu.\n",
 				(unsigned long long) msg->ino);
 			pdb_unlink_file_dev(msg);
 		}
@@ -886,7 +907,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		break;
 	case OP_MKDIR:		/* FALLTHROUGH */
 	case OP_MKNOD:
-		pseudo_debug(2, "mode 0%o", (int) msg->mode);
+		pseudo_debug(PDBGF_OP, "mode 0%o", (int) msg->mode);
 		/* for us to get called, the client has to have succeeded in
 		 * a creation (of a regular file, for mknod) -- meaning this
 		 * file DID NOT exist before the call.  Fix database:
@@ -916,7 +937,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	if (path_by_ino != msg->path) {
 		free(path_by_ino);
 	}
-	pseudo_debug(2, "completed %s.\n", pseudo_op_name(msg->op));
+	pseudo_debug(PDBGF_OP, "completed %s.\n", pseudo_op_name(msg->op));
 	if (opt_l)
 		pdb_log_msg(SEVERITY_INFO, msg, program, tag, NULL);
 	return 0;
@@ -961,13 +982,13 @@ pseudo_db_check(int fix) {
 		return EXIT_FAILURE;
 	}
 	while ((m = pdb_file(l)) != NULL) {
-		pseudo_debug(2, "m: %p (%d: %s)\n",
+		pseudo_debug(PDBGF_DB, "m: %p (%d: %s)\n",
 			(void *) m,
 			m ? (int) m->pathlen : -1,
 			m ? m->path : "<n/a>");
 		if (m->pathlen > 0) {
 			int fixup_needed = 0;
-			pseudo_debug(1, "Checking <%s>\n", m->path);
+			pseudo_debug(PDBGF_DB, "Checking <%s>\n", m->path);
 			if (lstat(m->path, &buf)) {
 				errors = EXIT_FAILURE;
 				pseudo_diag("can't stat <%s>\n", m->path);
@@ -978,7 +999,7 @@ pseudo_db_check(int fix) {
 			 * can't really set.
 			 */
 			if (buf.st_ino != m->ino) {
-				pseudo_debug(fix, "ino mismatch <%s>: ino %llu, db %llu\n",
+				pseudo_debug(PDBGF_DB, "ino mismatch <%s>: ino %llu, db %llu\n",
 					m->path,
 					(unsigned long long) buf.st_ino,
 					(unsigned long long) m->ino);
@@ -986,7 +1007,7 @@ pseudo_db_check(int fix) {
 				fixup_needed = 1;
 			}
 			if (buf.st_dev != m->dev) {
-				pseudo_debug(fix, "dev mismatch <%s>: dev %llu, db %llu\n",
+				pseudo_debug(PDBGF_DB, "dev mismatch <%s>: dev %llu, db %llu\n",
 					m->path,
 					(unsigned long long) buf.st_dev,
 					(unsigned long long) m->dev);
@@ -994,14 +1015,14 @@ pseudo_db_check(int fix) {
 				fixup_needed = 1;
 			}
 			if (S_ISLNK(buf.st_mode) != S_ISLNK(m->mode)) {
-				pseudo_debug(fix, "symlink mismatch <%s>: file %d, db %d\n",
+				pseudo_debug(PDBGF_DB, "symlink mismatch <%s>: file %d, db %d\n",
 					m->path,
 					S_ISLNK(buf.st_mode),
 					S_ISLNK(m->mode));
 				fixup_needed = 2;
 			}
 			if (S_ISDIR(buf.st_mode) != S_ISDIR(m->mode)) {
-				pseudo_debug(fix, "symlink mismatch <%s>: file %d, db %d\n",
+				pseudo_debug(PDBGF_DB, "symlink mismatch <%s>: file %d, db %d\n",
 					m->path,
 					S_ISDIR(buf.st_mode),
 					S_ISDIR(m->mode));

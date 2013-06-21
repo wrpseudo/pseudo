@@ -44,7 +44,7 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg) {
 		return rc;
 	}
 
-	pseudo_debug(4, "called: clone\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: clone\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -70,7 +70,7 @@ clone(int (*fn)(void *), void *child_stack, int flags, void *arg) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: clone\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: clone\n");
 	errno = save_errno;
 	return rc;
 }

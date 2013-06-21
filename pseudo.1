@@ -19,29 +19,74 @@
 .SH SYNOPSIS
 .B pseudo
 .RB [ \-dflv ]
-.RB [ \-P\ prefix ]
-.RB [ \-rR\ root ]
-.RB [ \-t\ timeout ]
-.RB [ command ]
+[
+.B \-x
+.I flags
+]
+[
+.B \-P
+.I prefix
+]
+[
+.B \-rR
+.I root
+]
+[
+.B \-t
+.I timeout
+]
+.RI [ command ]
 .PP
 .B pseudo \-h
 .PP
 .B pseudo
-.RB [ \-P\ prefix ]
+.RB [ \-dflv ]
+[
+.B \-x
+.I flags
+]
+[
+.B \-P
+.I prefix
+]
 .RB [ \-BC ]
 .BR \-i\  path
 .PP
 .B pseudo
-.RB [ \-P\ prefix ]
+.RB [ \-dflv ]
+[
+.B \-x
+.I flags
+]
+[
+.B \-P
+.I prefix
+]
 .RB [ \-BC ]
 .BR \-m\  from\  \-M\  to
 .PP
 .B pseudo
-.RB [ \-P\ prefix ]
+.RB [ \-dflv ]
+[
+.B \-x
+.I flags
+]
+[
+.B \-P
+.I prefix
+]
 .B \-S
 .PP
 .B pseudo
-.RB [ \-P\ prefix ]
+.RB [ \-dflv ]
+[
+.B \-x
+.I flags
+]
+[
+.B \-P
+.I prefix
+]
 .B \-V
 .SH DESCRIPTION
 The
@@ -240,11 +285,20 @@ Increase the verbosity of the
 daemon, and the client library for any programs started by this
 invocation of
 .IR pseudo .
-This is equivalent to the
+This is equivalent to the numeric form of the
 .B PSEUDO_DEBUG
 environment variable; multiple
 .B \-v
 options increase the debugging level.
+
+.TP 8
+.BI \-x\  (debug)
+Set specific deugging flags (the
+.I pseudo
+utility's help message lists them). This is equivalent to the string
+form of the
+.B PSEUDO_DEBUG
+environment variable.
 
 .SH EXAMPLES
 The two most common usages of
@@ -378,9 +432,12 @@ path.  Paths that are relative to this are treated as though they were
 instead relative to the filesystem root.
 .TP 8
 .B PSEUDO_DEBUG
-This variable holds the "debug level" for
+This variable holds either a numeric "debug level" for
 .I pseudo
-to run at.  In general, this is useful only for debugging
+to run at, or a set of specific debugging flags, generally letters.
+Use
+.B pseudo -h
+to see the available flags. In general, this is useful only for debugging
 .I pseudo
 itself.
 .TP 8

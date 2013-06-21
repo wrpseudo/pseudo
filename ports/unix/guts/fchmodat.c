@@ -42,7 +42,7 @@
 	 */
 	msg = pseudo_client_op(OP_STAT, 0, -1, -1, path, &buf);
 	if (!msg || msg->result != RESULT_SUCCEED) {
-		pseudo_debug(2, "chmodat to 0%o on %d/%s, ino %llu, new file.\n",
+		pseudo_debug(PDBGF_FILE, "chmodat to 0%o on %d/%s, ino %llu, new file.\n",
 			mode, dirfd, path, (unsigned long long) buf.st_ino);
 
 	}

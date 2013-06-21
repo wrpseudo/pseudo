@@ -66,10 +66,19 @@ class DataType:
         else:
             self.prefix = qualifiers
             columns = []
+        self.flags = False
         if len(columns):
             self.columns = []
             columns = string.split(columns, ', ')
             for col in columns:
+                indexed = False
+                if col.startswith("FLAGS"):
+                    print "Flags: set for %s" % self.name
+                    self.flags = True
+                    continue
+                if col.startswith("INDEXED "):
+                    col = col[8:]
+                    indexed = True
                 if "=" in col:
                     name, default = string.split(col, ' = ')
                 else:
@@ -81,11 +90,12 @@ class DataType:
                     type = ' '.join(words)
                 else:
                     type = "char *"
-                self.columns.append({"type":type, "name":name, "value":default})
+                self.columns.append({"indexed":indexed, "type":type, "name":name, "value":default})
         else:
             self.columns = []
         self.data = []
         self.comments = []
+        index = 1
         for line in source.readlines():
             item = {}
             if line.startswith('#'):
@@ -99,10 +109,22 @@ class DataType:
             column_list = []
             for col in self.columns:
                 if len(cols) > 0:
-                    column_list.append({"name":col["name"], "value":cols.pop(0)})
+                    value = cols.pop(0)
+                    if col["indexed"]:
+                        if not "max" in col:
+                            col["max"] = value
+                        if value > col["max"]:
+                            col["max"] = value
+                        if not "min" in col:
+                            col["min"] = value
+                        if value < col["min"]:
+                            col["min"] = value
+                    column_list.append({"name":col["name"], "value":value})
                 else:
                     column_list.append({"name":col["name"], "value":col["value"]})
             item["cols"] = column_list
+            item["index"] = index
+            index = index + 1
             self.data.append(item)
 
     def __getitem__(self, key):
@@ -143,6 +165,18 @@ class DataType:
     def enums(self):
         return ',\n\t'.join('%s_%s' % (self.prefix, x["upper"]) for x in self.data)
 
+    def flag_enums(self):
+        if not self.flags:
+            return ""
+        enum_lines = []
+        enum_lines.append('typedef enum {') 
+        prefix = self.prefix + 'F'
+        for x in self.data:
+            enum_lines.append('\t%s_%s = (1 << %s_%s),' %
+                (prefix, x["upper"], self.prefix, x["upper"]))
+        enum_lines.append('} pseudo_%s_f;' % self.name)
+        return '\n'.join(enum_lines)
+
     def column_names(self):
         decl_lines = []
         column = 0
@@ -153,6 +187,11 @@ class DataType:
                 decl_lines.append('\t%s,' % item["cols"][column]["value"])
             decl_lines.append('\t0')
             decl_lines.append("};")
+            if col["indexed"]:
+                decl_lines.append("static int %s_%s_to_id[] = {" % (self.name, col["name"]))
+                for item in self.data:
+                    decl_lines.append('\t[%s] = %d,' % (item["cols"][column]["value"], item["index"]))
+                decl_lines.append("};")
             column = column + 1
         return '\n'.join(decl_lines)
 
@@ -167,6 +206,19 @@ class DataType:
             decl_lines.append('\treturn %s_id_to_%s[id];' %
                 (self.name, col["name"]))
             decl_lines.append('}')
+            if col["indexed"]:
+                table_name = '%s_%s_to_id' % (self.name, col["name"])
+                decl_lines.append('extern int')
+                decl_lines.append('pseudo_%s_%s_id(%s val) {' %
+                    (self.name, col["name"], col["type"]))
+                decl_lines.append('\tif ((val < %s) || (val > %s)) {' % (col["min"], col["max"]))
+                decl_lines.append('\t\treturn -1;')
+                decl_lines.append('\t}')
+                decl_lines.append('\tif (%s[val] != 0) {' % table_name)
+                decl_lines.append('\t\treturn %s[val];' % table_name)
+                decl_lines.append('\t}')
+                decl_lines.append('\treturn -1;')
+                decl_lines.append('}')
         return '\n'.join(decl_lines)
 
     def column_protos(self):
@@ -174,6 +226,9 @@ class DataType:
         for col in self.columns:
             decl_lines.append('extern %s pseudo_%s_%s(pseudo_%s_t id);' %
                 (col["type"], self.name, col["name"], self.name))
+            if col["indexed"]:
+                decl_lines.append('extern int pseudo_%s_%s_id(%s val);' %
+                    (self.name, col["name"], col["type"]))
         return '\n'.join(decl_lines)
 
 def main():

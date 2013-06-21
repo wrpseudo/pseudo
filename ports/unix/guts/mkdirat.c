@@ -27,7 +27,7 @@
 		if (stat_rc != -1) {
 			pseudo_client_op(OP_MKDIR, 0, -1, dirfd, path, &buf);
 		} else {
-			pseudo_debug(1, "mkdir of %s succeeded, but stat failed: %s\n",
+			pseudo_debug(PDBGF_OP, "mkdir of %s succeeded, but stat failed: %s\n",
 				path, strerror(errno));
 		}
 	}

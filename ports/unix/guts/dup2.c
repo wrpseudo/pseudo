@@ -10,7 +10,7 @@
 
 	/* close existing one first - this also causes the socket to the
 	 * server to get moved around if someone tries to overwrite it. */
-	pseudo_debug(2, "dup2: %d->%d\n", oldfd, newfd);
+	pseudo_debug(PDBGF_CLIENT, "dup2: %d->%d\n", oldfd, newfd);
 	pseudo_client_op(OP_CLOSE, 0, newfd, -1, 0, 0);
 	rc = real_dup2(oldfd, newfd);
 	save_errno = errno;

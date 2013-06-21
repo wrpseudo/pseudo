@@ -1,3 +1,7 @@
+2013-06-20:
+	* (seebs) refactor debugging code
+	* (seebs) start using 1.5.2 numbering
+
 2013-06-18:
 	* (seebs) Fix bug in oldclone (reported by rich@noir.com).
 

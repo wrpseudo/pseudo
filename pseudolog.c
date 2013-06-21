@@ -80,13 +80,15 @@ usage(int status) {
 	int i;
 
 	fputs("pseudolog: create or report log entries. usage:\n", f);
-	fputs("pseudolog -l [-P pfx] [-E timefmt] [SPECIFIERS] -- create entries\n", f);
-	fputs("pseudolog [-U] [-P pfx] [-F fmt] [-E timefmt] [SPECIFIERS] -- report entries\n", f);
-	fputs("pseudolog -D [-P pfx] [-E timefmt] [SPECIFIERS] -- delete entries\n", f);
-	fputs("  fmt is a printf-like format string using the option letters\n", f);
+	fputs("pseudolog -l [SPECIFIERS] -- create entries\n", f);
+	fputs("pseudolog [-U] [-F format] [SPECIFIERS] -- report entries\n", f);
+	fputs("pseudolog -D [SPECIFIERS] -- delete entries\n", f);
+	fputs("shared options: [-P prefix] [-E timeformat] [-x flags]\n", f);
+	fputs("  format is a printf-like format string using the option letters\n", f);
 	fputs("  listed below as format specifiers for the corresponding field.\n", f);
-	fputs("  timefmt is a strftime-like format string, the default is '%x %X'.\n", f);
-	fputs("  pfx is the PSEUDO_PREFIX in which to find the database.\n", f);
+	fputs("  timeformat is a strftime-like format string, the default is '%x %X'.\n", f);
+	fputs("  prefix is the PSEUDO_PREFIX in which to find the database.\n", f);
+	fputs("  flags are characters from the same debug flag set used by pseudo.\n", f);
 	fputs("\n", f);
 	fputs("SPECIFIERS are options of the form -X <value>, where X is one of\n", f);
 	fputs("the following option letters, and value is the value to match.\n", f);
@@ -521,7 +523,7 @@ main(int argc, char **argv) {
 	int bad_args = 0;
 	char *format = "%s %-12.12R %-4y %7o: [mode %04m, %2a] %p %T";
 
-	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:P:r:R:s:S:t:T:u:Uy:")) != -1) {
+	while ((o = getopt(argc, argv, "vla:c:d:DE:f:F:g:G:hi:I:m:M:o:O:p:P:r:R:s:S:t:T:u:Ux:y:")) != -1) {
 		switch (o) {
 		case 'P':
 			s = PSEUDO_ROOT_PATH(AT_FDCWD, optarg, AT_SYMLINK_NOFOLLOW);
@@ -531,6 +533,9 @@ main(int argc, char **argv) {
 			break;
 		case 'v':
 			pseudo_debug_verbose();
+			break;
+		case 'x':
+			pseudo_debug_set(optarg);
 			break;
 		case 'l':
 			opt_l = 1;
@@ -599,6 +604,7 @@ main(int argc, char **argv) {
 			new_trait = 0;
 		}
 	}
+	pseudo_debug_flags_finalize();
 
 	if (optind < argc) {
 		pseudo_diag("Error: Extra arguments not associated with any option.\n");

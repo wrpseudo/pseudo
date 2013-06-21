@@ -15,7 +15,7 @@
 		save_errno = errno;
 		fd = dirfd(rc);
 		if (base_fstat(fd, &buf) == -1) {
-			pseudo_debug(1, "diropen (fd %d) succeeded, but fstat failed (%s).\n",
+			pseudo_debug(PDBGF_CONSISTENCY, "diropen (fd %d) succeeded, but fstat failed (%s).\n",
 				fd, strerror(errno));
 			pseudo_client_op(OP_OPEN, PSA_READ, fd, -1, path, 0);
 		} else {

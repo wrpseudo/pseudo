@@ -19,7 +19,7 @@
 		rc = real_stat(path, &buf);
 		existed = (rc != -1);
 		if (!existed)
-			pseudo_debug(2, "open_creat: %s -> 0%o\n", path, mode);
+			pseudo_debug(PDBGF_FILE, "open_creat: %s -> 0%o\n", path, mode);
 		errno = save_errno;
 	}
 
@@ -42,7 +42,7 @@
 			}
 			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, -1, path, &buf);
 		} else {
-			pseudo_debug(1, "open (fd %d, path %s, flags %d) succeeded, but stat failed (%s).\n",
+			pseudo_debug(PDBGF_CONSISTENCY, "open (fd %d, path %s, flags %d) succeeded, but stat failed (%s).\n",
 				rc, path, flags, strerror(errno));
 			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, -1, path, 0);
 		}

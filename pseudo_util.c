@@ -84,14 +84,14 @@ static void
 dump_env(char **envp) {
 	size_t i = 0;
 	for (i = 0; envp[i]; i++) {
-		pseudo_debug(0,"dump_envp: [%d]%s\n", (int) i, envp[i]);
+		pseudo_debug(PDBGF_ENV, "dump_envp: [%d]%s\n", (int) i, envp[i]);
 	}
 
 	for (i = 0; pseudo_env[i].key; i++) {
-		pseudo_debug(0,"dump_envp: {%d}%s=%s\n", (int) i, pseudo_env[i].key, pseudo_env[i].value);
+		pseudo_debug(PDBGF_ENV, "dump_envp: {%d}%s=%s\n", (int) i, pseudo_env[i].key, pseudo_env[i].value);
 	}
 
-	pseudo_debug(0, "dump_envp: _in_init %d\n", pseudo_util_initted);
+	pseudo_debug(PDBGF_ENV, "dump_envp: _in_init %d\n", pseudo_util_initted);
 }
 #endif
 
@@ -175,21 +175,19 @@ pseudo_init_util(void) {
         if (env) {
 		int i;
                 int level = atoi(env);
-                for (i = 0; i < level; ++i) {
-                        pseudo_debug_verbose();
-                }
+		if (level > 0) {
+			for (i = 0; i < level; ++i) {
+				pseudo_debug_verbose();
+			}
+		} else {
+			pseudo_debug_set(env);
+		}
+		pseudo_debug_flags_finalize();
         }
         free(env);
 }
 
-/* 5 = ridiculous levels of duplication
- * 4 = exhaustive detail
- * 3 = detailed protocol analysis
- * 2 = higher-level protocol analysis
- * 1 = stuff that might go wrong
- * 0 = fire and arterial bleeding
- */
-static int max_debug_level = 0;
+unsigned long pseudo_util_debug_flags = 0;
 int pseudo_util_debug_fd = 2;
 static int debugged_newline = 1;
 static char pid_text[32];
@@ -335,23 +333,65 @@ with_libpseudo(char *list, char *libdir_path) {
 
 char *pseudo_version = PSEUDO_VERSION;
 
+/* going away soon */
+static int max_debug_level = 0;
+
 void
 pseudo_debug_terse(void) {
-	if (max_debug_level > 0)
-		--max_debug_level;
+	char s[2] = { pseudo_debug_type_symbolic(max_debug_level) };
 
-	char s[16];
-	snprintf(s, 16, "%d", max_debug_level);
-	pseudo_set_value("PSEUDO_DEBUG", s);
+	if (max_debug_level > 0) {
+		--max_debug_level;
+		pseudo_debug_clear(s);
+	}
 }
 
 void
 pseudo_debug_verbose(void) {
-	++max_debug_level;
+	char s[2] = { pseudo_debug_type_symbolic(max_debug_level + 1) };
 
-	char s[16];
-	snprintf(s, 16, "%d", max_debug_level);
-	pseudo_set_value("PSEUDO_DEBUG", s);
+	if (s[0]) {
+		pseudo_debug_set(s);
+		++max_debug_level;
+	}
+}
+
+/* This exists because we don't want to allocate a bunch of strings
+ * and free them immediately if you have several flags set.
+ */
+void
+pseudo_debug_flags_finalize(void) {
+	char buf[PDBG_MAX + 1] = "", *s = buf;
+	for (int i = 0; i < PDBG_MAX; ++i) {
+		if (pseudo_util_debug_flags & (1 << i)) {
+			*s++ = pseudo_debug_type_symbolic(i);
+		}
+	}
+	pseudo_set_value("PSEUDO_DEBUG", buf);
+}
+
+void
+pseudo_debug_set(char *s) {
+	if (!s)
+		return;
+	for (; *s; ++s) {
+		int id = pseudo_debug_type_symbolic_id(*s);
+		if (id > 0) {
+			pseudo_util_debug_flags |= (1 << id);
+		}
+	}
+}
+
+void
+pseudo_debug_clear(char *s) {
+	if (!s)
+		return;
+	for (; *s; ++s) {
+		int id = pseudo_debug_type_symbolic_id(*s);
+		if (id > 0) {
+			pseudo_util_debug_flags &= ~(1 << id);
+		}
+	}
 }
 
 int
@@ -372,34 +412,7 @@ pseudo_diag(char *fmt, ...) {
 	if (len > 8192)
 		len = 8192;
 
-	if (debugged_newline && max_debug_level > 1) {
-		wrote += write(pseudo_util_debug_fd, pid_text, pid_len);
-	}
-	debugged_newline = (debuff[len - 1] == '\n');
-
-	wrote += write(pseudo_util_debug_fd, "pseudo: ", 8);
-	wrote += write(pseudo_util_debug_fd, debuff, len);
-	return wrote;
-}
-
-int
-pseudo_debug_real(int level, char *fmt, ...) {
-	va_list ap;
-	char debuff[8192];
-	int len;
-	int wrote = 0;
-
-	if (max_debug_level < level)
-		return 0;
-
-	va_start(ap, fmt);
-	len = vsnprintf(debuff, 8192, fmt, ap);
-	va_end(ap);
-
-	if (len > 8192)
-		len = 8192;
-
-	if (debugged_newline && max_debug_level > 1) {
+	if (debugged_newline && (pseudo_util_debug_flags & PDBGF_PID)) {
 		wrote += write(pseudo_util_debug_fd, pid_text, pid_len);
 	}
 	debugged_newline = (debuff[len - 1] == '\n');
@@ -419,8 +432,9 @@ round_up(size_t n, size_t block) {
 /* store pid in text form for prepending to messages */
 void
 pseudo_new_pid() {
-	pid_len = snprintf(pid_text, 32, "%d: ", getpid());
-	pseudo_debug(2, "new pid.\n");
+	int pid = getpid();
+	pid_len = snprintf(pid_text, 32, "%d: ", pid);
+	pseudo_debug(PDBGF_PID, "new pid: %d\n", pid);
 }
 
 /* helper function for pseudo_fix_path
@@ -637,7 +651,7 @@ pseudo_fix_path(const char *base, const char *path, size_t rootlen, size_t basel
 		if (*current == '/' && current > effective_root) {
 			*current = '\0';
 		}
-		pseudo_debug(5, "%s + %s => <%s>\n",
+		pseudo_debug(PDBGF_PATH, "%s + %s => <%s>\n",
 			base ? base : "<nil>",
 			path ? path : "<nil>",
 			newpath ? newpath : "<nil>");
@@ -716,7 +730,7 @@ void
 pseudo_setupenv() {
 	size_t i = 0;
 
-	pseudo_debug(2, "setting up pseudo environment.\n");
+	pseudo_debug(PDBGF_CLIENT, "setting up pseudo environment.\n");
 
 	/* Make sure everything has been evaluated */
 	free(pseudo_get_prefix(NULL));
@@ -725,8 +739,11 @@ pseudo_setupenv() {
 	free(pseudo_get_localstatedir());
 
         while (pseudo_env[i].key) {
-		if (pseudo_env[i].value)
+		if (pseudo_env[i].value) {
 			setenv(pseudo_env[i].key, pseudo_env[i].value, 0);
+			pseudo_debug(PDBGF_ENV | PDBGF_VERBOSE, "pseudo_env: %s => %s\n",
+				pseudo_env[i].key, pseudo_env[i].value);
+		}
                 i++;
         }
 
@@ -800,7 +817,7 @@ pseudo_setupenvp(char * const *envp) {
 
 	char *ld_preload = NULL, *ld_library_path = NULL;
 
-	pseudo_debug(2, "setting up envp environment.\n");
+	pseudo_debug(PDBGF_ENV, "setting up envp environment.\n");
 
 	/* Make sure everything has been evaluated */
 	free(pseudo_get_prefix(NULL));
@@ -1249,28 +1266,28 @@ pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs,
 			if (rc >= 0) {
 				if (realname)
 					strcpy(realname, filename);
-				pseudo_debug(2, "using <%s> for <%s>\n",
+				pseudo_debug(PDBGF_CHROOT, "using <%s> for <%s>\n",
 					filename, file);
 				return rc;
 			} else {
-				pseudo_debug(3, "didn't find <%s>\n",
+				pseudo_debug(PDBGF_CHROOT, "didn't find <%s>\n",
 					filename);
 			}
 		}
 	} else {
-		pseudo_debug(2, "pseudo_etc_file: no search dirs.\n");
+		pseudo_debug(PDBGF_CHROOT, "pseudo_etc_file: no search dirs.\n");
 	}
 #if PSEUDO_PORT_DARWIN
 	if (!strcmp("passwd", file)) {
-		pseudo_debug(2, "Darwin hackery: pseudo_etc_passwd returning magic passwd fd\n");
+		pseudo_debug(PDBGF_CHROOT, "Darwin hackery: pseudo_etc_passwd returning magic passwd fd\n");
 		return pseudo_host_etc_passwd_fd;
 	} else if (!strcmp("group", file)) {
-		pseudo_debug(2, "Darwin hackery: pseudo_etc_passwd returning magic group fd\n");
+		pseudo_debug(PDBGF_CHROOT, "Darwin hackery: pseudo_etc_passwd returning magic group fd\n");
 		return pseudo_host_etc_group_fd;
 	}
 #endif
 	snprintf(filename, pseudo_path_max(), "/etc/%s", file);
-	pseudo_debug(2, "falling back on <%s> for <%s>\n",
+	pseudo_debug(PDBGF_CHROOT, "falling back on <%s> for <%s>\n",
 		filename, file);
 	rc = open(filename, flags, 0600);
 	if (rc >= 0 && realname)
@@ -1293,7 +1310,7 @@ pseudo_logfile(char *defname) {
 
 	if (!filename) {
 		if (!defname) {
-			pseudo_debug(3, "no special log file requested, using stderr.\n");
+			pseudo_debug(PDBGF_INVOKE, "no special log file requested, using stderr.\n");
 			return -1;
 		}
 		pseudo_path = pseudo_localstatedir_path(defname);

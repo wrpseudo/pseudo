@@ -10,7 +10,7 @@ popen(const char *command, const char *mode) {
 		return rc;
 	}
 
-	pseudo_debug(4, "called: popen\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: popen\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -30,9 +30,9 @@ popen(const char *command, const char *mode) {
 /* This can cause hangs on some recentish systems which use locale
  * stuff for strerror...
  */
-	pseudo_debug(4, "completed: popen (maybe: %s)\n", strerror(save_errno));
+	pseudo_debug(PDBGF_WRAPPER, "completed: popen (maybe: %s)\n", strerror(save_errno));
 #endif
-	pseudo_debug(4, "completed: popen (errno: %d)\n", save_errno);
+	pseudo_debug(PDBGF_WRAPPER, "completed: popen (errno: %d)\n", save_errno);
 	errno = save_errno;
 	return rc;
 }

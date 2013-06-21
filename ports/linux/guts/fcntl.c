@@ -24,7 +24,7 @@
 		rc = real_fcntl(fd, cmd, arg);
 		save_errno = errno;
 		if (rc != -1) {
-			pseudo_debug(2, "fcntl_dup: %d->%d\n", fd, rc);
+			pseudo_debug(PDBGF_OP, "fcntl_dup: %d->%d\n", fd, rc);
 			pseudo_client_op(OP_DUP, 0, fd, rc, 0, 0);
 		}
 		errno = save_errno;

@@ -12,7 +12,7 @@
 	int save_errno;
 	int old_db_entry = 0;
 
-	pseudo_debug(2, "renameat: %d,%s->%d,%s\n",
+	pseudo_debug(PDBGF_FILE, "renameat: %d,%s->%d,%s\n",
 		olddirfd, oldpath ? oldpath : "<nil>",
 		newdirfd, newpath ? newpath : "<nil>");
 
@@ -96,7 +96,7 @@
 				oldbuf.st_ino = newbuf.st_ino;
 			}
 		}
-		pseudo_debug(1, "creating new '%s' [%llu] to rename\n",
+		pseudo_debug(PDBGF_OP, "creating new '%s' [%llu] to rename\n",
 			oldpath, (unsigned long long) oldbuf.st_ino);
 		pseudo_client_op(OP_LINK, 0, -1, olddirfd, oldpath, &oldbuf);
 	}

@@ -40,7 +40,7 @@
 			if (msg->result == RESULT_SUCCEED) {
 				pseudo_stat_msg(&buf, msg);
 			} else {
-				pseudo_debug(2, "chownat to %d:%d on %d/%s, ino %llu, new file.\n",
+				pseudo_debug(PDBGF_FILE, "chownat to %d:%d on %d/%s, ino %llu, new file.\n",
 					owner, group, dirfd, path,
 					(unsigned long long) buf.st_ino);
 			}

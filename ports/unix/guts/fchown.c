@@ -12,7 +12,7 @@
 
 	if (base_fstat(fd, &buf) == -1) {
 		save_errno = errno;
-		pseudo_debug(2, "fchown failing because fstat failed: %s\n",
+		pseudo_debug(PDBGF_CONSISTENCY, "fchown failing because fstat failed: %s\n",
 			strerror(errno));
 		errno = save_errno;
 		return -1;
@@ -24,7 +24,7 @@
 			if (msg->result == RESULT_SUCCEED) {
 				pseudo_stat_msg(&buf, msg);
 			} else {
-				pseudo_debug(2, "fchown fd %d, ino %llu, unknown file.\n",
+				pseudo_debug(PDBGF_FILE, "fchown fd %d, ino %llu, unknown file.\n",
 					fd, (unsigned long long) buf.st_ino);
 			}
 		} else {
@@ -39,7 +39,7 @@
 	if (group != (gid_t) -1) {
 		buf.st_gid = group;
 	}
-	pseudo_debug(2, "fchown, fd %d: %d:%d -> %d:%d\n",
+	pseudo_debug(PDBGF_OP, "fchown, fd %d: %d:%d -> %d:%d\n",
 		fd, owner, group, buf.st_uid, buf.st_gid);
 	pseudo_client_op(OP_FCHOWN, 0, fd, -1, 0, &buf);
         /* pretend we worked, errno should be unchanged */

@@ -45,7 +45,7 @@
 #endif
 		existed = (rc != -1);
 		if (!existed)
-			pseudo_debug(2, "openat_creat: %s -> 0%o\n", path, mode);
+			pseudo_debug(PDBGF_FILE, "openat_creat: %s -> 0%o\n", path, mode);
 		errno = save_errno;
 	}
 
@@ -76,7 +76,7 @@
 			}
 			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, dirfd, path, &buf);
 		} else {
-			pseudo_debug(1, "openat (fd %d, path %d/%s, flags %d) succeeded, but stat failed (%s).\n",
+			pseudo_debug(PDBGF_FILE, "openat (fd %d, path %d/%s, flags %d) succeeded, but stat failed (%s).\n",
 				rc, dirfd, path, flags, strerror(errno));
 			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, dirfd, path, 0);
 		}

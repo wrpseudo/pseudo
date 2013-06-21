@@ -33,12 +33,22 @@ char *pseudo_get_value(const char *key);
 
 extern void pseudo_debug_verbose(void);
 extern void pseudo_debug_terse(void);
+extern void pseudo_debug_set(char *);
+extern void pseudo_debug_clear(char *);
+extern void pseudo_debug_flags_finalize(void);
+extern unsigned long pseudo_util_debug_flags;
 extern int pseudo_util_debug_fd;
 extern int pseudo_disabled;
 extern int pseudo_allow_fsync;
+extern int pseudo_diag(char *, ...) __attribute__ ((format (printf, 1, 2)));
 #ifndef NDEBUG
-extern int pseudo_debug_real(int, char *, ...) __attribute__ ((format (printf, 2, 3)));
-#define pseudo_debug pseudo_debug_real
+#define pseudo_debug(x, ...) do { \
+	if ((x) & PDBGF_VERBOSE) { \
+		if ((pseudo_util_debug_flags & PDBGF_VERBOSE) && (pseudo_util_debug_flags & ((x) & ~PDBGF_VERBOSE))) { pseudo_diag(__VA_ARGS__); } \
+	} else { \
+		if (pseudo_util_debug_flags & (x)) { pseudo_diag(__VA_ARGS__); } \
+	} \
+} while (0) 
 #else
 /* this used to be a static inline function, but that meant that arguments
  * were still evaluated for side effects. We don't want that. The ...
@@ -46,7 +56,6 @@ extern int pseudo_debug_real(int, char *, ...) __attribute__ ((format (printf, 2
  */
 #define pseudo_debug(...) 0
 #endif
-extern int pseudo_diag(char *, ...) __attribute__ ((format (printf, 1, 2)));
 void pseudo_new_pid(void);
 /* pseudo_fix_path resolves symlinks up to this depth */
 #define PSEUDO_MAX_LINK_RECURSION 16

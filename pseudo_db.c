@@ -441,14 +441,14 @@ make_tables(sqlite3 *db,
 			dberr(db, "not done after the single row we expected?", rc);
 			return 1;
 		}
-		pseudo_debug(2, "existing database version: %d\n", version);
+		pseudo_debug(PDBGF_DB, "existing database version: %d\n", version);
 		rc = sqlite3_finalize(stmt);
 		if (rc) {
 			dberr(db, "couldn't finalize version check");
 			return 1;
 		}
 	} else {
-		pseudo_debug(2, "no existing database version\n");
+		pseudo_debug(PDBGF_DB, "no existing database version\n");
 		version = -1;
 	}
 	for (m = sql_migrations; m->sql; ++m)
@@ -462,10 +462,10 @@ make_tables(sqlite3 *db,
 		version = available_migrations - 1;
 	for (m = sql_migrations + (version + 1); m->sql; ++m) {
 		int migration = (m - sql_migrations);
-		pseudo_debug(3, "considering migration %d\n", migration);
+		pseudo_debug(PDBGF_DB, "considering migration %d\n", migration);
 		if (version >= migration)
 			continue;
-		pseudo_debug(2, "running migration %d\n", migration);
+		pseudo_debug(PDBGF_DB, "running migration %d\n", migration);
 		rc = sqlite3_prepare_v2(db,
 				m->sql,
 				strlen(m->sql),
@@ -512,7 +512,7 @@ make_tables(sqlite3 *db,
 			sqlite3_finalize(update_version);
 			return 1;
 		} else {
-			pseudo_debug(3, "update of migrations (after %d) fine.\n",
+			pseudo_debug(PDBGF_DB, "update of migrations (after %d) fine.\n",
 				migration);
 		}
 		sqlite3_finalize(update_version);
@@ -526,7 +526,7 @@ make_tables(sqlite3 *db,
 /* registered with atexit */
 static void
 cleanup_db(void) {
-	pseudo_debug(1, "server exiting\n");
+	pseudo_debug(PDBGF_SERVER, "server exiting\n");
 #ifdef USE_MEMORY_DB
         if (real_file_db) {
                 pdb_backup();
@@ -1124,7 +1124,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 	}
 	if (want_results)
 		frag(sql, "ORDER BY %s %s;", order_by, order_dir);
-	pseudo_debug(1, "created SQL: <%s>\n", sql->data);
+	pseudo_debug(PDBGF_SQL, "created SQL: <%s>\n", sql->data);
 
 	/* second, prepare it */
 	rc = sqlite3_prepare_v2(log_db, sql->data, strlen(sql->data), &stmt, NULL);
@@ -1388,7 +1388,7 @@ pdb_link_file(pseudo_msg_t *msg) {
 	sqlite3_bind_int(insert, 5, msg->gid);
 	sqlite3_bind_int(insert, 6, msg->mode);
 	sqlite3_bind_int(insert, 7, msg->rdev);
-	pseudo_debug(2, "linking %s: dev %llu, ino %llu, mode %o, owner %d\n",
+	pseudo_debug(PDBGF_DB, "linking %s: dev %llu, ino %llu, mode %o, owner %d\n",
 		(msg->pathlen ? msg->path : "<nil> (as NAMELESS FILE)"),
 		(unsigned long long) msg->dev, (unsigned long long) msg->ino,
 		(int) msg->mode, msg->uid);
@@ -1455,7 +1455,7 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 		}
 	}
 	if (!msg || !msg->pathlen) {
-		pseudo_debug(1, "can't update a file without a message or path.\n");
+		pseudo_debug(PDBGF_DB, "can't update a file without a message or path.\n");
 		return 1;
 	}
 	sqlite3_bind_text(update, 1, msg->path, -1, SQLITE_STATIC);
@@ -1496,7 +1496,7 @@ pdb_may_unlink_file(pseudo_msg_t *msg, int deleting) {
 		sqlite3_bind_int(mark_file, 1, deleting);
 		sqlite3_bind_text(mark_file, 2, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot mark a file for pending deletion without a path.");
+		pseudo_debug(PDBGF_DB, "cannot mark a file for pending deletion without a path.");
 		return 1;
 	}
 	file_db_dirty = 1;
@@ -1506,7 +1506,7 @@ pdb_may_unlink_file(pseudo_msg_t *msg, int deleting) {
 		return 1;
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d) ", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d) ", exact);
 	sqlite3_reset(mark_file);
 	sqlite3_clear_bindings(mark_file);
 	/* indicate whether we marked something */
@@ -1540,7 +1540,7 @@ pdb_cancel_unlink_file(pseudo_msg_t *msg) {
 	if (msg->pathlen) {
 		sqlite3_bind_text(mark_file, 1, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot unmark a file for pending deletion without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unmark a file for pending deletion without a path.");
 		return 1;
 	}
 	file_db_dirty = 1;
@@ -1549,7 +1549,7 @@ pdb_cancel_unlink_file(pseudo_msg_t *msg) {
 		dberr(file_db, "unmark for deletion may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d) ", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d) ", exact);
 	sqlite3_reset(mark_file);
 	sqlite3_clear_bindings(mark_file);
 	return rc != SQLITE_DONE;
@@ -1586,7 +1586,7 @@ pdb_did_unlink_files(int deleting) {
 		dberr(file_db, "cleanup of files marked for deletion may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d)\n", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d)\n", exact);
 	sqlite3_reset(delete_exact);
 	sqlite3_clear_bindings(delete_exact);
 	return rc != SQLITE_DONE;
@@ -1611,7 +1611,7 @@ pdb_did_unlink_file(char *path, int deleting) {
 		}
 	}
 	if (!path) {
-		pseudo_debug(1, "cannot unlink a file without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unlink a file without a path.");
 		return 1;
 	}
 	sqlite3_bind_text(delete_exact, 1, path, -1, SQLITE_STATIC);
@@ -1622,7 +1622,7 @@ pdb_did_unlink_file(char *path, int deleting) {
 		dberr(file_db, "cleanup of file marked for deletion may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d)\n", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d)\n", exact);
 	sqlite3_reset(delete_exact);
 	sqlite3_clear_bindings(delete_exact);
 	return rc != SQLITE_DONE;
@@ -1652,7 +1652,7 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 	if (msg->pathlen) {
 		sqlite3_bind_text(delete_exact, 1, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot unlink a file without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unlink a file without a path.");
 		return 1;
 	}
 	file_db_dirty = 1;
@@ -1661,7 +1661,7 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 		dberr(file_db, "delete exact by path may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d) ", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d) ", exact);
 	sqlite3_reset(delete_exact);
 	sqlite3_clear_bindings(delete_exact);
 	return rc != SQLITE_DONE;
@@ -1700,7 +1700,7 @@ pdb_unlink_contents(pseudo_msg_t *msg) {
 		sqlite3_bind_text(delete_sub, 1, msg->path, -1, SQLITE_STATIC);
 		sqlite3_bind_text(delete_sub, 2, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot unlink a file without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unlink a file without a path.");
 		return 1;
 	}
 	file_db_dirty = 1;
@@ -1709,7 +1709,7 @@ pdb_unlink_contents(pseudo_msg_t *msg) {
 		dberr(file_db, "delete sub by path may have failed");
 	}
 	sub = sqlite3_changes(file_db);
-	pseudo_debug(3, "(sub %d) ", sub);
+	pseudo_debug(PDBGF_DB, "(sub %d) ", sub);
 	sqlite3_reset(delete_sub);
 	sqlite3_clear_bindings(delete_sub);
 	return rc != SQLITE_DONE;
@@ -1754,14 +1754,14 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 		return 1;
 	}
 	if (!msg->pathlen) {
-		pseudo_debug(1, "rename: No path provided (ino %llu)\n", (unsigned long long) msg->ino);
+		pseudo_debug(PDBGF_DB, "rename: No path provided (ino %llu)\n", (unsigned long long) msg->ino);
 		return 1;
 	}
 	if (!oldpath) {
-		pseudo_debug(1, "rename: No old path for %s\n", msg->path);
+		pseudo_debug(PDBGF_DB, "rename: No old path for %s\n", msg->path);
 		return 1;
 	}
-	pseudo_debug(2, "rename: Changing %s to %s\n", oldpath, msg->path);
+	pseudo_debug(PDBGF_DB, "rename: Changing %s to %s\n", oldpath, msg->path);
 	rc = sqlite3_bind_text(update_exact, 1, msg->path, -1, SQLITE_STATIC);
 	rc = sqlite3_bind_text(update_exact, 2, oldpath, -1, SQLITE_STATIC);
 	rc = sqlite3_bind_text(update_sub, 1, oldpath, -1, SQLITE_STATIC);
@@ -1829,7 +1829,7 @@ pdb_renumber_all(dev_t from, dev_t to) {
 	}
 	sqlite3_reset(update);
 	sqlite3_clear_bindings(update);
-	pseudo_debug(2, "updating device dev %llu to %llu\n",
+	pseudo_debug(PDBGF_DB, "updating device dev %llu to %llu\n",
 		(unsigned long long) from, (unsigned long long) to);
 	return rc != SQLITE_DONE;
 }
@@ -1880,7 +1880,7 @@ pdb_update_inode(pseudo_msg_t *msg) {
 	}
 	sqlite3_reset(update);
 	sqlite3_clear_bindings(update);
-	pseudo_debug(2, "updating path %s to dev %llu, ino %llu\n",
+	pseudo_debug(PDBGF_DB, "updating path %s to dev %llu, ino %llu\n",
 		msg->path,
 		(unsigned long long) msg->dev, (unsigned long long) msg->ino);
 	return rc != SQLITE_DONE;
@@ -1925,7 +1925,7 @@ pdb_update_file(pseudo_msg_t *msg) {
 	}
 	sqlite3_reset(update);
 	sqlite3_clear_bindings(update);
-	pseudo_debug(2, "updating dev %llu, ino %llu, new mode %o, owner %d\n",
+	pseudo_debug(PDBGF_DB, "updating dev %llu, ino %llu, new mode %o, owner %d\n",
 		(unsigned long long) msg->dev, (unsigned long long) msg->ino,
 		(int) msg->mode, msg->uid);
 	return rc != SQLITE_DONE;
@@ -1969,7 +1969,7 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_exact: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_exact: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -2025,7 +2025,7 @@ pdb_find_file_path(pseudo_msg_t *msg) {
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_path: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_path: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -2075,7 +2075,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 		}
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_dev: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_dev: sqlite_done on first row\n");
 		response = 0;
 		break;
 	default:
@@ -2122,7 +2122,7 @@ pdb_find_file_dev(pseudo_msg_t *msg) {
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_dev: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_dev: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -2171,7 +2171,7 @@ pdb_find_file_ino(pseudo_msg_t *msg) {
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_ino: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_ino: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -2231,7 +2231,7 @@ pdb_file(pdb_file_list l) {
 		pseudo_diag("couldn't allocate file message.\n");
 		return NULL;
 	}
-	pseudo_debug(2, "pdb_file: '%s'\n", s ? (const char *) s : "<nil>");
+	pseudo_debug(PDBGF_DB, "pdb_file: '%s'\n", s ? (const char *) s : "<nil>");
 	m->dev = sqlite3_column_int64(l->stmt, column++);
 	m->ino = sqlite3_column_int64(l->stmt, column++);
 	m->uid = sqlite3_column_int64(l->stmt, column++);

@@ -33,7 +33,7 @@ execl_to_v(va_list ap, const char *argv0, char *const **envp) {
 	char **argv = malloc((sizeof *argv) * alloc_size);
 
 	if (!argv) {
-		pseudo_debug(1, "execl failed: couldn't allocate memory for %lu arguments\n",
+		pseudo_debug(PDBGF_CLIENT, "execl failed: couldn't allocate memory for %lu arguments\n",
 			(unsigned long) alloc_size);
 		return NULL;
 	}
@@ -45,7 +45,7 @@ execl_to_v(va_list ap, const char *argv0, char *const **envp) {
 			alloc_size = alloc_size + 256;
 			argv = realloc(argv, (sizeof *argv) * alloc_size);
 			if (!argv) {
-				pseudo_debug(1, "execl failed: couldn't allocate memory for %lu arguments\n",
+				pseudo_debug(PDBGF_CLIENT, "execl failed: couldn't allocate memory for %lu arguments\n",
 					(unsigned long) alloc_size);
 				return NULL;
 			}
@@ -81,7 +81,7 @@ execl(const char *file, const char *arg, ...) {
 		return -1;
 	}
 
-	pseudo_debug(4, "called: execl\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: execl\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -98,7 +98,7 @@ execl(const char *file, const char *arg, ...) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: execl\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: execl\n");
 	errno = save_errno;
 	free(argv);
 	return rc;
@@ -126,7 +126,7 @@ execlp(const char *file, const char *arg, ...) {
 		return -1;
 	}
 
-	pseudo_debug(4, "called: execlp\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: execlp\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -143,7 +143,7 @@ execlp(const char *file, const char *arg, ...) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: execlp\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: execlp\n");
 	errno = save_errno;
 	free(argv);
 	return rc;
@@ -172,7 +172,7 @@ execle(const char *file, const char *arg, ...) {
 		return -1;
 	}
 
-	pseudo_debug(4, "called: execle\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: execle\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -189,7 +189,7 @@ execle(const char *file, const char *arg, ...) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: execle\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: execle\n");
 	errno = save_errno;
 	free(argv);
 	return rc;
@@ -207,7 +207,7 @@ execv(const char *file, char *const *argv) {
 		return rc;
 	}
 
-	pseudo_debug(4, "called: execv\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: execv\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -224,7 +224,7 @@ execv(const char *file, char *const *argv) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: execv\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: execv\n");
 	errno = save_errno;
 	return rc;
 }
@@ -241,7 +241,7 @@ execve(const char *file, char *const *argv, char *const *envp) {
 		return rc;
 	}
 
-	pseudo_debug(4, "called: execve\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: execve\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -258,7 +258,7 @@ execve(const char *file, char *const *argv, char *const *envp) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: execve\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: execve\n");
 	errno = save_errno;
 	return rc;
 }
@@ -275,7 +275,7 @@ execvp(const char *file, char *const *argv) {
 		return rc;
 	}
 
-	pseudo_debug(4, "called: execvp\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: execvp\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -292,7 +292,7 @@ execvp(const char *file, char *const *argv) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: execvp\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: execvp\n");
 	errno = save_errno;
 	return rc;
 }
@@ -309,7 +309,7 @@ fork(void) {
 		return rc;
 	}
 
-	pseudo_debug(4, "called: fork\n");
+	pseudo_debug(PDBGF_WRAPPER, "called: fork\n");
 	pseudo_sigblock(&saved);
 	if (pseudo_getlock()) {
 		errno = EBUSY;
@@ -325,7 +325,7 @@ fork(void) {
 		
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
-	pseudo_debug(4, "completed: fork\n");
+	pseudo_debug(PDBGF_WRAPPER, "completed: fork\n");
 	errno = save_errno;
 	return rc;
 }
