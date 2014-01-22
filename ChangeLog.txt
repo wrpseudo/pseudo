@@ -1,5 +1,6 @@
 2014-01-22:
 	* (seebs) notes on some Futures planning.
+	* (seebs) Typo/formatting issue in man page.
 
 2014-01-15:
 	* (seebs) performance test/test case updates.
