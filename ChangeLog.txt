@@ -1,3 +1,6 @@
+2014-01-15:
+	* (seebs) performance test/test case updates.
+
 2013-06-20:
 	* (seebs) refactor debugging code
 	* (seebs) start using 1.5.2 numbering
