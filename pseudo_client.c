@@ -225,7 +225,7 @@ pseudo_init_client(void) {
 				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
 				/* directory is missing? */
 				if (pseudo_prefix_dir_fd == -1 && errno == ENOENT) {
-					pseudo_debug(PDBGF_CLIENT, "prefix directory doesn't exist, trying to create\n");
+					pseudo_debug(PDBGF_CLIENT, "prefix directory '%s' doesn't exist, trying to create\n", pseudo_path);
 					mkdir_p(pseudo_path);
 					pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
 				}
@@ -235,7 +235,7 @@ pseudo_init_client(void) {
 				exit(1);
 			}
 			if (pseudo_prefix_dir_fd == -1) {
-				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+				pseudo_diag("Can't open prefix path '%s' for server: %s\n",
 					pseudo_path,
 					strerror(errno));
 				exit(1);
@@ -248,17 +248,17 @@ pseudo_init_client(void) {
 				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
 				/* directory is missing? */
 				if (pseudo_localstate_dir_fd == -1 && errno == ENOENT) {
-					pseudo_debug(PDBGF_CLIENT, "local state directory doesn't exist, trying to create\n");
+					pseudo_debug(PDBGF_CLIENT, "local state directory '%s' doesn't exist, trying to create\n", pseudo_path);
 					mkdir_p(pseudo_path);
 					pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
 				}
 				pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
 			} else {
-				pseudo_diag("No prefix available to to find server.\n");
+				pseudo_diag("No local state directory available for server/file interactions.\n");
 				exit(1);
 			}
 			if (pseudo_localstate_dir_fd == -1) {
-				pseudo_diag("Can't open local state path (%s) for server: %s\n",
+				pseudo_diag("Can't open local state path '%s': %s\n",
 					pseudo_path,
 					strerror(errno));
 				exit(1);
@@ -308,7 +308,7 @@ pseudo_init_client(void) {
 			if (pseudo_chroot) {
 				pseudo_chroot_len = strlen(pseudo_chroot);
 			} else {
-				pseudo_diag("can't store chroot path (%s)\n", env);
+				pseudo_diag("Can't store chroot path '%s'\n", env);
 			}
 		}
 		free(env);
@@ -748,7 +748,7 @@ pseudo_fd(int fd, int how) {
 
 	/* Set close on exec, even if we didn't move it. */
 	if ((newfd >= 0) && (fcntl(newfd, F_SETFD, FD_CLOEXEC) < 0))
-		pseudo_diag("can't set close on exec flag: %s\n",
+		pseudo_diag("Can't set close on exec flag: %s\n",
 			strerror(errno));
 
 	return(newfd);
@@ -767,7 +767,7 @@ client_connect(void) {
 	connect_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	connect_fd = pseudo_fd(connect_fd, MOVE_FD);
 	if (connect_fd == -1) {
-		pseudo_diag("can't create socket: %s (%s)\n", sun.sun_path, strerror(errno));
+		pseudo_diag("Can't create socket: %s (%s)\n", sun.sun_path, strerror(errno));
 		return 1;
 	}
 
@@ -789,7 +789,7 @@ client_connect(void) {
 		return 1;
 	}
 	if (connect(connect_fd, (struct sockaddr *) &sun, sizeof(sun)) == -1) {
-		pseudo_debug(PDBGF_CLIENT, "can't connect socket to pseudo.socket: (%s)\n", strerror(errno));
+		pseudo_debug(PDBGF_CLIENT, "Can't connect socket to pseudo.socket: (%s)\n", strerror(errno));
 		close(connect_fd);
 		if (fchdir(cwd_fd) == -1) {
 			pseudo_diag("return to previous directory failed: %s\n",
@@ -885,7 +885,7 @@ pseudo_client_request(pseudo_msg_t *msg, size_t len, const char *path) {
 				pseudo_client_setup();
 				++tries;
 				if (tries > 3) {
-					pseudo_debug(PDBGF_CLIENT, "can't get server going again.\n");
+					pseudo_debug(PDBGF_CLIENT, "Can't get server going again.\n");
 					return 0;
 				}
 			}
@@ -896,7 +896,7 @@ pseudo_client_request(pseudo_msg_t *msg, size_t len, const char *path) {
                         if (!response) {
                                 ++tries;
                                 if (tries > 3) {
-                                        pseudo_debug(PDBGF_CLIENT, "can't get responses.\n");
+                                        pseudo_debug(PDBGF_CLIENT, "Can't get responses.\n");
                                         return 0;
                                 }
                         }
@@ -1094,7 +1094,7 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 			size_t full_len = strlen(oldpath) + 1 + pathlen;
 			char *both_paths = malloc(full_len);
 			if (!both_paths) {
-				pseudo_diag("can't allocate space for paths for a rename operation.  Sorry.\n");
+				pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
 				pseudo_magic();
 				return 0;
 			}
