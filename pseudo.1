@@ -559,7 +559,14 @@ environment, the chroot directory is used by preference.  The
 parallelism between these cases is why this variable points at
 the parent directory of
 .I etc
-rather than the directory containing the files.
+rather than the directory containing the files. If there is no
+.I chroot
+environment, and this variable is also unset,
+.I pseudo
+falls back to a directory specified at configure time, with the
+default being the root directory. This is controlled by the
+.B PSEUDO_PASSWD_FALLBACK
+definition.
 .TP 8
 .B PSEUDO_PREFIX
 If set, the variable

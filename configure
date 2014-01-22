@@ -27,6 +27,7 @@ opt_sqlite=/usr
 opt_rpath=
 opt_memory=
 opt_async=
+opt_passwd_fallback='""'
 
 compile_x86_32=-m32
 compile_x86_64=-m64
@@ -44,6 +45,7 @@ usage()
     echo >&2 "           [--enable-static-sqlite]"
     echo >&2 "           [--with-static-sqlite=...]"
     echo >&2 "           [--with-rpath=...|--without-rpath]"
+    echo >&2 "           [--with-passwd-fallback=...|--without-passwd-fallback]"
     echo >&2 "           [--cflags='']"
     echo >&2 "           [--bits=32|64]"
     exit 1
@@ -68,6 +70,14 @@ do
         opt_sqlite_ldarg=${arg#--with-static-sqlite=}
         sqlite_ldarg=$opt_sqlite_ldarg
         use_maybe_rpath=false
+        ;;
+    --without-passwd-fallback)
+	opt_passwd_fallback='NULL'
+        ;;
+    --with-passwd-fallback=*)
+	opt_passwd_fallback="${arg#--with-passwd-fallback=}"
+	# Trim a trailing /, remove quotes. So / => "".
+        opt_passwd_fallback="\"${opt_passwd_fallback%/}\""
         ;;
     --enable-static-sqlite)
         sqlite_ldarg='$(SQLITE)/$(SQLITE_LIB)/libsqlite3.a'
@@ -230,6 +240,7 @@ sed -e '
   s,@SQLITE_LIB@,'"$opt_sqlite_lib"',g
   s,@SQLITE_MEMORY@,'"$SQLITE_MEMORY"',g
   s,@FORCE_ASYNC@,'"$FORCE_ASYNC"',g
+  s,@PASSWD_FALLBACK@,'$opt_passwd_fallback',g
   s!@RPATH@!'"$opt_rpath"'!g
   s,@MARK64@,'"$opt_mark64"',g
   s,@ARCH@,'"$opt_arch"',g

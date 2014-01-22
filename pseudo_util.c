@@ -1245,53 +1245,53 @@ FILE *pseudo_host_etc_group_file = &pseudo_fake_group_file;
 #endif
 
 int
-pseudo_etc_file(const char *file, char *realname, int flags, char **search_dirs, int dircount) {
+pseudo_etc_file(const char *file, char *realname, int flags, char *search_dirs[], int dircount) {
 	char filename[pseudo_path_max()];
-	int rc;
+	int rc = -1;
 
 	if (!file) {
-		pseudo_diag("pseudo_etc_file: needs argument, usually passwd/group\n");
-		return 0;
+		pseudo_debug(PDBGF_CHROOT, "pseudo_etc_file: needs argument, usually passwd/group\n");
+		errno = ENOENT;
+		return -1;
 	}
-	if (search_dirs) {
-		char *s;
-		int i;
-		for (i = 0; i < dircount; ++i) {
-			s = search_dirs[i];
-			if (!s)
-				continue;
-			snprintf(filename, pseudo_path_max(), "%s/etc/%s",
-				s, file);
-			rc = open(filename, flags, 0600);
-			if (rc >= 0) {
-				if (realname)
-					strcpy(realname, filename);
-				pseudo_debug(PDBGF_CHROOT, "using <%s> for <%s>\n",
-					filename, file);
-				return rc;
-			} else {
-				pseudo_debug(PDBGF_CHROOT, "didn't find <%s>\n",
-					filename);
+	int i;
+	if (!search_dirs || dircount == 0) {
+		pseudo_debug(PDBGF_CHROOT, "pseudo_etc_file: no search dirs.\n");
+		errno = ENOENT;
+		return -1;
+	}
+	for (i = 0; i < dircount; ++i) {
+		char *s = search_dirs[i];
+		if (!s)
+			continue;
+#if PSEUDO_PORT_DARWIN
+		/* special magic: empty string implies our emulation
+		 * of the passwd/group files.
+		 */
+		if (!*s) {
+			if (!strcmp("passwd", file)) {
+				pseudo_debug(PDBGF_CHROOT, "Darwin hackery: pseudo_etc_passwd returning magic passwd fd\n");
+				return pseudo_host_etc_passwd_fd;
+			} else if (!strcmp("group", file)) {
+				pseudo_debug(PDBGF_CHROOT, "Darwin hackery: pseudo_etc_passwd returning magic group fd\n");
+				return pseudo_host_etc_group_fd;
 			}
 		}
-	} else {
-		pseudo_debug(PDBGF_CHROOT, "pseudo_etc_file: no search dirs.\n");
-	}
-#if PSEUDO_PORT_DARWIN
-	if (!strcmp("passwd", file)) {
-		pseudo_debug(PDBGF_CHROOT, "Darwin hackery: pseudo_etc_passwd returning magic passwd fd\n");
-		return pseudo_host_etc_passwd_fd;
-	} else if (!strcmp("group", file)) {
-		pseudo_debug(PDBGF_CHROOT, "Darwin hackery: pseudo_etc_passwd returning magic group fd\n");
-		return pseudo_host_etc_group_fd;
-	}
 #endif
-	snprintf(filename, pseudo_path_max(), "/etc/%s", file);
-	pseudo_debug(PDBGF_CHROOT, "falling back on <%s> for <%s>\n",
-		filename, file);
-	rc = open(filename, flags, 0600);
-	if (rc >= 0 && realname)
-		strcpy(realname, filename);
+		snprintf(filename, pseudo_path_max(), "%s/etc/%s",
+			s, file);
+		rc = open(filename, flags, 0600);
+		if (rc >= 0) {
+			if (realname)
+				strcpy(realname, filename);
+			pseudo_debug(PDBGF_CHROOT, "pseudo_etc_file: using '%s' for '%s'.\n",
+				filename, file);
+			return rc;
+		} else {
+			pseudo_debug(PDBGF_CHROOT | PDBGF_VERBOSE, "didn't find <%s>\n",
+				filename);
+		}
+	}
 	return rc;
 }
 

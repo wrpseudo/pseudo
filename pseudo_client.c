@@ -88,6 +88,8 @@ gid_t pseudo_egid;
 gid_t pseudo_sgid;
 gid_t pseudo_fgid;
 
+#define PSEUDO_ETC_FILE(filename, realname, flags) pseudo_etc_file(filename, realname, flags, (char *[]) { pseudo_chroot, pseudo_passwd, PSEUDO_PASSWD_FALLBACK }, PSEUDO_PASSWD_FALLBACK ? 3 : 2)
+
 /* helper function to make a directory, just like mkdir -p.
  * Can't use system() because the child shell would end up trying
  * to do the same thing...
