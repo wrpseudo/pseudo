@@ -1,3 +1,6 @@
+2014-01-23:
+	* (seebs) mknod wasn't calling mknodat.
+
 2014-01-22:
 	* (seebs) notes on some Futures planning.
 	* (seebs) Typo/formatting issue in man page.
