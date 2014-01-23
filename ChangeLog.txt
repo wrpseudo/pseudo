@@ -1,5 +1,6 @@
 2014-01-23:
 	* (seebs) mknod wasn't calling mknodat.
+	* (seebs) mkdirat wasn't recording the logical DB mode for directories
 
 2014-01-22:
 	* (seebs) notes on some Futures planning.
