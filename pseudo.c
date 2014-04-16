@@ -51,7 +51,7 @@ long opt_p = 0;
 char *opt_r = NULL;
 int opt_S = 0;
 
-static int pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag);
+static int pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **response_path, size_t *response_len);
 static int pseudo_db_check(int fix);
 
 void
@@ -318,7 +318,7 @@ main(int argc, char *argv[]) {
 			pseudo_diag("Couldn't allocate data structure for path.\n");
 			exit(EXIT_FAILURE);
 		}
-		if (pdb_find_file_path(msg)) {
+		if (pdb_find_file_path(msg, NULL)) {
 			pseudo_diag("Couldn't find a database entry for '%s'.\n", opt_i);
 			exit(EXIT_FAILURE);
 		}
@@ -485,14 +485,17 @@ main(int argc, char *argv[]) {
  * sanity checks, then implements the fairly small DB changes required.
  */
 int
-pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
+pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **response_path, size_t *response_len) {
 	pseudo_msg_t msg_header;
 	pseudo_msg_t by_path = { .op = 0 }, by_ino = { .op = 0 };
+	long long row = -1;
 	pseudo_msg_t db_header;
 	char *path_by_ino = 0;
 	char *oldpath = 0;
+	size_t oldpathlen = 0;
 	int found_path = 0, found_ino = 0;
 	int prefer_ino = 0;
+	int xattr_flags = 0;
 
 	if (!msg)
 		return 1;
@@ -520,11 +523,23 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 	 * stuff into a rename, break them apart (null seperated)
 	 */
 
-	if (msg->pathlen && msg->op == OP_RENAME) {
-		/* In a rename there are two paths, null seperate in msg->path */
-		oldpath = msg->path + strlen(msg->path) + 1;
-		pseudo_debug(PDBGF_OP | PDBGF_FILE, "rename: path %s, oldpath %s\n",
-			msg->path, oldpath);
+	if (msg->pathlen) {
+		switch (msg->op) {
+		case OP_RENAME:
+		case OP_CREATE_XATTR:
+		case OP_GET_XATTR:
+		case OP_LIST_XATTR:
+		case OP_REPLACE_XATTR:
+		case OP_SET_XATTR:
+			/* In a rename there are two paths, null separated in msg->path */
+			oldpath = msg->path + strlen(msg->path) + 1;
+			oldpathlen = msg->pathlen - (oldpath - msg->path);
+			pseudo_debug(PDBGF_OP | PDBGF_FILE | PDBGF_XATTR, "%s: path '%s', oldpath '%s' [%d]\n",
+				pseudo_op_name(msg->op), msg->path, oldpath, (int) oldpathlen);
+			break;
+		default:
+			break;
+		}
 	}
 
 	/* stash original header, in case we need it later */
@@ -537,7 +552,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 
 	/* Lookup the full path, with inode and dev if available */
 	if (msg->pathlen && msg->dev && msg->ino) {
-		if (!pdb_find_file_exact(msg)) {
+		if (!pdb_find_file_exact(msg, &row)) {
 			/* restore header contents */
 			by_path = *msg;
 			by_ino = *msg;
@@ -553,7 +568,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		if (msg->pathlen) {
 			/* for now, don't canonicalize paths anymore */
 			/* used to do it here, but now doing it in client */
-			if (!pdb_find_file_path(msg)) {
+			if (!pdb_find_file_path(msg, &row)) {
 				by_path = *msg;
 				found_path = 1;
 			} else {
@@ -564,7 +579,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		}
 		/* search on original inode -- in case of mismatch */
 		if (msg->dev && msg->ino) {
-			if (!pdb_find_file_dev(&by_ino)) {
+			if (!pdb_find_file_dev(&by_ino, &row)) {
 				found_ino = 1;
 				path_by_ino = pdb_get_file_path(&by_ino);
 			}
@@ -760,7 +775,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			pdb_unlink_file_dev(&by_ino);
 		}
 		if (!found_path) {
-			pdb_link_file(msg);
+			pdb_link_file(msg, NULL);
 		} else {
 			/* again, an error, but leaving it alone for now. */
 			pseudo_diag("creat ignored for existing file '%s'.\n",
@@ -790,7 +805,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		/* if the path is not known, link it */
 		if (!found_path) {
 			pseudo_debug(PDBGF_FILE, "(new) ");
-			pdb_link_file(msg);
+			pdb_link_file(msg, NULL);
 		}
 		break;
 	case OP_CHOWN:		/* FALLTHROUGH */
@@ -816,7 +831,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		}
 		/* if the path is not known, link it */
 		if (!found_path) {
-			pdb_link_file(msg);
+			pdb_link_file(msg, NULL);
 		}
 		break;
 	case OP_STAT:		/* FALLTHROUGH */
@@ -871,7 +886,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 		} else {
 			*msg = msg_header;
 		}
-		pdb_link_file(msg);
+		pdb_link_file(msg, NULL);
 		break;
 	case OP_RENAME:
 		/* a rename implies renaming an existing entry... and every
@@ -933,7 +948,46 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 			pdb_unlink_file_dev(&by_ino);
 		}
 		*msg = msg_header;
-		pdb_link_file(msg);
+		pdb_link_file(msg, NULL);
+		break;
+	case OP_GET_XATTR:
+		if (pdb_get_xattr(row, &oldpath, &oldpathlen)) {
+			msg->result = RESULT_FAIL;
+		} else {
+			*response_path = oldpath;
+			*response_len = oldpathlen;
+			pseudo_debug(PDBGF_XATTR, "get results: '%s' (%d bytes)\n",
+				*response_path, (int) *response_len);
+		}
+		break;
+	case OP_LIST_XATTR:
+		if (pdb_list_xattr(row, &oldpath, &oldpathlen)) {
+			msg->result = RESULT_FAIL;
+		} else {
+			pseudo_debug(PDBGF_XATTR, "got %d bytes of xattrs to list: %.*s\n", (int) oldpathlen, (int) oldpathlen, oldpath);
+			*response_path = oldpath;
+			*response_len = oldpathlen;
+		}
+		break;
+	case OP_CREATE_XATTR:
+	case OP_REPLACE_XATTR: /* fallthrough */
+		if (msg->op == OP_CREATE_XATTR) {
+			xattr_flags = XATTR_CREATE;
+		}
+		if (msg->op == OP_REPLACE_XATTR) {
+			xattr_flags = XATTR_REPLACE;
+		}
+	case OP_SET_XATTR:
+		/* we need a row entry to store xattr info */
+		if (row == -1) {
+			pdb_link_file(msg, &row);
+		}
+		if (pdb_set_xattr(row, oldpath, oldpathlen, xattr_flags)) {
+			msg->result = RESULT_FAIL;
+		}
+		break;
+	case OP_REMOVE_XATTR:
+		pdb_remove_xattr(row, oldpath, oldpathlen);
 		break;
 	default:
 		pseudo_diag("unknown op from client %d, op %d [%s]\n",
@@ -956,7 +1010,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag) {
 
 /* SHUTDOWN does not get this far, it's handled in pseudo_server.c */
 int
-pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag) {
+pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag, char **response_path, size_t *response_len) {
 	switch (msg->type) {
 	case PSEUDO_MSG_PING:
 		msg->result = RESULT_SUCCEED;
@@ -966,7 +1020,7 @@ pseudo_server_response(pseudo_msg_t *msg, const char *program, const char *tag) 
 		break;
 	case PSEUDO_MSG_OP:
 	case PSEUDO_MSG_FASTOP:
-		return pseudo_op(msg, program, tag);
+		return pseudo_op(msg, program, tag, response_path, response_len);
 		break;
 	case PSEUDO_MSG_ACK:		/* FALLTHROUGH */
 	case PSEUDO_MSG_NAK:		/* FALLTHROUGH */

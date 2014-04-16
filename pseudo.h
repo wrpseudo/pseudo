@@ -134,4 +134,12 @@ extern char *pseudo_version;
  */
 #define PSEUDO_LINK_SYMLINK_BEHAVIOR 0
 
+/* given n, pick a multiple of block enough bigger than n
+ * to give us some breathing room.
+ */
+static inline size_t
+round_up(size_t n, size_t block) {
+	return block * (((n + block / 4) / block) + 1);
+}
+
 #include "pseudo_ports.h"

@@ -21,3 +21,9 @@ exec, 0
 may-unlink, 1
 did-unlink, 0
 cancel-unlink, 0
+get-xattr, 1
+list-xattr, 1
+remove-xattr, 1
+set-xattr, 0
+create-xattr, 1
+replace-xattr, 1

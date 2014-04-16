@@ -421,14 +421,6 @@ pseudo_diag(char *fmt, ...) {
 	return wrote;
 }
 
-/* given n, pick a multiple of block enough bigger than n
- * to give us some breathing room.
- */
-static inline size_t
-round_up(size_t n, size_t block) {
-	return block * (((n + block / 4) / block) + 1);
-}
-
 /* store pid in text form for prepending to messages */
 void
 pseudo_new_pid() {

@@ -1056,6 +1056,7 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	size_t pathlen = -1;
 	int do_request = 0;
 	char *oldpath = 0;
+	size_t oldpathlen = 0;
 	char *alloced_path = 0;
 
 	/* disable wrappers */
@@ -1073,12 +1074,39 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 			pseudo_magic();
 			return 0;
 		}
+		/* we have to calculate this here, because SET_XATTR
+		 * and friends will be using oldpath to hold a hunk of
+		 * data of arbitrary length
+		 */
+		oldpathlen = strlen(oldpath);
 		if (!path) {
 			pseudo_diag("rename (%s) without new path.\n",
 				path ? path : "<nil>");
 			pseudo_magic();
 			return 0;
 		}
+	}
+
+	/* we treat the "create" and "replace" flags as logically
+	 * distinct operations, because they can fail when set can't.
+	 */
+	if (op == OP_SET_XATTR || op == OP_CREATE_XATTR || op == OP_REPLACE_XATTR) {
+		va_list ap;
+		va_start(ap, buf);
+		oldpath = va_arg(ap, char *);
+		oldpathlen = va_arg(ap, size_t);
+		pseudo_debug(PDBGF_XATTR, "setxattr, oldpath (%d bytes): '%s'\n",
+			(int) oldpathlen, oldpath);
+		va_end(ap);
+	}
+	if (op == OP_GET_XATTR){
+		va_list ap;
+		va_start(ap, buf);
+		oldpath = va_arg(ap, char *);
+		oldpathlen = strlen(oldpath);
+		pseudo_debug(PDBGF_XATTR, "getxattr, oldpath (%d bytes): '%s'\n",
+			(int) oldpathlen, oldpath);
+		va_end(ap);
 	}
 
 	if (path) {
@@ -1093,16 +1121,18 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		pathlen = strlen(path) + 1;
 		int strip_slash = (pathlen > 2 && (path[pathlen - 2]) == '/');
 		if (oldpath) {
-			size_t full_len = strlen(oldpath) + 1 + pathlen;
+			size_t full_len = oldpathlen + 1 + pathlen;
+			size_t partial_len = pathlen - 1 - strip_slash;
 			char *both_paths = malloc(full_len);
 			if (!both_paths) {
 				pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
 				pseudo_magic();
 				return 0;
 			}
-			snprintf(both_paths, full_len, "%.*s%c%s",
-				(int) (pathlen - 1 - strip_slash),
-				path, 0, oldpath);
+			memcpy(both_paths, path, partial_len);
+			both_paths[partial_len] = '\0';
+			memcpy(both_paths + partial_len + 1, oldpath, oldpathlen);
+			both_paths[full_len - 1] = '\0';
 			pseudo_debug(PDBGF_PATH | PDBGF_FILE, "rename: %s -> %s [%d]\n",
 				both_paths + pathlen, both_paths, (int) full_len);
 			alloced_path = both_paths;
@@ -1239,6 +1269,10 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	case OP_DID_UNLINK:
 	case OP_CANCEL_UNLINK:
 	case OP_MAY_UNLINK:
+	case OP_GET_XATTR:
+	case OP_LIST_XATTR:
+	case OP_SET_XATTR:
+	case OP_REMOVE_XATTR:
 		do_request = 1;
 		break;
 	default:

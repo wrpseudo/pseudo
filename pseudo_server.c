@@ -1,5 +1,6 @@
 /*
  * pseudo_server.c, pseudo's server-side logic and message handling
+
  *
  * Copyright (c) 2008-2010, 2013 Wind River Systems, Inc.
  *
@@ -268,6 +269,7 @@ serve_client(int i) {
 	in = pseudo_msg_receive(clients[i].fd);
 	if (in) {
 		char *response_path = 0;
+		size_t response_pathlen;
                 int send_response = 1;
 		pseudo_debug(PDBGF_SERVER | PDBGF_VERBOSE, "got a message (%d): %s\n", in->type, (in->pathlen ? in->path : "<no path>"));
 		/* handle incoming ping */
@@ -306,16 +308,22 @@ serve_client(int i) {
 		if (in->type != PSEUDO_MSG_SHUTDOWN) {
                         if (in->type == PSEUDO_MSG_FASTOP)
                                 send_response = 0;
-			if (pseudo_server_response(in, clients[i].program, clients[i].tag)) {
+			/* most messages don't need these, but xattr may */
+			response_path = 0;
+			response_pathlen = -1;
+			if (pseudo_server_response(in, clients[i].program, clients[i].tag, &response_path, &response_pathlen)) {
 				in->type = PSEUDO_MSG_NAK;
 			} else {
 				in->type = PSEUDO_MSG_ACK;
 				pseudo_debug(PDBGF_SERVER | PDBGF_VERBOSE, "response: %d (%s)\n",
 					in->result, pseudo_res_name(in->result));
 			}
-			/* no path in response */
-			in->pathlen = 0;
 			in->client = i;
+			if (response_path) {
+				in->pathlen = response_pathlen;
+			} else {
+				in->pathlen = 0;
+			}
 		} else {
 			/* the server's listen fd is "a client", and
 			 * so is the program connecting to request a shutdown.
@@ -347,7 +355,7 @@ serve_client(int i) {
 			}
 		}
                 if (send_response) {
-                        if ((rc = pseudo_msg_send(clients[i].fd, in, -1, response_path)) != 0) {
+                        if ((rc = pseudo_msg_send(clients[i].fd, in, in->pathlen, response_path)) != 0) {
                                 pseudo_debug(PDBGF_SERVER, "failed to send response to client %d [%d]: %d (%s)\n",
                                         i, (int) clients[i].pid, rc, strerror(errno));
                         }
