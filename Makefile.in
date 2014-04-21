@@ -160,7 +160,9 @@ clean:
 		pseudo_wrapper_table.c \
 		pseudo_tables.c pseudo_tables.h \
 		pseudo_ports.h port_wrappers.c \
-		offsets32 offsets64
+		offsets32 offsets64 \
+		port_deps.mk func_deps.mk
+	touch port_deps.mk func_deps.mk
 
 distclean: clean
 	rm -f Makefile
@@ -183,3 +185,8 @@ tarball:
 	  rmdir pseudo \
 	)
 	tar cjf pseudo-$(VERSION).tar.bz2 pseudo-$(VERSION)
+
+# Note when we need to rebuild pseudo_wrappers.o
+include port_deps.mk
+include func_deps.mk
+

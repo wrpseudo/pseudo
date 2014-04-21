@@ -420,6 +420,9 @@ class Function:
             pretty += ' (%s)' % self.comments
         return pretty
 
+    def funcdeps(self):
+        return 'pseudo_wrappers.o: ports/%s/guts/%s.c' % ( self.port, self.name )
+
 class Port:
     """
 A Port is a set of function declarations and code providing
@@ -497,6 +500,17 @@ additional ports to include.
     def define(self):
         return '#define PSEUDO_PORT_%s 1' % string.upper(self.name).replace('/', '_')
 
+    def portdeps(self):
+	deps = []
+	if self.wrappers:
+	    deps.append(self.wrappers)
+	if self.portdef_file:
+	    deps.append(self.portdef_file)
+        if deps:
+            return 'pseudo_wrappers.o: %s' % ' '.join(deps)
+        else:
+            return '# no extra dependencies for %s.' % self.name
+
     def portdefs(self):
         if self.portdef_file:
             return '#include "%s"' % self.portdef_file
@@ -561,7 +575,8 @@ def main():
     for path in glob.glob('templates/*'):
         try:
             source = TemplateFile(path)
-            source.emit('copyright')
+	    if source.name.endswith('.c') or source.name.endswith('.h'):
+                source.emit('copyright')
             source.emit('header')
             sources.append(source)
         except IOError:

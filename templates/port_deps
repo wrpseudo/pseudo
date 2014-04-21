@@ -1,0 +1,5 @@
+@name port_deps.mk
+@port
+${portdeps}
+@header
+# port dependencies

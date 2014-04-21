@@ -1,0 +1,4 @@
+@name func_deps.mk
+${funcdeps}
+@header
+# Per-function extra dependencies

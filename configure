@@ -229,6 +229,9 @@ else
     SQLITE_MEMORY=""
 fi
 
+touch port_deps.mk
+touch func_deps.mk
+
 sed -e '
   s,@PREFIX@,'"$opt_prefix"',g
   s,@LIBDIR@,'"$opt_libdir"',g
