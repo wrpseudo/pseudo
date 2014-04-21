@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/wait.h>
 
 #include "pseudo.h"
 #include "pseudo_ipc.h"
@@ -410,12 +411,22 @@ main(int argc, char *argv[]) {
 		}
 		pseudo_setupenv();
 
-		rc = execv(fullpath, argv);
-		if (rc == -1) {
-			pseudo_diag("pseudo: can't run %s: %s\n",
-				argv[0], strerror(errno));
+		rc = fork();
+		if (rc) {
+			waitpid(rc, &rc, 0);
+			/* try to hint that we don't think we still need
+			 * the server.
+			 */
+			pseudo_client_shutdown();
+			return WEXITSTATUS(rc);
+		} else {
+			rc = execv(fullpath, argv);
+			if (rc == -1) {
+				pseudo_diag("pseudo: can't run %s: %s\n",
+					argv[0], strerror(errno));
+			}
+			exit(EXIT_FAILURE);
 		}
-		exit(EXIT_FAILURE);
 	}
 	/* if we got here, we are not running a command, and we are not in
 	 * a pseudo environment.
