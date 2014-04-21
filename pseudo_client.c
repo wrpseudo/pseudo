@@ -1058,6 +1058,7 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	char *oldpath = 0;
 	size_t oldpathlen = 0;
 	char *alloced_path = 0;
+	int strip_slash;
 
 	/* disable wrappers */
 	pseudo_antimagic();
@@ -1109,7 +1110,20 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		va_end(ap);
 	}
 
+	/* if path isn't available, try to find one? */
+	if (!path && fd >= 0 && fd <= nfds) {
+		path = fd_path(fd);
+		if (!path) {
+			pathlen = 0;
+		} else {
+			pathlen = strlen(path) + 1;
+		}
+	}
+
 	if (path) {
+		if (pathlen == (size_t) -1) {
+			pathlen = strlen(path) + 1;
+		}
 		/* path fixup has to happen in the specific functions,
 		 * because they may have to make calls which have to be
 		 * fixed up for chroot stuff already.
@@ -1118,43 +1132,43 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		 * (no attempt is made to handle a rename of "/" occurring
 		 * in a chroot...)
 		 */
-		pathlen = strlen(path) + 1;
-		int strip_slash = (pathlen > 2 && (path[pathlen - 2]) == '/');
-		if (oldpath) {
-			size_t full_len = oldpathlen + 1 + pathlen;
-			size_t partial_len = pathlen - 1 - strip_slash;
-			char *both_paths = malloc(full_len);
-			if (!both_paths) {
-				pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
-				pseudo_magic();
-				return 0;
-			}
-			memcpy(both_paths, path, partial_len);
-			both_paths[partial_len] = '\0';
-			memcpy(both_paths + partial_len + 1, oldpath, oldpathlen);
-			both_paths[full_len - 1] = '\0';
-			pseudo_debug(PDBGF_PATH | PDBGF_FILE, "rename: %s -> %s [%d]\n",
-				both_paths + pathlen, both_paths, (int) full_len);
-			alloced_path = both_paths;
-			path = alloced_path;
-			pathlen = full_len;
-		} else {
-			if (strip_slash) {
-				alloced_path = strdup(path);
-				alloced_path[pathlen - 2] = '\0';
-				path = alloced_path;
-			}
-		}
-	} else if (fd >= 0 && fd <= nfds) {
-		path = fd_path(fd);
-		if (!path)
-			msg.pathlen = 0;
-		else
-			msg.pathlen = strlen(path) + 1;
+		strip_slash = (pathlen > 2 && (path[pathlen - 2]) == '/');
 	} else {
-		path = 0;
-		msg.pathlen = 0;
+		path = "";
+		pathlen = 0;
+		strip_slash = 0;
 	}
+
+	/* f*xattr operations can result in needing to send a path
+	 * value even though we don't have one available. We use an
+	 * empty path for that.
+	 */
+	if (oldpath) {
+		size_t full_len = oldpathlen + 1 + pathlen;
+		size_t partial_len = pathlen - 1 - strip_slash;
+		char *both_paths = malloc(full_len);
+		if (!both_paths) {
+			pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
+			pseudo_magic();
+			return 0;
+		}
+		memcpy(both_paths, path, partial_len);
+		both_paths[partial_len] = '\0';
+		memcpy(both_paths + partial_len + 1, oldpath, oldpathlen);
+		both_paths[full_len - 1] = '\0';
+		pseudo_debug(PDBGF_PATH | PDBGF_FILE, "rename: %s -> %s [%d]\n",
+			both_paths + pathlen, both_paths, (int) full_len);
+		alloced_path = both_paths;
+		path = alloced_path;
+		pathlen = full_len;
+	} else {
+		if (strip_slash) {
+			alloced_path = strdup(path);
+			alloced_path[pathlen - 2] = '\0';
+			path = alloced_path;
+		}
+	}
+
 	pseudo_debug(PDBGF_OP, "%s%s", pseudo_op_name(op),
 		(dirfd != -1 && dirfd != AT_FDCWD && op != OP_DUP) ? "at" : "");
 	if (oldpath) {

@@ -524,6 +524,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 	 */
 
 	if (msg->pathlen) {
+		size_t initial_len;
 		switch (msg->op) {
 		case OP_RENAME:
 		case OP_CREATE_XATTR:
@@ -532,10 +533,18 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 		case OP_REPLACE_XATTR:
 		case OP_SET_XATTR:
 			/* In a rename there are two paths, null separated in msg->path */
-			oldpath = msg->path + strlen(msg->path) + 1;
-			oldpathlen = msg->pathlen - (oldpath - msg->path);
-			pseudo_debug(PDBGF_OP | PDBGF_FILE | PDBGF_XATTR, "%s: path '%s', oldpath '%s' [%d]\n",
-				pseudo_op_name(msg->op), msg->path, oldpath, (int) oldpathlen);
+			initial_len = strlen(msg->path);
+			oldpath = msg->path + initial_len + 1;
+			/* for rename, the path name would be null-terminated,
+			 * but for *xattr, we don't want the null. */
+			oldpathlen = msg->pathlen - (oldpath - msg->path) - 1;
+			pseudo_debug(PDBGF_OP | PDBGF_FILE | PDBGF_XATTR, "%s: path '%s', oldpath '%s' [%d/%d]\n",
+				pseudo_op_name(msg->op), msg->path, oldpath, (int) oldpathlen, (int) msg->pathlen);
+			/* if we got an oldpath, but a 0-length initial
+			 * path, we don't want to act as though we had
+			 * a non-empty initial path.
+			 */
+			msg->pathlen = initial_len;
 			break;
 		default:
 			break;
@@ -956,8 +965,8 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 		} else {
 			*response_path = oldpath;
 			*response_len = oldpathlen;
-			pseudo_debug(PDBGF_XATTR, "get results: '%s' (%d bytes)\n",
-				*response_path, (int) *response_len);
+			pseudo_debug(PDBGF_XATTR, "get results: '%.*s' (%d bytes)\n",
+				(int) *response_len, *response_path, (int) *response_len);
 		}
 		break;
 	case OP_LIST_XATTR:

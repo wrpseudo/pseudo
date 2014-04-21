@@ -2377,8 +2377,8 @@ pdb_set_xattr(long long file_id, char *value, size_t len, int flags) {
 	vlen = strlen(value);
 	len = len - (vlen + 1);
 	value = value + len;
-	pseudo_debug(PDBGF_XATTR, "trying to set a value for %lld: name is '%s', value is '%s'. Existing row %lld.\n",
-		file_id, vname, value, existing_row);
+	pseudo_debug(PDBGF_XATTR, "trying to set a value for %lld: name is '%s' [%d/%d bytes], value is '%s'. Existing row %lld.\n",
+		file_id, vname, (int) vlen, (int) (len + vlen + 1), value, existing_row);
 	if (existing_row != -1) {
 		/* update */
 		if (!update) {
@@ -2388,7 +2388,7 @@ pdb_set_xattr(long long file_id, char *value, size_t len, int flags) {
 				return 1;
 			}
 		}
-		rc = sqlite3_bind_text(update, 1, value, -1, SQLITE_STATIC);
+		rc = sqlite3_bind_text(update, 1, value, len, SQLITE_STATIC);
 		if (rc) {
 			dberr(file_db, "couldn't bind xattr value to UPDATE.");
 			return 1;
