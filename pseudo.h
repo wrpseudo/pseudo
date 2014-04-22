@@ -49,13 +49,22 @@ extern int pseudo_diag(char *, ...) __attribute__ ((format (printf, 1, 2)));
 		if (pseudo_util_debug_flags & (x)) { pseudo_diag(__VA_ARGS__); } \
 	} \
 } while (0) 
+#define pseudo_debug_call(x, fn, ...) do { \
+	if ((x) & PDBGF_VERBOSE) { \
+		if ((pseudo_util_debug_flags & PDBGF_VERBOSE) && (pseudo_util_debug_flags & ((x) & ~PDBGF_VERBOSE))) { fn(__VA_ARGS__); } \
+	} else { \
+		if (pseudo_util_debug_flags & (x)) { fn(__VA_ARGS__); } \
+	} \
+} while (0) 
 #else
 /* this used to be a static inline function, but that meant that arguments
  * were still evaluated for side effects. We don't want that. The ...
  * is a C99ism, also supported by GNU C.
  */
 #define pseudo_debug(...) 0
+#define pseudo_debug_call(...) 0
 #endif
+extern void pseudo_dump_data(char *, const void *, size_t);
 void pseudo_new_pid(void);
 /* pseudo_fix_path resolves symlinks up to this depth */
 #define PSEUDO_MAX_LINK_RECURSION 16

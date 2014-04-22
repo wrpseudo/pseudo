@@ -2376,7 +2376,7 @@ pdb_set_xattr(long long file_id, char *value, size_t len, int flags) {
 	/* the material after the name is the value */
 	vlen = strlen(value);
 	len = len - (vlen + 1);
-	value = value + len;
+	value = value + vlen + 1;
 	pseudo_debug(PDBGF_XATTR, "trying to set a value for %lld: name is '%s' [%d/%d bytes], value is '%s'. Existing row %lld.\n",
 		file_id, vname, (int) vlen, (int) (len + vlen + 1), value, existing_row);
 	if (existing_row != -1) {

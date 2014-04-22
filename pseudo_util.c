@@ -1432,3 +1432,40 @@ pseudo_stat64_from32(struct stat64 *buf64, const struct stat *buf) {
 	buf64->st_mtime = buf->st_mtime;
 	buf64->st_ctime = buf->st_ctime;
 }
+
+/* pretty-dump some data.
+ * expects to be called using pseudo_debug_call() so it doesn't have
+ * to do debug checks.
+ */
+void
+pseudo_dump_data(char *name, const void *v, size_t len) {
+	char hexbuf[128];
+	char asciibuf[32];
+	const unsigned char *base = v;
+	const unsigned char *data = base;
+	int remaining = len;
+	pseudo_diag("%s at %p [%d byte%s]:\n",
+		name ? name : "data", v, (int) len, len == 1 ? "" : "s");
+	while (remaining > 0) {
+		char *hexptr = hexbuf;
+		char *asciiptr = asciibuf;
+		for (int i = 0; i < 16 && i < remaining; ++i) {
+			hexptr += snprintf(hexptr, 4, "%02x ", data[i]);
+			if (isprint(data[i])) {
+				*asciiptr++ = data[i];
+			} else {
+				*asciiptr++ = '.';
+			}
+			if (i % 4 == 3) {
+				*hexptr++ = ' ';
+			}
+		}
+		*hexptr = '\0';
+		*asciiptr = '\0';
+		pseudo_diag("0x%06x %-50.50s '%.16s'\n",
+			(int) (data - base),
+			hexbuf, asciibuf);
+		remaining = remaining - 16;
+		data = data + 16;
+	}
+}

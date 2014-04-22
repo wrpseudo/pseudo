@@ -1055,9 +1055,12 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	pseudo_msg_t msg = { .type = PSEUDO_MSG_OP };
 	size_t pathlen = -1;
 	int do_request = 0;
-	char *oldpath = 0;
-	size_t oldpathlen = 0;
-	char *alloced_path = 0;
+	char *path_extra_1 = 0;
+	size_t path_extra_1len = 0;
+	char *path_extra_2 = 0;
+	size_t path_extra_2len = 0;
+	static char *alloced_path = 0;
+	static size_t alloced_len = 0;
 	int strip_slash;
 
 	/* disable wrappers */
@@ -1065,27 +1068,25 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 
 	if (op == OP_RENAME) {
 		va_list ap;
-		va_start(ap, buf);
-		oldpath = va_arg(ap, char *);
-		va_end(ap);
-		/* last argument is the previous path of the file */
-		if (!oldpath) {
-			pseudo_diag("rename (%s) without old path.\n",
-				path ? path : "<nil>");
-			pseudo_magic();
-			return 0;
-		}
-		/* we have to calculate this here, because SET_XATTR
-		 * and friends will be using oldpath to hold a hunk of
-		 * data of arbitrary length
-		 */
-		oldpathlen = strlen(oldpath);
 		if (!path) {
 			pseudo_diag("rename (%s) without new path.\n",
 				path ? path : "<nil>");
 			pseudo_magic();
 			return 0;
 		}
+		va_start(ap, buf);
+		path_extra_1 = va_arg(ap, char *);
+		va_end(ap);
+		/* last argument is the previous path of the file */
+		if (!path_extra_1) {
+			pseudo_diag("rename (%s) without old path.\n",
+				path ? path : "<nil>");
+			pseudo_magic();
+			return 0;
+		}
+		path_extra_1len = strlen(path_extra_1);
+		pseudo_debug(PDBGF_PATH | PDBGF_FILE, "rename: %s -> %s\n",
+			path_extra_1, path);
 	}
 
 	/* we treat the "create" and "replace" flags as logically
@@ -1094,20 +1095,23 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	if (op == OP_SET_XATTR || op == OP_CREATE_XATTR || op == OP_REPLACE_XATTR) {
 		va_list ap;
 		va_start(ap, buf);
-		oldpath = va_arg(ap, char *);
-		oldpathlen = va_arg(ap, size_t);
-		pseudo_debug(PDBGF_XATTR, "setxattr, oldpath (%d bytes): '%s'\n",
-			(int) oldpathlen, oldpath);
+		path_extra_1 = va_arg(ap, char *);
+		path_extra_1len = strlen(path_extra_1);
+		path_extra_2 = va_arg(ap, char *);
+		path_extra_2len = va_arg(ap, size_t);
 		va_end(ap);
+		pseudo_debug(PDBGF_XATTR, "setxattr, name '%s', value %d bytes\n",
+			path_extra_1, (int) path_extra_2len);
+		pseudo_debug_call(PDBGF_XATTR | PDBGF_VERBOSE, pseudo_dump_data, "xattr value", path_extra_2, path_extra_2len);
 	}
-	if (op == OP_GET_XATTR){
+	if (op == OP_GET_XATTR || op == OP_REMOVE_XATTR) {
 		va_list ap;
 		va_start(ap, buf);
-		oldpath = va_arg(ap, char *);
-		oldpathlen = strlen(oldpath);
-		pseudo_debug(PDBGF_XATTR, "getxattr, oldpath (%d bytes): '%s'\n",
-			(int) oldpathlen, oldpath);
+		path_extra_1 = va_arg(ap, char *);
+		path_extra_1len = strlen(path_extra_1);
 		va_end(ap);
+		pseudo_debug(PDBGF_XATTR, "%sxattr, name '%s'\n",
+			op == OP_GET_XATTR ? "get" : "remove", path_extra_1);
 	}
 
 	/* if path isn't available, try to find one? */
@@ -1143,27 +1147,48 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	 * value even though we don't have one available. We use an
 	 * empty path for that.
 	 */
-	if (oldpath) {
-		size_t full_len = oldpathlen + 1 + pathlen;
+	if (path_extra_1) {
+		size_t full_len = path_extra_1len + 1 + pathlen;
 		size_t partial_len = pathlen - 1 - strip_slash;
-		char *both_paths = malloc(full_len);
-		if (!both_paths) {
-			pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
-			pseudo_magic();
-			return 0;
+		if (path_extra_2) {
+			full_len += path_extra_2len + 1;
 		}
-		memcpy(both_paths, path, partial_len);
-		both_paths[partial_len] = '\0';
-		memcpy(both_paths + partial_len + 1, oldpath, oldpathlen);
-		both_paths[full_len - 1] = '\0';
-		pseudo_debug(PDBGF_PATH | PDBGF_FILE, "rename: %s -> %s [%d]\n",
-			both_paths + pathlen, both_paths, (int) full_len);
-		alloced_path = both_paths;
+		if (full_len > alloced_len) {
+			free(alloced_path);
+			alloced_path = malloc(full_len);
+			alloced_len = full_len;
+			if (!alloced_path) {
+				pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
+				alloced_len = 0;
+				pseudo_magic();
+				return 0;
+			}
+		}
+		memcpy(alloced_path, path, partial_len);
+		alloced_path[partial_len] = '\0';
+		memcpy(alloced_path + partial_len + 1, path_extra_1, path_extra_1len);
+		alloced_path[partial_len + path_extra_1len + 1] = '\0';
+		if (path_extra_2) {
+			memcpy(alloced_path + partial_len + path_extra_1len + 2, path_extra_2, path_extra_2len);
+		}
+		alloced_path[full_len - 1] = '\0';
 		path = alloced_path;
 		pathlen = full_len;
+		pseudo_debug_call(PDBGF_IPC | PDBGF_VERBOSE, pseudo_dump_data, "combined path buffer", path, pathlen);
 	} else {
 		if (strip_slash) {
-			alloced_path = strdup(path);
+			if (pathlen > alloced_len) {
+				free(alloced_path);
+				alloced_path = malloc(pathlen);
+				alloced_len = pathlen;
+				if (!alloced_path) {
+					pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
+					alloced_len = 0;
+					pseudo_magic();
+					return 0;
+				}
+			}
+			memcpy(alloced_path, path, pathlen);
 			alloced_path[pathlen - 2] = '\0';
 			path = alloced_path;
 		}
@@ -1171,8 +1196,8 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 
 	pseudo_debug(PDBGF_OP, "%s%s", pseudo_op_name(op),
 		(dirfd != -1 && dirfd != AT_FDCWD && op != OP_DUP) ? "at" : "");
-	if (oldpath) {
-		pseudo_debug(PDBGF_OP, " %s ->", (char *) oldpath);
+	if (path_extra_1) {
+		pseudo_debug(PDBGF_OP, " %s ->", path_extra_1);
 	}
 	if (path) {
 		pseudo_debug(PDBGF_OP, " %s", path);
@@ -1338,11 +1363,6 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		pseudo_debug(PDBGF_OP, "(%d) (no request)", getpid());
 	}
 	pseudo_debug(PDBGF_OP, "\n");
-
-	/* if not NULL, alloced_path is an allocated buffer for both
-	 * paths, or for modified paths...
-	 */
-	free(alloced_path);
 
 	if (do_request && (messages % 1000 == 0)) {
 		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE | PDBGF_BENCHMARK, "%d messages handled in %.4f seconds\n",

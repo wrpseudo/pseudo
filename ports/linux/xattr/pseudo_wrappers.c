@@ -112,7 +112,7 @@ posix_permissions(const acl_header *header, int entries, int *extra, int *mode) 
 static ssize_t shared_getxattr(const char *path, int fd, const char *name, void *value, size_t size) {
 	RC_AND_BUF
 
-	pseudo_debug(PDBGF_XATTR, "getxattr(%s/%d, %s)\n",
+	pseudo_debug(PDBGF_XATTR, "getxattr(%s [fd %d], %s)\n",
 		path ? path : "<no path>", fd, name);
 	pseudo_msg_t *result = pseudo_client_op(OP_GET_XATTR, 0, fd, -1, path, &buf, name);
 	if (result->result != RESULT_SUCCEED) {
@@ -135,20 +135,38 @@ static ssize_t shared_getxattr(const char *path, int fd, const char *name, void 
 
 static int shared_setxattr(const char *path, int fd, const char *name, const void *value, size_t size, int flags) {
 	RC_AND_BUF
-
-	char *combined;
-	size_t nlen = strlen(name);
-	size_t combined_len = nlen + size + 1;
-	combined = malloc(combined_len + 1);
-	memcpy(combined, name, nlen);
-	combined[nlen] = '\0';
-	memcpy(combined + nlen + 1, value, size);
-	combined[combined_len] = '\0';
-
-	pseudo_debug(PDBGF_XATTR, "setxattr(%s/%d, %s, %s => %s [%d])\n",
-		path ? path : "<no path>", fd, name, (char *) value, combined + nlen + 1, (int) size);
-
 	pseudo_op_t op;
+
+	pseudo_debug(PDBGF_XATTR, "setxattr(%s [fd %d], %s => '%.*s')\n",
+		path ? path : "<no path>", fd, name, (int) size, (char *) value);
+
+	/* this may be a plain chmod */
+	if (!strcmp(name, "system.posix_acl_access")) {
+		int extra;
+		int mode;
+		int entries = (size - sizeof(acl_header)) / sizeof(acl_entry);
+		if (!posix_permissions(value, entries, &extra, &mode)) {
+			pseudo_debug(PDBGF_XATTR, "posix_acl_access translated to mode %04o. Remaining attribute(s): %d.\n",
+				mode, extra);
+			buf.st_mode = mode;
+			/* we want to actually issue a corresponding chmod,
+			 * as well, or else the file ends up 0600 on the
+			 * host. Using the slightly-less-efficient wrap_chmod
+			 * avoids possible misalignment.
+			 */
+			if (path) {
+				wrap_chmod(path, mode);
+			} else {
+				wrap_fchmod(fd, mode);
+			}
+			/* we are sneaky, and do not actually record this using
+			 * extended attributes. */
+			if (!extra) {
+				return 0;
+			}
+		}
+	}
+
 	switch (flags) {
 	case XATTR_CREATE:
 		op = OP_CREATE_XATTR;
@@ -161,25 +179,7 @@ static int shared_setxattr(const char *path, int fd, const char *name, const voi
 		break;
 	}
 
-	/* this may be a plain chmod */
-	if (!strcmp(name, "system.posix_acl_access")) {
-		int extra;
-		int mode;
-		int entries = (size - sizeof(acl_header)) / sizeof(acl_entry);
-		if (!posix_permissions(value, entries, &extra, &mode)) {
-			pseudo_debug(PDBGF_XATTR, "posix_acl_access translated to mode %04o. Remaining attribute(s): %d.\n",
-				mode, extra);
-			buf.st_mode = mode;
-			pseudo_client_op(path ? OP_CHMOD : OP_FCHMOD, 0, fd, -1, path, &buf);
-			/* we are sneaky, and do not actually record this using
-			 * extended attributes. */
-			if (!extra) {
-				return 0;
-			}
-		}
-	}
-
-	pseudo_msg_t *result = pseudo_client_op(op, 0, fd, -1, path, &buf, combined, combined_len);
+	pseudo_msg_t *result = pseudo_client_op(op, 0, fd, -1, path, &buf, name, value, size);
 	
 	/* we automatically assume success */
 	if (op == OP_SET_XATTR) {
