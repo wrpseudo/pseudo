@@ -25,6 +25,7 @@ SQLITE=@SQLITE@
 SQLITE_LIB=@SQLITE_LIB@
 SQLITE_MEMORY=@SQLITE_MEMORY@
 FORCE_ASYNC=@FORCE_ASYNC@
+XATTR=@XATTR@
 PASSWD_FALLBACK=@PASSWD_FALLBACK@
 BITS=@BITS@
 ARCH_FLAGS=@ARCH_FLAGS@
@@ -133,7 +134,7 @@ tables: enums/*.in maketables templatefile.py $(TABLES)
 	./maketables enums/*.in
 
 wrappers: makewrappers templatefile.py $(TEMPLATES) ports/*/wrapfuncs.in
-	./makewrappers
+	./makewrappers "xattr=$(XATTR)"
 
 .SECONDARY: tables wrappers
 

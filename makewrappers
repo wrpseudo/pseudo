@@ -562,10 +562,14 @@ def process_wrapfuncs(port):
     print ""
     return funcs
 
-def main():
+def main(argv):
     """Read in function definitions, write out files based on templates."""
     funcs = []
     sources = []
+
+    for arg in argv:
+        name, value = arg.split('=')
+	os.environ["port_" + name] = value
 
     # error checking helpfully provided by the exception handler
     copyright_file = open('guts/COPYRIGHT')
@@ -609,4 +613,4 @@ def main():
         source.close()
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

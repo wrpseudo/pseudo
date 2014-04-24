@@ -25,7 +25,8 @@ rm -f dummy.c dummy.o
 if ! $found; then
 	echo >&2 "Can't tell, omitting clone(2) support."
 fi
-if	getfattr --help >/dev/null 2>&1; then
+
+if	$port_xattr; then
 	echo "linux/xattr"
 else
 	echo "linux/noxattr"
