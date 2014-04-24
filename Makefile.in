@@ -134,7 +134,7 @@ tables: enums/*.in maketables templatefile.py $(TABLES)
 	./maketables enums/*.in
 
 wrappers: makewrappers templatefile.py $(TEMPLATES) ports/*/wrapfuncs.in
-	./makewrappers "xattr=$(XATTR)"
+	CC="$(CC) $(CFLAGS) $(CFLAGS_PSEUDO)" ./makewrappers "xattr=$(XATTR)"
 
 .SECONDARY: tables wrappers
 

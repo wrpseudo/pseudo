@@ -1,11 +1,11 @@
 #!/bin/sh
 found=false
-printf >&2 "Checking for old/new clone mechanics..."
+printf >&2 "Checking for old/new clone mechanics... "
 cat > dummy.c <<EOF
 #include <sched.h>
 int clone(int (*fn)(void *), void *child_stack, int flags, void *arg, ...) { return 0; }
 EOF
-if	cc -c -o dummy.o dummy.c >/dev/null 2>&1; then
+if	${CC} -c -o dummy.o dummy.c >/dev/null 2>&1; then
 	rm -f dummy.c dummy.o
 	echo >&2 "New clone."
 	echo "linux/newclone"
@@ -15,7 +15,7 @@ cat > dummy.c <<EOF
 #include <sched.h>
 int clone(int (*fn)(void *), void *child_stack, int flags, void *arg) { return 0; }
 EOF
-if	! $found && cc -c -o dummy.o dummy.c >/dev/null 2>&1; then
+if	! $found && ${CC} -c -o dummy.o dummy.c >/dev/null 2>&1; then
 	rm -f dummy.c dummy.o
 	echo >&2 "Old clone."
 	echo "linux/oldclone"
@@ -27,7 +27,17 @@ if ! $found; then
 fi
 
 if	$port_xattr; then
+	cat > dummy.c <<EOF
+#include <sys/types.h>
+#include <attr/xattr.h>
+int i;
+EOF
+	if ! ${CC} -c -o dummy.o dummy.c >/dev/null 2>&1; then
+		echo >&2 "Warning: Can't compile trivial program using <attr/xattr.h>".
+		echo >&2 "         xattr support will require that header."
+	fi
 	echo "linux/xattr"
 else
 	echo "linux/noxattr"
 fi
+rm -f dummy.c dummy.o
