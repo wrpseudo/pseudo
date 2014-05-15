@@ -1,3 +1,9 @@
+2014-05-15:
+	* (seebs) drop flags when calling fchmodat() to appease GNU tar.
+
+2014-04-24:
+	* (seebs) extended attribute support
+
 2014-01-23:
 	* (seebs) mknod wasn't calling mknodat.
 	* (seebs) mkdirat wasn't recording the logical DB mode for directories

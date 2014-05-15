@@ -54,7 +54,12 @@
 	 * specified, we already bailed previously. */
 	real_chmod(path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)));
 #else
-	real_fchmodat(dirfd, path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)), flags);
+	/* AT_SYMLINK_NOFOLLOW isn't supported by fchmodat. GNU tar
+	 * tries to use it anyway, figuring it can just retry if that
+	 * fails. But we never fail, so they don't retry. So we drop
+	 * the flag here.
+	 */
+	real_fchmodat(dirfd, path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)), 0);
 #endif
 	/* we ignore a failure from underlying fchmod, because pseudo
 	 * may believe you are permitted to change modes that the filesystem
