@@ -11,6 +11,7 @@
 	* (pabigot) Don't memory-leak on checks for PSEUDO_UNLOAD, also
 	  check the correct environment when spawning new things. (Contributed
 	  by Peter A. Bigot).
+	* (seebs) mask 022 back in too, when restoring a database mode.
 
 2014-05-15:
 	* (seebs) drop flags when calling fchmodat() to appease GNU tar.
