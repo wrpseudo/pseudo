@@ -28,6 +28,7 @@ extern void pseudo_init_client(void);
 void pseudo_dump_env(char **envp);
 int pseudo_set_value(const char *key, const char *value);
 char *pseudo_get_value(const char *key);
+int pseudo_has_unload(char * const *envp);
 
 #include "pseudo_tables.h"
 

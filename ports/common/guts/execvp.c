@@ -20,7 +20,7 @@
         }
 
 	pseudo_setupenv();
-	if (pseudo_get_value("PSEUDO_UNLOAD"))
+	if (pseudo_has_unload(NULL))
 		pseudo_dropenv();
 
 	/* if exec() fails, we may end up taking signals unexpectedly...

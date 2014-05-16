@@ -9,7 +9,7 @@
 		return 1;
 
 	pseudo_setupenv();
-	if (pseudo_get_value("PSEUDO_UNLOAD"))
+	if (pseudo_has_unload(NULL))
 		pseudo_dropenv();
 
 	rc = real_system(command);

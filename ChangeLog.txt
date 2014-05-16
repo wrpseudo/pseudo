@@ -8,6 +8,9 @@
 	* (seebs) send a round-trip message to the server before exiting
 	  if any messages have been sent, so the program won't exit before
 	  the server processed those messages.
+	* (pabigot) Don't memory-leak on checks for PSEUDO_UNLOAD, also
+	  check the correct environment when spawning new things. (Contributed
+	  by Peter A. Bigot).
 
 2014-05-15:
 	* (seebs) drop flags when calling fchmodat() to appease GNU tar.

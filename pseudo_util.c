@@ -95,6 +95,33 @@ dump_env(char **envp) {
 }
 #endif
 
+int
+pseudo_has_unload(char * const *envp) {
+	static const char unload[] = "PSEUDO_UNLOAD";
+	static size_t unload_len = strlen(unload);
+	size_t i = 0;
+
+	/* Is it in the caller environment? */
+	if (NULL != getenv(unload))
+		return 1;
+
+	/* Is it in the environment cache? */
+	if (pseudo_util_initted == -1)
+		pseudo_init_util();
+	while (pseudo_env[i].key && strcmp(pseudo_env[i].key, unload))
+	       ++i;
+	if (pseudo_env[i].key && pseudo_env[i].value)
+		return 1;
+
+	/* Is it in the operational environment? */
+	while (envp && *envp) {
+		if ((!strncmp(*envp, unload, unload_len)) && ('=' == (*envp)[unload_len]))
+			return 1;
+		++envp;
+	}
+	return 0;
+}
+
 /* Caller must free memory! */
 char *
 pseudo_get_value(const char *key) {
