@@ -76,6 +76,9 @@ static int nfds = 0;
 static int messages = 0;
 static struct timeval message_time = { .tv_sec = 0 };
 static int pseudo_inited = 0;
+
+static int sent_messages = 0;
+
 int pseudo_nosymlinkexp = 0;
 
 /* note: these are int, not uid_t/gid_t, so I can use 'em with scanf */
@@ -731,6 +734,11 @@ client_ping(void) {
 	return 0;
 }
 
+static void
+void_client_ping(void) {
+	client_ping();
+}
+
 int
 pseudo_fd(int fd, int how) {
 	int newfd;
@@ -1065,6 +1073,11 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 
 	/* disable wrappers */
 	pseudo_antimagic();
+
+	if (!sent_messages) {
+		sent_messages = 1;
+		atexit(void_client_ping);
+	}
 
 	if (op == OP_RENAME) {
 		va_list ap;

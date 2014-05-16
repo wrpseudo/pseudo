@@ -5,6 +5,9 @@
 	* (seebs) mask out group/other write bits in real filesystem to
 	  reduce risks when assembling a rootfs including world-writeable
 	  directories.
+	* (seebs) send a round-trip message to the server before exiting
+	  if any messages have been sent, so the program won't exit before
+	  the server processed those messages.
 
 2014-05-15:
 	* (seebs) drop flags when calling fchmodat() to appease GNU tar.
