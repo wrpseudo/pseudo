@@ -1,3 +1,11 @@
+2014-05-16:
+	* (seebs) fchmodat: don't drop flags, report failures, to improve
+	  compatibility/consistency. Cache the knowledge that
+	  AT_SYMLINK_NOFOLLOW gets ENOTSUP.
+	* (seebs) mask out group/other write bits in real filesystem to
+	  reduce risks when assembling a rootfs including world-writeable
+	  directories.
+
 2014-05-15:
 	* (seebs) drop flags when calling fchmodat() to appease GNU tar.
 

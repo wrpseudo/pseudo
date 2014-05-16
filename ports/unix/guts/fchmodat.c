@@ -8,6 +8,7 @@
  */
 	PSEUDO_STATBUF buf;
 	int save_errno = errno;
+	static int picky_fchmodat = 0;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
@@ -15,6 +16,16 @@
 		return -1;
 	}
 	if (flags & AT_SYMLINK_NOFOLLOW) {
+		/* Linux, as of this writing, will always reject this.
+		 * GNU tar relies on getting the rejection. To cut down
+		 * on traffic, we check for the failure, and if we saw
+		 * a failure previously, we reject it right away and tell
+		 * the caller to retry.
+		 */
+		if (picky_fchmodat) {
+			errno = ENOTSUP;
+			return -1;
+		}
 		rc = base_lstat(path, &buf);
 	} else {
 		rc = base_stat(path, &buf);
@@ -50,18 +61,22 @@
 
 	/* user bits added so "root" can always access files. */
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
-	/* note:  if path was a symlink, and AT_NOFOLLOW_SYMLINKS was
+	/* note:  if path was a symlink, and AT_SYMLINK_NOFOLLOW was
 	 * specified, we already bailed previously. */
 	real_chmod(path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)));
 #else
+	rc = real_fchmodat(dirfd, path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)), flags);
 	/* AT_SYMLINK_NOFOLLOW isn't supported by fchmodat. GNU tar
 	 * tries to use it anyway, figuring it can just retry if that
-	 * fails. But we never fail, so they don't retry. So we drop
-	 * the flag here.
+	 * fails. So we want to report that *particular* failure instead
+	 * of doing the fallback.
 	 */
-	real_fchmodat(dirfd, path, PSEUDO_FS_MODE(mode, S_ISDIR(buf.st_mode)), 0);
+	if (rc == -1 && errno == ENOTSUP && (flags & AT_SYMLINK_NOFOLLOW)) {
+		picky_fchmodat = 1;
+		return -1;
+	}
 #endif
-	/* we ignore a failure from underlying fchmod, because pseudo
+	/* we otherwise ignore failures from underlying fchmod, because pseudo
 	 * may believe you are permitted to change modes that the filesystem
 	 * doesn't. Note that we also don't need to know whether the
          * file might be a (pseudo) block device or some such; pseudo
