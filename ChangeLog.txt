@@ -1,6 +1,7 @@
 2014-05-27:
 	* (seebs) start noticing umask, mask it out from open or mkdir
 	  calls rather than relying on underlying open/mkdir to do it.
+	* (seebs) add a test for umask and filesystem-vs-db modes.
 
 2014-05-16:
 	* (seebs) fchmodat: don't drop flags, report failures, to improve
