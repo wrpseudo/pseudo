@@ -11,6 +11,9 @@
 		errno = ENOSYS;
 		return -1;
 	}
+	/* mask out mode bits appropriately */
+	mode = mode & ~pseudo_umask;
+
 	rc = real_mkdir(path, PSEUDO_FS_MODE(mode, 1));
 #else
 	rc = real_mkdirat(dirfd, path, PSEUDO_FS_MODE(mode, 1));

@@ -10,6 +10,9 @@
 	int existed = 1;
 	int save_errno;
 
+	/* mask out mode bits appropriately */
+	mode = mode & ~pseudo_umask;
+
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
 		errno = ENOSYS;

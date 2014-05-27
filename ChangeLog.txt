@@ -1,3 +1,7 @@
+2014-05-27:
+	* (seebs) start noticing umask, mask it out from open or mkdir
+	  calls rather than relying on underlying open/mkdir to do it.
+
 2014-05-16:
 	* (seebs) fchmodat: don't drop flags, report failures, to improve
 	  compatibility/consistency. Cache the knowledge that

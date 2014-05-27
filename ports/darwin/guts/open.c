@@ -9,6 +9,9 @@
 	struct stat buf = { };
 	int existed = 1;
 	int save_errno;
+
+	/* mask out mode bits appropriately */
+	mode = mode & ~pseudo_umask;
 #ifdef PSEUDO_FORCE_ASYNCH
         flags &= ~O_SYNC;
 #endif

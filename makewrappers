@@ -204,6 +204,7 @@ class Function:
             'uid_t': '0',
             'int': '-1',
             'long': '-1',
+            'mode_t': '0',
             'ssize_t': '-1'
         }
     

@@ -71,6 +71,8 @@ int pseudo_disabled = 0;
 int pseudo_allow_fsync = 0;
 static int pseudo_local_only = 0;
 
+int pseudo_umask = 022;
+
 static char **fd_paths = NULL;
 static int nfds = 0;
 static int messages = 0;
@@ -223,6 +225,9 @@ pseudo_init_client(void) {
 
 	if (!pseudo_disabled && !pseudo_inited) {
 		char *pseudo_path = 0;
+
+		pseudo_umask = umask(022);
+		umask(pseudo_umask);
 
 		pseudo_path = pseudo_prefix_path(NULL);
 		if (pseudo_prefix_dir_fd == -1) {
