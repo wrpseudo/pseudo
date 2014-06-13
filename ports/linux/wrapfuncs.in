@@ -18,10 +18,10 @@ int openat64(int dirfd, const char *path, int flags, ...{mode_t mode}); /* flags
 int __openat64_2(int dirfd, const char *path, int flags); /* flags=0 */
 int creat64(const char *path, mode_t mode);
 int stat(const char *path, struct stat *buf); /* real_func=pseudo_stat */
-int lstat(const char *path, struct stat *buf); /* real_func=pseudo_lstat */
+int lstat(const char *path, struct stat *buf); /* real_func=pseudo_lstat, flags=AT_SYMLINK_NOFOLLOW */
 int fstat(int fd, struct stat *buf); /* real_func=pseudo_fstat */
 int stat64(const char *path, struct stat64 *buf); /* real_func=pseudo_stat64 */
-int lstat64(const char *path, struct stat64 *buf); /* real_func=pseudo_lstat64 */
+int lstat64(const char *path, struct stat64 *buf); /* real_func=pseudo_lstat64, flags=AT_SYMLINK_NOFOLLOW */
 int fstat64(int fd, struct stat64 *buf); /* real_func=pseudo_fstat64 */
 int __xstat64(int ver, const char *path, struct stat64 *buf);
 int __lxstat64(int ver, const char *path, struct stat64 *buf); /* flags=AT_SYMLINK_NOFOLLOW */

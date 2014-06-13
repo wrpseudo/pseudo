@@ -1,3 +1,6 @@
+2014-06-13:
+	* (seebs) don't follow symlinks for lutimes.
+
 2014-05-27:
 	* (seebs) start noticing umask, mask it out from open or mkdir
 	  calls rather than relying on underlying open/mkdir to do it.
