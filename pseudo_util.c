@@ -98,7 +98,7 @@ dump_env(char **envp) {
 int
 pseudo_has_unload(char * const *envp) {
 	static const char unload[] = "PSEUDO_UNLOAD";
-	static size_t unload_len = strlen(unload);
+	static size_t unload_len = sizeof(unload) - 1;
 	size_t i = 0;
 
 	/* Is it in the caller environment? */
