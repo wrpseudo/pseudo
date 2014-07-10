@@ -32,6 +32,7 @@
 #include <sys/fcntl.h>
 #include <sys/file.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 
 #include "pseudo.h"
 #include "pseudo_ipc.h"
@@ -68,17 +69,17 @@ usage(int status) {
 	for (int i = 1; i < PDBG_MAX; i += 2) {
 		unsigned char symbolics[2];
 		const char *descriptions[2];
-		symbolics[1] = pseudo_debug_type_symbolic(i);
-		symbolics[2] = pseudo_debug_type_symbolic(i + 1);
-		descriptions[1] = pseudo_debug_type_description(i);
-		descriptions[2] = pseudo_debug_type_description(i + 1);
-		if (symbolics[2]) {
+		symbolics[0] = pseudo_debug_type_symbolic(i);
+		symbolics[1] = pseudo_debug_type_symbolic(i + 1);
+		descriptions[0] = pseudo_debug_type_description(i);
+		descriptions[1] = pseudo_debug_type_description(i + 1);
+		if (symbolics[1]) {
 			fprintf(f, "       %c %-32s  %c %-32s\n",
-				symbolics[1], descriptions[1],
-				symbolics[2], descriptions[2]);
+				symbolics[0], descriptions[0],
+				symbolics[1], descriptions[1]);
 		} else {
 			fprintf(f, "       %c %-32s\n",
-				symbolics[1], descriptions[1]);
+				symbolics[0], descriptions[0]);
 		}
 	}
 	exit(status);

@@ -1,6 +1,11 @@
 2014-07-10:
 	* (seebs) Don't pass -L/usr/lib* for sqlite, because that's probably
 	  the default.
+	* (seebs) include sys/xattr.h explicitly for Darwin, also fix things
+	  up so we aren't relying on seeing a declaration for our dummy
+	  wrapper for fgetgrent_r which doesn't exist here.
+	* (seebs) fix typo in xattr message
+	* (seebs) make xattr work on Darwin, too.
 
 2014-06-13:
 	* (seebs) don't follow symlinks for lutimes.

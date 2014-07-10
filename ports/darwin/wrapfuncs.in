@@ -7,14 +7,6 @@ int fcntl(int fd, int cmd, ...{struct flock *lock});
 # just so we know the inums of symlinks
 # for emulation of passwd utilities
 int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
-# we use "pathname" to avoid canonicalizing paths, because these functions are
-# unimplemented
-ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size, u_int32_t position, int options);
-ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size, u_int32_t position, int options);
-ssize_t listxattr(const char *pathname, char *list, size_t size, int options);
-ssize_t flistxattr(int filedes, char *list, size_t size, int options);
-int setxattr(const char *pathname, const char *name, const void *value, size_t size, u_int32_t position, int options);
-int fsetxattr(int filedes, const char *name, const void *value, size_t size, u_int32_t position, int options);
 # local color UIDs
 int getgrouplist(const char *name, int basegid, int *groups, int *ngroups);
 int scandir(const char *path, struct dirent ***namelist, int (*filter)(const struct dirent *), int (*compar)());
@@ -24,3 +16,12 @@ int fgetpwent_r(FILE *fp, struct passwd *pbuf, char *buf, size_t buflen, struct 
 int getpwent_r(struct passwd *pwbuf, char *buf, size_t buflen, struct passwd **pwbufp); /* real_func=pseudo_getpwent_r */
 int getgrent_r(struct group *gbuf, char *buf, size_t buflen, struct group **gbufp); /* real_func=pseudo_getgrent_r */
 int sync_file_range(int fd, off_t offset, off_t nbytes, unsigned int flags); /* async_skip=0 */
+
+ssize_t getxattr(const char *path, const char *name, void *value, size_t size, u_int32_t position, int options); /* flags=(options&XATTR_NOFOLLOW?AT_SYMLINK_NOFOLLOW:0) */
+ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size, u_int32_t position, int options);
+int setxattr(const char *path, const char *name, const void *value, size_t size, u_int32_t position, int options); /* flags=0 */
+int fsetxattr(int filedes, const char *name, const void *value, size_t size, u_int32_t position, int options);
+ssize_t listxattr(const char *path, char *list, size_t size, int options); /* flags=0 */
+ssize_t flistxattr(int filedes, char *list, size_t size, int options);
+int removexattr(const char *path, const char *name, int options); /* flags=0 */
+int fremovexattr(int filedes, const char *name, int options);
