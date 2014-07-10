@@ -267,6 +267,11 @@ else
     SQLITE_MEMORY=""
 fi
 
+# Suppress the -L if sqlite is in the default path.
+if [ "$opt_sqlite" = "/usr" ]; then
+    default_sqlite="# "
+fi
+
 touch port_deps.mk
 touch func_deps.mk
 
@@ -278,6 +283,7 @@ sed -e '
   s,@SUFFIX@,'"$opt_suffix"',g
   s,@SQLITE@,'"$opt_sqlite"',g
   s,@ARCH_FLAGS@,'"$arch_flags"',g
+  s,@DEFAULT_SQLITE@,'"$default_sqlite"',g
   s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g
   s,@SQLITE_LIB@,'"$opt_sqlite_lib"',g
   s,@SQLITE_MEMORY@,'"$SQLITE_MEMORY"',g
