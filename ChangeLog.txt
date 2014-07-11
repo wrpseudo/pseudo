@@ -1,3 +1,7 @@
+2014-07-11:
+	* (seebs) merge in symbol version restrictions (slightly tweaked)
+	  for Linux.
+
 2014-07-10:
 	* (seebs) Don't pass -L/usr/lib* for sqlite, because that's probably
 	  the default.
