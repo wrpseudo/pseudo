@@ -983,7 +983,7 @@ pseudo_client_shutdown(void) {
 		}
 	}
 	if (client_connect()) {
-		pseudo_diag("Pseudo server seems to be already offline.\n");
+		pseudo_debug(PDBGF_INVOKE, "Pseudo server seems to be already offline.\n");
 		return 0;
 	}
 	memset(&msg, 0, sizeof(pseudo_msg_t));
