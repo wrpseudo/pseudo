@@ -1,6 +1,7 @@
 2014-07-18:
 	* (seebs) Make "server already offline" message into a debugging
 	  message (PDBGF_INVOKE).
+	* (seebs) 1.6.1
 
 2014-07-17:
 	* (seebs) Restrict symbol version restrictions to x86-64 and i386
