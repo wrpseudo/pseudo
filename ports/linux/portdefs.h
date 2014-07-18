@@ -22,6 +22,6 @@
 
 #ifdef __amd64__   
 GLIBC_COMPAT_SYMBOL(memcpy,2.2.5);
-#else /* tentatively assume this means x86 */
+#elif defined(__i386__)
 GLIBC_COMPAT_SYMBOL(memcpy,2.0);
 #endif

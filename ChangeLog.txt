@@ -1,3 +1,7 @@
+2014-07-17:
+	* (seebs) Restrict symbol version restrictions to x86-64 and i386
+	  rather than x86-64 and any old thing. Fixes build problems on ARM.
+
 2014-07-11:
 	* (seebs) merge in symbol version restrictions (slightly tweaked)
 	  for Linux.
