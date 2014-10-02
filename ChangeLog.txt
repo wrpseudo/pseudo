@@ -1,3 +1,6 @@
+2014-10-02:
+	* (seebs) use sqlite3_bind_int64 for inodes.
+
 2014-07-18:
 	* (seebs) Make "server already offline" message into a debugging
 	  message (PDBGF_INVOKE).

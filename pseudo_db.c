@@ -780,7 +780,7 @@ pdb_log_entry(log_entry *e) {
 		sqlite3_bind_int(insert, field++, e->client);
 		sqlite3_bind_int(insert, field++, e->dev);
 		sqlite3_bind_int(insert, field++, e->gid);
-		sqlite3_bind_int(insert, field++, e->ino);
+		sqlite3_bind_int64(insert, field++, e->ino);
 		sqlite3_bind_int(insert, field++, e->mode);
 		if (e->path) {
 			sqlite3_bind_text(insert, field++, e->path, -1, SQLITE_STATIC);
@@ -874,7 +874,7 @@ pdb_log_msg(pseudo_sev_t severity, pseudo_msg_t *msg, const char *program, const
 		sqlite3_bind_int(insert, field++, msg->client);
 		sqlite3_bind_int(insert, field++, msg->dev);
 		sqlite3_bind_int(insert, field++, msg->gid);
-		sqlite3_bind_int(insert, field++, msg->ino);
+		sqlite3_bind_int64(insert, field++, msg->ino);
 		sqlite3_bind_int(insert, field++, msg->mode);
 		if (msg->pathlen) {
 			sqlite3_bind_text(insert, field++, msg->path, -1, SQLITE_STATIC);
@@ -1175,7 +1175,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 		case PSQF_STAMP:
 		case PSQF_TYPE:
 		case PSQF_UID:
-			sqlite3_bind_int(stmt, field++, trait->data.ivalue);
+			sqlite3_bind_int64(stmt, field++, trait->data.ivalue);
 			break;
 		default:
 			pseudo_diag("Inexplicably invalid field type %d\n", trait->field);
@@ -1396,7 +1396,7 @@ pdb_link_file(pseudo_msg_t *msg, long long *row) {
 		sqlite3_bind_text(insert, 1, "NAMELESS FILE", -1, SQLITE_STATIC);
 	}
 	sqlite3_bind_int(insert, 2, msg->dev);
-	sqlite3_bind_int(insert, 3, msg->ino);
+	sqlite3_bind_int64(insert, 3, msg->ino);
 	sqlite3_bind_int(insert, 4, msg->uid);
 	sqlite3_bind_int(insert, 5, msg->gid);
 	sqlite3_bind_int(insert, 6, msg->mode);
@@ -1441,7 +1441,7 @@ pdb_unlink_file_dev(pseudo_msg_t *msg) {
 		return 1;
 	}
 	sqlite3_bind_int(sql_delete, 1, msg->dev);
-	sqlite3_bind_int(sql_delete, 2, msg->ino);
+	sqlite3_bind_int64(sql_delete, 2, msg->ino);
 	file_db_dirty = 1;
 	rc = sqlite3_step(sql_delete);
 	if (rc != SQLITE_DONE) {
@@ -1477,7 +1477,7 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 	}
 	sqlite3_bind_text(update, 1, msg->path, -1, SQLITE_STATIC);
 	sqlite3_bind_int(update, 2, msg->dev);
-	sqlite3_bind_int(update, 3, msg->ino);
+	sqlite3_bind_int64(update, 3, msg->ino);
 	file_db_dirty = 1;
 	rc = sqlite3_step(update);
 	if (rc != SQLITE_DONE) {
@@ -1880,7 +1880,7 @@ pdb_update_inode(pseudo_msg_t *msg) {
 		return 1;
 	}
 	sqlite3_bind_int(update, 1, msg->dev);
-	sqlite3_bind_int(update, 2, msg->ino);
+	sqlite3_bind_int64(update, 2, msg->ino);
 	rc = sqlite3_bind_text(update, 3, msg->path, -1, SQLITE_STATIC);
 	if (rc) {
 		/* msg->path can never be null, and if msg didn't
@@ -1933,7 +1933,7 @@ pdb_update_file(pseudo_msg_t *msg) {
 	sqlite3_bind_int(update, 3, msg->mode);
 	sqlite3_bind_int(update, 4, msg->rdev);
 	sqlite3_bind_int(update, 5, msg->dev);
-	sqlite3_bind_int(update, 6, msg->ino);
+	sqlite3_bind_int64(update, 6, msg->ino);
 
 	file_db_dirty = 1;
 	rc = sqlite3_step(update);
@@ -1974,7 +1974,7 @@ pdb_find_file_exact(pseudo_msg_t *msg, long long *row) {
 		dberr(file_db, "error binding %s to select", msg->pathlen ? msg->path : "<nil>");
 	}
 	sqlite3_bind_int(select, 2, msg->dev);
-	sqlite3_bind_int(select, 3, msg->ino);
+	sqlite3_bind_int64(select, 3, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
@@ -2084,7 +2084,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 		return 0;
 	}
 	sqlite3_bind_int(select, 1, msg->dev);
-	sqlite3_bind_int(select, 2, msg->ino);
+	sqlite3_bind_int64(select, 2, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
@@ -2133,7 +2133,7 @@ pdb_find_file_dev(pseudo_msg_t *msg, long long *row) {
 		return 1;
 	}
 	sqlite3_bind_int(select, 1, msg->dev);
-	sqlite3_bind_int(select, 2, msg->ino);
+	sqlite3_bind_int64(select, 2, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
@@ -2459,7 +2459,7 @@ pdb_find_file_ino(pseudo_msg_t *msg, long long *row) {
 	if (!msg) {
 		return 1;
 	}
-	sqlite3_bind_int(select, 1, msg->ino);
+	sqlite3_bind_int64(select, 1, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
