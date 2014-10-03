@@ -1401,7 +1401,7 @@ pdb_link_file(pseudo_msg_t *msg, long long *row) {
 	sqlite3_bind_int(insert, 5, msg->gid);
 	sqlite3_bind_int(insert, 6, msg->mode);
 	sqlite3_bind_int(insert, 7, msg->rdev);
-	pseudo_debug(PDBGF_DB, "linking %s: dev %llu, ino %llu, mode %o, owner %d\n",
+	pseudo_debug(PDBGF_DB | PDBGF_FILE, "linking %s: dev %llu, ino %llu, mode %o, owner %d\n",
 		(msg->pathlen ? msg->path : "<nil> (as NAMELESS FILE)"),
 		(unsigned long long) msg->dev, (unsigned long long) msg->ino,
 		(int) msg->mode, msg->uid);
@@ -2113,7 +2113,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 
 /* find file using dev/inode as key */
 int
-pdb_find_file_dev(pseudo_msg_t *msg, long long *row) {
+pdb_find_file_dev(pseudo_msg_t *msg, long long *row, char **path) {
 	static sqlite3_stmt *select;
 	int rc;
 	char *sql = "SELECT * FROM files WHERE dev = ? AND ino = ?;";
@@ -2145,6 +2145,12 @@ pdb_find_file_dev(pseudo_msg_t *msg, long long *row) {
 		msg->mode = (unsigned long) sqlite3_column_int64(select, 6);
 		msg->rdev = (unsigned long) sqlite3_column_int64(select, 7);
 		msg->deleting = (int) sqlite3_column_int64(select, 8);
+		/* stash path */
+		if (path) {
+			*path = strdup((char *) sqlite3_column_text(select, 1));
+			pseudo_debug(PDBGF_FILE, "find_file_dev: path %s\n",
+				*path ? *path : "<nil>");
+		}
 		rc = 0;
 		break;
 	case SQLITE_DONE:

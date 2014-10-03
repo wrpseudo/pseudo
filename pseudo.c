@@ -571,6 +571,9 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 			found_ino = 1;
 			/* note:  we have to avoid freeing this later */
 			path_by_ino = msg->path;
+			if (msg->op == OP_LINK) {
+				pseudo_debug(PDBGF_FILE, "[matches existing link]");
+			}
 		}
 	}
 
@@ -589,9 +592,8 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 		}
 		/* search on original inode -- in case of mismatch */
 		if (msg->dev && msg->ino) {
-			if (!pdb_find_file_dev(&by_ino, &row)) {
+			if (!pdb_find_file_dev(&by_ino, &row, &path_by_ino)) {
 				found_ino = 1;
-				path_by_ino = pdb_get_file_path(&by_ino);
 			}
 		}
 	}
@@ -820,8 +822,11 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 			/* just in case find_file_path screwed up the msg */
 			msg->mode = msg_header.mode;
 		}
-		/* if the path is not known, link it */
-		if (!found_path) {
+		/* if we've never seen the file at all before, link it.
+		 * If we have it in the db by inode, but not by name,
+		 * it got fixed during the sanity checks.
+		 */
+		if (!found_path && !found_ino) {
 			pseudo_debug(PDBGF_FILE, "(new) ");
 			pdb_link_file(msg, NULL);
 		}
@@ -847,8 +852,12 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 			msg->uid = msg_header.uid;
 			msg->gid = msg_header.gid;
 		}
-		/* if the path is not known, link it */
-		if (!found_path) {
+		/* if we've never seen the file at all before, link it.
+		 * If we have it in the db by inode, but not by name,
+		 * it got fixed during the sanity checks.
+		 */
+		if (!found_path && !found_ino) {
+			pseudo_debug(PDBGF_FILE, "(new) ");
 			pdb_link_file(msg, NULL);
 		}
 		break;

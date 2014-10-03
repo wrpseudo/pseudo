@@ -53,7 +53,7 @@ extern int pdb_rename_file(const char *oldpath, pseudo_msg_t *msg);
 extern int pdb_renumber_all(dev_t from, dev_t to);
 extern int pdb_find_file_exact(pseudo_msg_t *msg, long long *row);
 extern int pdb_find_file_path(pseudo_msg_t *msg, long long *row);
-extern int pdb_find_file_dev(pseudo_msg_t *msg, long long *row);
+extern int pdb_find_file_dev(pseudo_msg_t *msg, long long *row, char **path);
 extern int pdb_find_file_ino(pseudo_msg_t *msg, long long *row);
 extern char *pdb_get_file_path(pseudo_msg_t *msg);
 extern int pdb_get_xattr(long long file_id, char **value, size_t *len);

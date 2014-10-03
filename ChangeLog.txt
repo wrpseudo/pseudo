@@ -1,6 +1,13 @@
 2014-10-03:
 	* (seebs) in fact, suppress a lot of sanity checks entirely for
 	  did_unlink.
+	* (seebs) merge get_file_path functionality into find_file_dev,
+	  since you never call find_file_dev unless you want to do that.
+	* (seebs) If a file is in the database by inode but not path,
+	  don't try to create a new link for it.
+	* (seebs) when renaming, the link of the "old" file name should be
+	  contingent on whether *it* was in the database, not whether
+	  the *new* name was in the database. Whoops.
 
 2014-10-02:
 	* (seebs) use sqlite3_bind_int64 for inodes.
