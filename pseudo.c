@@ -602,7 +602,11 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 		(unsigned long long) msg_header.ino,
 		found_ino ? "+" : "-");
 
-	if (found_path) {
+	/* the sanity checks are inappropriate for DID_UNLINK, since it's
+	 * completely legitimate to have a new database entry for the
+	 * same inode.
+	 */
+	if (found_path && msg->op != OP_DID_UNLINK) {
 		/* This is a bad sign.  We should never have a different entry
 		 * for the inode...  But an inode of 0 from an EXEC is normal,
 		 * we don't track those.
@@ -657,7 +661,11 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 		}
 	}
 
-	if (found_ino) {
+	/* for OP_DID_UNLINK, the reason this op exists is that the same
+	 * inode might have been reclaimed. Don't sanity-check it, and
+	 * especially don't delete the database contents!
+	 */
+	if (found_ino && msg->op != OP_DID_UNLINK) {
 		/* Not always an absolute failure case.
 		 * If a file descriptor shows up unexpectedly and gets
 		 * fchown()d, you could have an entry giving the inode and
@@ -711,21 +719,12 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 						msg->path);
 					pdb_did_unlink_file(path_by_ino, by_ino.deleting);
 				} else {
-					if (msg->op != OP_DID_UNLINK) {
-						pseudo_diag("path mismatch [%d link%s]: ino %llu db '%s' req '%s'.\n",
-							msg->nlink,
-							msg->nlink == 1 ? "" : "s",
-							(unsigned long long) msg_header.ino,
-							path_by_ino ? path_by_ino : "no path",
-							msg->path);
-					} else {
-						pseudo_debug(PDBGF_FILE, "path mismatch on did-unlink [%d link%s]: ino %llu db '%s' req '%s'.\n",
-							msg->nlink,
-							msg->nlink == 1 ? "" : "s",
-							(unsigned long long) msg_header.ino,
-							path_by_ino ? path_by_ino : "no path",
-							msg->path);
-					}
+					pseudo_diag("path mismatch [%d link%s]: ino %llu db '%s' req '%s'.\n",
+						msg->nlink,
+						msg->nlink == 1 ? "" : "s",
+						(unsigned long long) msg_header.ino,
+						path_by_ino ? path_by_ino : "no path",
+						msg->path);
 				}
 			}
 		} else {
