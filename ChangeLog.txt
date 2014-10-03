@@ -8,6 +8,7 @@
 	* (seebs) when renaming, the link of the "old" file name should be
 	  contingent on whether *it* was in the database, not whether
 	  the *new* name was in the database. Whoops.
+	* (seebs) 1.6.2
 
 2014-10-02:
 	* (seebs) use sqlite3_bind_int64 for inodes.
