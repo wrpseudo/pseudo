@@ -520,7 +520,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 		break;
 	}
 
-	/* Process rename path seperation, there are two paths old / new
+	/* Process rename path separation, there are two paths old / new
 	 * stuff into a rename, break them apart (null seperated)
 	 */
 
@@ -711,13 +711,22 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 						msg->path);
 					pdb_did_unlink_file(path_by_ino, by_ino.deleting);
 				} else {
-					pseudo_diag("path mismatch [%d link%s]: ino %llu db '%s' req '%s'.\n",
-						msg->nlink,
-						msg->nlink == 1 ? "" : "s",
-						(unsigned long long) msg_header.ino,
-						path_by_ino ? path_by_ino : "no path",
-						msg->path);
+					if (msg->op != OP_DID_UNLINK) {
+						pseudo_diag("path mismatch [%d link%s]: ino %llu db '%s' req '%s'.\n",
+							msg->nlink,
+							msg->nlink == 1 ? "" : "s",
+							(unsigned long long) msg_header.ino,
+							path_by_ino ? path_by_ino : "no path",
+							msg->path);
+					} else {
+						pseudo_debug(PDBGF_FILE, "path mismatch on did-unlink [%d link%s]: ino %llu db '%s' req '%s'.\n",
+							msg->nlink,
+							msg->nlink == 1 ? "" : "s",
+							(unsigned long long) msg_header.ino,
+							path_by_ino ? path_by_ino : "no path",
+							msg->path);
 					}
+				}
 			}
 		} else {
 			/* I don't think I've ever seen this one. */
