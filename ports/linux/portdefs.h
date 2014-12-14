@@ -11,3 +11,17 @@
  * causes errors; you have to leave it empty or specify AT_SYMLINK_FOLLOW.
  */
 #define PSEUDO_LINK_SYMLINK_BEHAVIOR 0
+
+/* There were symbol changes that can cause the linker to request
+ * newer versions of glibc, which causes problems occasionally on
+ * older hosts if pseudo is built against a newer glibc and then
+ * run with an older one. Sometimes we can just avoid the symbols,
+ * but memcpy's pretty hard to get away from.
+ */
+#define GLIBC_COMPAT_SYMBOL(sym, ver) __asm(".symver " #sym "," #sym "@GLIBC_" #ver)
+
+#ifdef __amd64__   
+GLIBC_COMPAT_SYMBOL(memcpy,2.2.5);
+#elif defined(__i386__)
+GLIBC_COMPAT_SYMBOL(memcpy,2.0);
+#endif

@@ -72,6 +72,8 @@ extern char *pseudo_passwd;
 extern size_t pseudo_chroot_len;
 extern int pseudo_nosymlinkexp;
 
+extern int pseudo_umask;
+
 /* Root can read and write files, and enter directories which have no
  * read, write, or execute permissions.  (But can't execute files without
  * execute permissions!)
@@ -85,6 +87,6 @@ extern int pseudo_nosymlinkexp;
  * None of this will behave very sensibly if umask has 0700 bits in it;
  * this is a known limitation.
  */
-#define PSEUDO_FS_MODE(mode, isdir) ((mode) | S_IRUSR | S_IWUSR | ((isdir) ? S_IXUSR : 0))
-#define PSEUDO_DB_MODE(fs_mode, user_mode) (((fs_mode) & ~0700) | ((user_mode & 0700)))
+#define PSEUDO_FS_MODE(mode, isdir) (((mode) | S_IRUSR | S_IWUSR | ((isdir) ? S_IXUSR : 0)) & ~(S_IWGRP | S_IWOTH))
+#define PSEUDO_DB_MODE(fs_mode, user_mode) (((fs_mode) & ~0722) | ((user_mode & 0722)))
 

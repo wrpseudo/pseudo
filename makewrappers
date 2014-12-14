@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2011 Wind River Systems, Inc.
+# Copyright (c) 2008-2011,2013 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -204,6 +204,7 @@ class Function:
             'uid_t': '0',
             'int': '-1',
             'long': '-1',
+            'mode_t': '0',
             'ssize_t': '-1'
         }
     
@@ -219,6 +220,7 @@ class Function:
         self.paths_to_munge = []
         self.specific_dirfds = {}
         self.hand_wrapped = None
+        self.async_skip = None
         # used for the copyright date when creating stub functions
         self.date = datetime.date.today().year
     
@@ -299,6 +301,17 @@ class Function:
 """
         else:
             return ""
+
+    def maybe_async_skip(self):
+        if self.async_skip:
+	    return """/* This function is not called if pseudo is configured --enable-force-async */
+#ifdef PSEUDO_FORCE_ASYNC
+	if (!pseudo_allow_fsync)
+		return %s;
+#endif
+""" % self.async_skip
+        else:
+	    return ""
 
     def comment(self):
         """declare self (in a comment)"""
@@ -408,6 +421,9 @@ class Function:
             pretty += ' (%s)' % self.comments
         return pretty
 
+    def funcdeps(self):
+        return 'pseudo_wrappers.o: ports/%s/guts/%s.c' % ( self.port, self.name )
+
 class Port:
     """
 A Port is a set of function declarations and code providing
@@ -420,6 +436,7 @@ additional ports to include.
         self.name = port
         self.subports = []
         self.preports = []
+	print port
 
         if os.path.exists(self.portfile("pseudo_wrappers.c")):
             self.wrappers = self.portfile("pseudo_wrappers.c")
@@ -484,6 +501,17 @@ additional ports to include.
     def define(self):
         return '#define PSEUDO_PORT_%s 1' % string.upper(self.name).replace('/', '_')
 
+    def portdeps(self):
+	deps = []
+	if self.wrappers:
+	    deps.append(self.wrappers)
+	if self.portdef_file:
+	    deps.append(self.portdef_file)
+        if deps:
+            return 'pseudo_wrappers.o: %s' % ' '.join(deps)
+        else:
+            return '# no extra dependencies for %s.' % self.name
+
     def portdefs(self):
         if self.portdef_file:
             return '#include "%s"' % self.portdef_file
@@ -535,10 +563,14 @@ def process_wrapfuncs(port):
     print ""
     return funcs
 
-def main():
+def main(argv):
     """Read in function definitions, write out files based on templates."""
     funcs = []
     sources = []
+
+    for arg in argv:
+        name, value = arg.split('=')
+	os.environ["port_" + name] = value
 
     # error checking helpfully provided by the exception handler
     copyright_file = open('guts/COPYRIGHT')
@@ -548,7 +580,8 @@ def main():
     for path in glob.glob('templates/*'):
         try:
             source = TemplateFile(path)
-            source.emit('copyright')
+	    if source.name.endswith('.c') or source.name.endswith('.h'):
+                source.emit('copyright')
             source.emit('header')
             sources.append(source)
         except IOError:
@@ -581,4 +614,4 @@ def main():
         source.close()
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

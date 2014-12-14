@@ -1,4 +1,4 @@
-#!/bin/bash
+#!//usr/bin/env bash
 opt_verbose=
 
 usage()
@@ -21,6 +21,15 @@ do
         esac
 done
 
+# make sure this is not run as root / group 0 / within pseudo, since
+# the fake uid / gid test will fail.
+uid=`id -u`
+gid=`id -g`
+if [ $uid -eq 0 -o $gid -eq 0 ]; then
+    echo "ERROR: the tests must not be run as a user with uid=0 (root) or gid=0 (root) or in pseudo itself!"
+    exit 1
+fi
+
 #The tests will be run on the build dir, not the installed versions
 #This requires to following be set properly.
 export PSEUDO_PREFIX=${PWD}
@@ -33,7 +42,7 @@ do
     filename=${file#test/}
     let num_tests++
     mkdir -p var/pseudo
-    ./bin/pseudo $file ${opt_verbose}
+    ./bin/pseudo ${opt_verbose} $file
     if [ "$?" -eq "0" ]; then
         let num_passed_tests++
         if [ "${opt_verbose}" == "-v" ]; then

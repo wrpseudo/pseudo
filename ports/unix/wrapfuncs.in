@@ -14,7 +14,7 @@ FTS *fts_open(char * const *path_argv, int options, int (*compar)(const FTSENT *
 int ftw(const char *path, int (*fn)(const char *, const struct stat *, int), int nopenfd);
 int nftw(const char *path, int (*fn)(const char *, const struct stat *, int, struct FTW *), int nopenfd, int flag);
 int glob(const char *pattern, int flags, int (*errfunc)(const char *, int), glob_t *pglob);
-int lutimes(const char *path, const struct timeval *tv);
+int lutimes(const char *path, const struct timeval *tv); /* flags=AT_SYMLINK_NOFOLLOW */
 char *mkdtemp(char *template);
 char *mktemp(char *template);
 long pathconf(const char *path, int name);
@@ -37,7 +37,7 @@ int chmod(const char *path, mode_t mode);
 int chown(const char *path, uid_t owner, gid_t group);
 int fchmodat(int dirfd, const char *path, mode_t mode, int flags);
 int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flags);
-int link(const char *oldpath, const char *newpath); /* flags=AT_SYMLINK_NOFOLLOW */
+int link(const char *oldname, const char *newname); /* flags=AT_SYMLINK_NOFOLLOW */
 int linkat(int olddirfd, const char *oldname, int newdirfd, const char *newname, int flags);
 int mkdir(const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
 int mkdirat(int dirfd, const char *path, mode_t mode); /* flags=AT_SYMLINK_NOFOLLOW */
@@ -58,3 +58,13 @@ ssize_t readlink(const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLIN
 ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz); /* flags=AT_SYMLINK_NOFOLLOW */
 int system(const char *command);
 FILE *popen(const char *command, const char *mode); /* hand_wrapped=1 */
+# Based on experiments by Richard Purdie: Allow pseudo to eliminate
+# sync-type operations globally, mostly relevant for performance reasons
+# during filesystem assembly.
+int fsync(int fd); /* async_skip=0 */
+int fdatasync(int fd); /* async_skip=0 */
+void sync(void); /* async_skip= */
+int syncfs(int fd); /* async_skip=0 */
+int sync_file_range(int fd, off64_t offset, off64_t nbytes, unsigned int flags); /* async_skip=0 */
+int msync(void *addr, size_t length, int flags); /* async_skip=0 */
+mode_t umask(mode_t mask);

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Return vals: 2 - invalid arg list
 #              1 - chroot failed
@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
 }
 EOF
 
-gcc -o chroot_test chroot_test.c
+cc -o chroot_test chroot_test.c
 
 ./chroot_test `pwd`
 

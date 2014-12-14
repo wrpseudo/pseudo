@@ -4,3 +4,4 @@ shutdown
 op
 ack
 nak
+fastop

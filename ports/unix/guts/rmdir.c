@@ -28,7 +28,7 @@
 			pseudo_client_op(OP_DID_UNLINK, 0, -1, -1, path, &buf);
 		}
 	} else {
-		pseudo_debug(1, "rmdir on <%s>, not in database, no effect.\n", path);
+		pseudo_debug(PDBGF_FILE, "rmdir on <%s>, not in database, no effect.\n", path);
 	}
 
 /*	return rc;

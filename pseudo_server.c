@@ -1,7 +1,8 @@
 /*
  * pseudo_server.c, pseudo's server-side logic and message handling
+
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2010, 2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -76,7 +77,7 @@ quit_now(int signal) {
 	die_forcefully = 1;
 }
 
-static int messages = 0;
+static int messages = 0, responses = 0;
 static struct timeval message_time = { .tv_sec = 0 };
 
 static void pseudo_server_loop(void);
@@ -155,7 +156,7 @@ pseudo_server_start(int daemonize) {
 				pseudo_diag("couldn't spawn server: %s\n", strerror(errno));
 				return 0;
 			}
-			pseudo_debug(2, "started server, pid %d\n", rc);
+			pseudo_debug(PDBGF_SERVER, "started server, pid %d\n", rc);
 			close(listen_fd);
 			/* Parent writes pid, that way it's always correct */
 			return pseudo_server_write_pid(rc);
@@ -189,7 +190,7 @@ open_client(int fd) {
 	/* if possible, use first open client slot */
 	for (i = 0; i < max_clients; ++i) {
 		if (clients[i].fd == -1) {
-			pseudo_debug(2, "reusing client %d for fd %d\n", i, fd);
+			pseudo_debug(PDBGF_SERVER, "reusing client %d for fd %d\n", i, fd);
 			clients[i].fd = fd;
 			clients[i].pid = 0;
 			clients[i].tag = NULL;
@@ -232,7 +233,7 @@ open_client(int fd) {
  */
 static void
 close_client(int client) {
-	pseudo_debug(2, "lost client %d [%d], closing fd %d\n", client,
+	pseudo_debug(PDBGF_SERVER, "lost client %d [%d], closing fd %d\n", client,
 		clients[client].pid, clients[client].fd);
 	/* client went away... */
 	if (client > highest_client || client <= 0) {
@@ -260,7 +261,7 @@ serve_client(int i) {
 	pseudo_msg_t *in;
 	int rc;
 
-	pseudo_debug(2, "message from client %d [%d:%s - %s] fd %d\n",
+	pseudo_debug(PDBGF_SERVER, "message from client %d [%d:%s - %s] fd %d\n",
 		i, (int) clients[i].pid,
 		clients[i].program ? clients[i].program : "???",
 		clients[i].tag ? clients[i].tag : "NO TAG",
@@ -268,51 +269,61 @@ serve_client(int i) {
 	in = pseudo_msg_receive(clients[i].fd);
 	if (in) {
 		char *response_path = 0;
-		pseudo_debug(4, "got a message (%d): %s\n", in->type, (in->pathlen ? in->path : "<no path>"));
+		size_t response_pathlen;
+                int send_response = 1;
+		pseudo_debug(PDBGF_SERVER | PDBGF_VERBOSE, "got a message (%d): %s\n", in->type, (in->pathlen ? in->path : "<no path>"));
 		/* handle incoming ping */
 		if (in->type == PSEUDO_MSG_PING && !clients[i].pid) {
-			pseudo_debug(2, "new client: %d -> %d",
+			pseudo_debug(PDBGF_SERVER, "new client: %d -> %d",
 				i, in->client);
 			clients[i].pid = in->client;
 			if (in->pathlen) {
 				size_t proglen;
 				proglen = strlen(in->path);
 
-				pseudo_debug(2, " <%s>", in->path);
+				pseudo_debug(PDBGF_SERVER, " <%s>", in->path);
 				free(clients[i].program);
 				clients[i].program = malloc(proglen + 1);
 				if (clients[i].program) {
 					snprintf(clients[i].program, proglen + 1, "%s", in->path);
 				}
 				if (in->pathlen > proglen) {
-					pseudo_debug(2, " [%s]", in->path + proglen + 1);
+					pseudo_debug(PDBGF_SERVER, " [%s]", in->path + proglen + 1);
 					clients[i].tag = malloc(in->pathlen - proglen);
 					if (clients[i].tag)
 						snprintf(clients[i].tag, in->pathlen - proglen,
 							"%s", in->path + proglen + 1);
 				}
 			}
-			pseudo_debug(2, "\n");
+			pseudo_debug(PDBGF_SERVER, "\n");
 		}
 		/* sanity-check client ID */
 		if (in->client != clients[i].pid) {
-			pseudo_debug(1, "uh-oh, expected pid %d for client %d, got %d\n",
+			pseudo_debug(PDBGF_SERVER, "uh-oh, expected pid %d for client %d, got %d\n",
 				(int) clients[i].pid, i, in->client);
 		}
 		/* regular requests are processed in place by
 		 * pseudo_server_response.
 		 */
 		if (in->type != PSEUDO_MSG_SHUTDOWN) {
-			if (pseudo_server_response(in, clients[i].program, clients[i].tag)) {
+                        if (in->type == PSEUDO_MSG_FASTOP)
+                                send_response = 0;
+			/* most messages don't need these, but xattr may */
+			response_path = 0;
+			response_pathlen = -1;
+			if (pseudo_server_response(in, clients[i].program, clients[i].tag, &response_path, &response_pathlen)) {
 				in->type = PSEUDO_MSG_NAK;
 			} else {
 				in->type = PSEUDO_MSG_ACK;
-				pseudo_debug(4, "response: %d (%s)\n",
+				pseudo_debug(PDBGF_SERVER | PDBGF_VERBOSE, "response: %d (%s)\n",
 					in->result, pseudo_res_name(in->result));
 			}
-			/* no path in response */
-			in->pathlen = 0;
 			in->client = i;
+			if (response_path) {
+				in->pathlen = response_pathlen;
+			} else {
+				in->pathlen = 0;
+			}
 		} else {
 			/* the server's listen fd is "a client", and
 			 * so is the program connecting to request a shutdown.
@@ -343,17 +354,21 @@ serve_client(int i) {
 				die_peacefully = 1;
 			}
 		}
-		if ((rc = pseudo_msg_send(clients[i].fd, in, -1, response_path)) != 0)
-			pseudo_debug(1, "failed to send response to client %d [%d]: %d (%s)\n",
-				i, (int) clients[i].pid, rc, strerror(errno));
-		rc = in->op;
+                if (send_response) {
+                        if ((rc = pseudo_msg_send(clients[i].fd, in, in->pathlen, response_path)) != 0) {
+                                pseudo_debug(PDBGF_SERVER, "failed to send response to client %d [%d]: %d (%s)\n",
+                                        i, (int) clients[i].pid, rc, strerror(errno));
+                        }
+                } else {
+                        rc = 1;
+                }
 		free(response_path);
 		return rc;
 	} else {
 		/* this should not be happening, but the exceptions aren't
 		 * being detected in select() for some reason.
 		 */
-		pseudo_debug(2, "client %d: no message\n", (int) clients[i].pid);
+		pseudo_debug(PDBGF_SERVER, "client %d: no message\n", (int) clients[i].pid);
 		close_client(i);
 		return 0;
 	}
@@ -391,7 +406,7 @@ pseudo_server_loop(void) {
 	max_clients = 16;
 	highest_client = 0;
 
-	pseudo_debug(2, "server loop started.\n");
+	pseudo_debug(PDBGF_SERVER, "server loop started.\n");
 	if (listen_fd < 0) {
 		pseudo_diag("got into loop with no valid listen fd.\n");
 		exit(1);
@@ -416,15 +431,18 @@ pseudo_server_loop(void) {
 			 */
 			if (active_clients == 1) {
 				loop_timeout -= LOOP_DELAY;
+                                /* maybe flush database to disk */
+                                pdb_maybe_backup();
 				if (loop_timeout <= 0) {
-					pseudo_debug(1, "no more clients, got bored.\n");
+					pseudo_debug(PDBGF_SERVER, "no more clients, got bored.\n");
 					die_peacefully = 1;
 				} else {
 					/* display this if not exiting */
-					pseudo_debug(1, "%d messages handled in %.4f seconds\n",
+					pseudo_debug(PDBGF_SERVER | PDBGF_BENCHMARK, "%d messages handled in %.4f seconds, %d responses\n",
 						messages,
 						(double) message_time.tv_sec +
-						(double) message_time.tv_usec / 1000000.0);
+						(double) message_time.tv_usec / 1000000.0,
+                                                responses);
 				}
 			}
 		} else if (rc > 0) {
@@ -437,11 +455,13 @@ pseudo_server_loop(void) {
 					close_client(i);
 				} else if (FD_ISSET(clients[i].fd, &reads)) {
 					struct timeval tv1, tv2;
-					int op;
+                                        int rc;
 					gettimeofday(&tv1, NULL);
-					op = serve_client(i);
+					rc = serve_client(i);
 					gettimeofday(&tv2, NULL);
 					++messages;
+                                        if (rc == 0)
+                                                ++responses;
 					message_time.tv_sec += (tv2.tv_sec - tv1.tv_sec);
 					message_time.tv_usec += (tv2.tv_usec - tv1.tv_usec);
 					if (message_time.tv_usec < 0) {
@@ -460,15 +480,15 @@ pseudo_server_loop(void) {
 			     FD_ISSET(clients[0].fd, &reads))) {
 				len = sizeof(client);
 				if ((fd = accept(listen_fd, (struct sockaddr *) &client, &len)) != -1) {
-					pseudo_debug(2, "new client fd %d\n", fd);
+					pseudo_debug(PDBGF_SERVER, "new client fd %d\n", fd);
 					open_client(fd);
 				}
 			}
-			pseudo_debug(2, "server loop complete [%d clients left]\n", active_clients);
+			pseudo_debug(PDBGF_SERVER, "server loop complete [%d clients left]\n", active_clients);
 		}
 		if (die_peacefully || die_forcefully) {
-			pseudo_debug(2, "quitting.\n");
-			pseudo_debug(1, "server %d exiting: handled %d messages in %.4f seconds\n",
+			pseudo_debug(PDBGF_SERVER, "quitting.\n");
+			pseudo_debug(PDBGF_SERVER | PDBGF_BENCHMARK, "server %d exiting: handled %d messages in %.4f seconds\n",
 				getpid(), messages,
 				(double) message_time.tv_sec +
 				(double) message_time.tv_usec / 1000000.0);
@@ -500,7 +520,7 @@ pseudo_server_loop(void) {
 			}
 		}
 		if (current_clients != active_clients) {
-			pseudo_debug(1, "miscount of current clients (%d) against active_clients (%d)?\n",
+			pseudo_debug(PDBGF_SERVER, "miscount of current clients (%d) against active_clients (%d)?\n",
 				current_clients, active_clients);
 		}
 		/* reinitialize timeout because Linux select alters it */

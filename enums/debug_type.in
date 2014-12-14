@@ -1,0 +1,28 @@
+debug_type: PDBG; INDEXED unsigned char symbolic = '\0', const char * description = NULL, FLAGS
+# Note: For convenience/consistency with the old numerc debug levels
+# stuff, these are sorted in a very rough approximation of "likelihood
+# that the user will care." So, PSEUDO_DEBUG=1 will pick up the
+# consistency checks. In general, most numeric debug levels will be
+# significantly less chatty than they used to be; there was one
+# level 5 message, I think, and nothing else above a 4. Which was a
+# problem.
+# Note: Descriptions should be under 32 characters to match the formatting
+# in pseudo's help message.
+consistency, 'n', "consistency checks"
+file, 'f', "file creation/deletion"
+op, 'o', "operations"
+pid, 'P', "show process IDs"
+client, 'c', "client side startup/shutdown"
+server, 'v', "server side startup/shutdown"
+db, 'd', "database interactions"
+syscall, 'y', "system calls"
+env, 'e', "environment manipulation"
+chroot, 'r', "chroot functionality"
+path, 'p', "path computations"
+sql, 's', "SQL query information"
+wrapper, 'w', "wrapper functionality"
+ipc, 'i', "client/server interactions"
+invoke, 'k', "invocation and launching"
+benchmark, 'b', "performance statistics"
+verbose, 'V', "extra detail"
+xattr, 'x', "extended attributes"

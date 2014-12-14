@@ -2,7 +2,7 @@
 #
 # configure, simulation of autoconf script, much simplified
 #
-# Copyright (c) 2008-2012 Wind River Systems, Inc.
+# Copyright (c) 2008-2013 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -25,6 +25,10 @@ opt_arch=x86
 opt_bits=
 opt_sqlite=/usr
 opt_rpath=
+opt_memory=
+opt_async=
+opt_xattr=
+opt_passwd_fallback='""'
 
 compile_x86_32=-m32
 compile_x86_64=-m64
@@ -35,10 +39,15 @@ usage()
     echo >&2 "  configure --prefix=..."
     echo >&2 "           [--libdir=...]"
     echo >&2 "           [--suffix=...]"
+    echo >&2 "           [--enable-memory-db]"
+    echo >&2 "           [--enable-xattr]"
+    echo >&2 "           [--enable-force-async]"
     echo >&2 "           [--with-sqlite=...]"
+    echo >&2 "           [--with-sqlite-lib=...]"
     echo >&2 "           [--enable-static-sqlite]"
     echo >&2 "           [--with-static-sqlite=...]"
     echo >&2 "           [--with-rpath=...|--without-rpath]"
+    echo >&2 "           [--with-passwd-fallback=...|--without-passwd-fallback]"
     echo >&2 "           [--cflags='']"
     echo >&2 "           [--bits=32|64]"
     exit 1
@@ -52,6 +61,11 @@ use_maybe_rpath=true
 for arg
 do
     case $arg in
+    --disable-*)
+        arg="--enable-${arg%--disable-}=no"
+	;;
+    esac
+    case $arg in
     --)    shift; break ;;
     --prefix=*)
         opt_prefix=${arg#--prefix=}
@@ -64,14 +78,45 @@ do
         sqlite_ldarg=$opt_sqlite_ldarg
         use_maybe_rpath=false
         ;;
+    --without-passwd-fallback)
+	opt_passwd_fallback='NULL'
+        ;;
+    --with-passwd-fallback=*)
+	opt_passwd_fallback="${arg#--with-passwd-fallback=}"
+	# Trim a trailing /, remove quotes. So / => "".
+        opt_passwd_fallback="\"${opt_passwd_fallback%/}\""
+        ;;
     --enable-static-sqlite)
-        sqlite_ldarg='$(SQLITE)/$(LIB)/libsqlite3.a'
+        sqlite_ldarg='$(SQLITE)/$(SQLITE_LIB)/libsqlite3.a'
         use_maybe_rpath=false
         ;;
+    --enable-force-async=no | --disable-force-async)
+        opt_async=false
+        ;;
+    --enable-force-async=yes | --enable-force-async)
+        opt_async=true
+	;;
+    --enable-xattr=no)
+        opt_xattr=false
+        ;;
+    --enable-xattr=yes | --enable-xattr)
+        opt_xattr=true
+	;;
+    --enable-memory-db=no)
+        opt_memory=false
+        ;;
+    --enable-memory-db=yes | --enable-memory-db)
+        opt_memory=true
+	;;
     --with-sqlite=*)
         opt_sqlite=${arg#--with-sqlite=}
         # assign new value if unset
-        maybe_rpath='-Wl,-R$(SQLITE)/$(LIB)'
+        maybe_rpath='-Wl,-R$(SQLITE)/$(SQLITE_LIB)'
+        ;;
+    --with-sqlite-lib=*)
+        opt_sqlite_lib=${arg#--with-sqlite-lib=}
+        # assign new value if unset
+        maybe_rpath='-Wl,-R$(SQLITE)/$(SQLITE_LIB)'
         ;;
     --without-rpath)
         opt_rpath=''
@@ -94,12 +139,6 @@ do
         ;;
     --bits=*)
         opt_bits=${arg#--bits=}
-        case $opt_bits in
-        64)    opt_mark64=64;;
-        32)    opt_mark64=;;
-        *)     echo >&2 "Unknown bit size $opt_bits (only 32 and 64 known)."
-               ;;
-        esac
         ;;
     *)
         echo >&2 "warning: Unrecognized option '$arg'"
@@ -112,6 +151,27 @@ case $opt_arch in
     ;;
 *)    echo >&2 "Untested arch $opt_arch."
     ;;
+esac
+
+if [ -z "$opt_bits" ]; then
+    printf >&2 "Bit width unspecified;"
+    case $(file -L /bin/sh 2>/dev/null) in
+    *64-bit*)	opt_bits=64;;
+    *32-bit*)	opt_bits=32;;
+    esac
+    if [ -n "$opt_bits" ]; then
+        echo >&2 " guessing bit width is $opt_bits, based on /bin/sh."
+    else
+        echo >&2 " can't tell, assuming 32."
+	opt_bits=32
+    fi
+fi
+
+case $opt_bits in
+64)    opt_mark64=64;;
+32)    opt_mark64=;;
+*)     echo >&2 "Unknown bit size $opt_bits (only 32 and 64 known)."
+       ;;
 esac
 
 if [ "${opt_cflags-UNSET}" = "UNSET" ]; then
@@ -144,6 +204,10 @@ if [ "$opt_lib" = "$opt_libdir" ]; then
     exit 1
 fi
 
+if [ -z "$opt_sqlite_lib" ]; then
+    opt_sqlite_lib=$opt_lib
+fi
+
 if [ ! -f "${opt_sqlite}/include/sqlite3.h" ]; then
     echo >&2 "SQLite3 headers not found in at ${opt_sqlite}/include/sqlite3.h. Please check that SQLite3 and SQLite3 headers are installed."
     exit 1
@@ -160,16 +224,73 @@ if [ "${SQLITE3_VERSION}" -lt "03006000" ]; then
     exit 1
 fi
 
+if [ -z "$opt_async" ]; then
+    opt_async=false
+fi
+
+if $opt_async; then
+    FORCE_ASYNC="-DPSEUDO_FORCE_ASYNC"
+else
+    FORCE_ASYNC=""
+fi
+
+if [ -z "$opt_xattr" ]; then
+    if getfattr --help >/dev/null 2>&1; then
+        opt_xattr=true
+	echo "getfattr runs, enabling extended attribute support"
+    else
+        opt_xattr=false
+	echo "getfattr fails, disabling extended attribute support"
+    fi
+fi
+
+if [ -z "$opt_memory" ]; then
+    if [ "${SQLITE3_VERSION}" -lt "03007000" ]; then
+        echo "Disabling in-memory database by default (sqlite too old)."
+	opt_memory=false
+    else
+        echo "Enabling in-memory database by default."
+	opt_memory=true
+    fi
+fi
+
+if $opt_memory; then
+    if [ "${SQLITE3_VERSION}" -lt "03007000" ]; then
+	cat >&2 <<EOF
+WARNING: sqlite prior to 3.7 has been known to perform exceedingly poorly
+with the in-memory database option. You asked for it, you get it, but if
+you get horrible performance, try turning it off.
+EOF
+    fi
+    SQLITE_MEMORY="-DUSE_MEMORY_DB"
+else
+    SQLITE_MEMORY=""
+fi
+
+# Suppress the -L if sqlite is in the default path.
+if [ "$opt_sqlite" = "/usr" ]; then
+    default_sqlite="# "
+fi
+
+touch port_deps.mk
+touch func_deps.mk
+
 sed -e '
-  s,@PREFIX@,'"$opt_prefix"',g
-  s,@LIBDIR@,'"$opt_libdir"',g
-  s,@LIB@,'"$opt_lib"',g
-  s,@SUFFIX@,'"$opt_suffix"',g
-  s,@SQLITE@,'"$opt_sqlite"',g
-  s,@ARCH_FLAGS@,'"$arch_flags"',g
-  s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g
-  s!@RPATH@!'"$opt_rpath"'!g
-  s,@MARK64@,'"$opt_mark64"',g
-  s,@ARCH@,'"$opt_arch"',g
-  s,@BITS@,'"$opt_bits"',g
+  s,@PREFIX@,'"$opt_prefix"',g;
+  s,@XATTR@,'"$opt_xattr"',g;
+  s,@LIBDIR@,'"$opt_libdir"',g;
+  s,@LIB@,'"$opt_lib"',g;
+  s,@SUFFIX@,'"$opt_suffix"',g;
+  s,@SQLITE@,'"$opt_sqlite"',g;
+  s,@ARCH_FLAGS@,'"$arch_flags"',g;
+  s,@DEFAULT_SQLITE@,'"$default_sqlite"',g;
+  s,@SQLITE_LDARG@,'"$sqlite_ldarg"',g;
+  s,@SQLITE_LIB@,'"$opt_sqlite_lib"',g;
+  s,@SQLITE_MEMORY@,'"$SQLITE_MEMORY"',g;
+  s,@FORCE_ASYNC@,'"$FORCE_ASYNC"',g;
+  s,@PASSWD_FALLBACK@,'$opt_passwd_fallback',g;
+  s!@RPATH@!'"$opt_rpath"'!g;
+  s,@MARK64@,'"$opt_mark64"',g;
+  s,@ARCH@,'"$opt_arch"',g;
+  s,@BITS@,'"$opt_bits"',g;
 ' < Makefile.in > Makefile

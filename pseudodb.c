@@ -38,7 +38,7 @@ main(int argc, char **argv) {
 		exit(1);
 	}
 	msg = pseudo_msg_new(0, argv[1]);
-	rc = pdb_find_file_path(msg);
+	rc = pdb_find_file_path(msg, NULL);
 	if (rc) {
 		printf("error.\n");
 		return 1;

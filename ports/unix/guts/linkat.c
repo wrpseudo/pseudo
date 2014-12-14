@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Wind River Systems; see
+ * Copyright (c) 2012, 2013 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * int linkat(int olddirfd, const char *oldname, int newdirfd, const char *newname, int flags)
@@ -31,24 +31,17 @@
 		errno = ENOSYS;
 		return -1;
 	}
+#endif
         oldpath = pseudo_root_path(__func__, __LINE__, olddirfd, oldname, rflags);
         newpath = pseudo_root_path(__func__, __LINE__, newdirfd, newname, AT_SYMLINK_NOFOLLOW);
         rc = real_link(oldpath, newpath);
+        save_errno = errno;
         if (rc == -1) {
-                save_errno = errno;
                 free(oldpath);
                 free(newpath);
                 errno = save_errno;
                 return rc;
         }
-#else
-        rc = real_linkat(olddirfd, oldname, newdirfd, newname, flags);
-        if (rc == -1) {
-                return rc;
-        }
-        oldpath = pseudo_root_path(__func__, __LINE__, olddirfd, oldname, rflags);
-        newpath = pseudo_root_path(__func__, __LINE__, newdirfd, newname, AT_SYMLINK_NOFOLLOW);
-#endif
 
         /* if we got this far, the link succeeded, and oldpath and newpath
          * are the newly-allocated canonical paths. If OS, filesystem, or
@@ -74,7 +67,6 @@
          */
         pseudo_client_op(OP_LINK, 0, -1, -1, newpath, &buf);
 
-        save_errno = errno;
         free(oldpath);
         free(newpath);
         errno = save_errno;

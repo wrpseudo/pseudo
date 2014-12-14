@@ -11,8 +11,9 @@
 	int oldrc, newrc;
 	int save_errno;
 	int old_db_entry = 0;
+	int may_unlinked = 0;
 
-	pseudo_debug(2, "rename: %s->%s\n",
+	pseudo_debug(PDBGF_OP, "rename: %s->%s\n",
 		oldpath ? oldpath : "<nil>",
 		newpath ? newpath : "<nil>");
 
@@ -32,10 +33,13 @@
 	/* as with unlink, we have to mark that the file may get deleted */
 	msg = pseudo_client_op(OP_MAY_UNLINK, 0, -1, -1, newpath, newrc ? NULL : &newbuf);
 	if (msg && msg->result == RESULT_SUCCEED)
+		may_unlinked = 1;
+	msg = pseudo_client_op(OP_STAT, 0, -1, -1, oldpath, oldrc ? NULL : &oldbuf);
+	if (msg && msg->result == RESULT_SUCCEED)
 		old_db_entry = 1;
 	rc = real_rename(oldpath, newpath);
 	save_errno = errno;
-	if (old_db_entry) {
+	if (may_unlinked) {
 		if (rc == -1) {
 			/* since we failed, that wasn't really unlinked -- put
 			 * it back.
@@ -84,7 +88,7 @@
 				oldbuf.st_ino = newbuf.st_ino;
 			}
 		}
-		pseudo_debug(1, "creating new '%s' [%llu] to rename\n",
+		pseudo_debug(PDBGF_FILE, "creating new '%s' [%llu] to rename\n",
 			oldpath, (unsigned long long) oldbuf.st_ino);
 		pseudo_client_op(OP_LINK, 0, -1, -1, oldpath, &oldbuf);
 	}

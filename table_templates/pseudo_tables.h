@@ -16,6 +16,7 @@ typedef enum {
 	${enums},
 	${prefix}_MAX
 } pseudo_${name}_t;
+${flag_enums}
 extern const char *pseudo_${name}_name(pseudo_${name}_t);
 extern pseudo_${name}_t pseudo_${name}_id(const char *);
 ${column_protos}

@@ -11,7 +11,7 @@
 	while ((rc = wrap_getgrent_r(gbuf, buf, buflen, gbufp)) == 0) {
 		/* 0 means no error occurred, and *gbufp == gbuf */
 		if (gbuf->gr_gid == gid) {
-			pseudo_debug(1, "found group gid %d, name %s\n",
+			pseudo_debug(PDBGF_CLIENT, "found group gid %d, name %s\n",
 				gbuf->gr_gid, gbuf->gr_name);
 			endgrent();
 			return rc;

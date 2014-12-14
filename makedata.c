@@ -9,10 +9,10 @@ main(void) {
 	char name[] = "dir_%d/dir_%d/%d%d.txt";
 	for (i = 0; i < 10; ++i) {
 		snprintf(name, sizeof(name), "dir_%d", i);
-		mkdir(name);
+		mkdir(name, 0755);
 		for (j = 0; j < 40; ++j) {
 			snprintf(name, sizeof(name), "dir_%d/dir_%d", i, j);
-			mkdir(name);
+			mkdir(name, 0755);
 			for (k = 0; k < 10; ++k) {
 				for (l = 0; l < 10; ++l) {
 					FILE *fp;

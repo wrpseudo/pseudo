@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012 Wind River Systems; see
+ * Copyright (c) 2011-2013 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
  * int open(const char *path, int flags, ... { int mode })
@@ -10,13 +10,19 @@
 	int existed = 1;
 	int save_errno;
 
+	/* mask out mode bits appropriately */
+	mode = mode & ~pseudo_umask;
+#ifdef PSEUDO_FORCE_ASYNCH
+        flags &= ~O_SYNC;
+#endif
+
 	/* if a creation has been requested, check whether file exists */
 	if (flags & O_CREAT) {
 		save_errno = errno;
 		rc = real_stat(path, &buf);
 		existed = (rc != -1);
 		if (!existed)
-			pseudo_debug(2, "open_creat: %s -> 0%o\n", path, mode);
+			pseudo_debug(PDBGF_FILE, "open_creat: %s -> 0%o\n", path, mode);
 		errno = save_errno;
 	}
 
@@ -39,7 +45,7 @@
 			}
 			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, -1, path, &buf);
 		} else {
-			pseudo_debug(1, "open (fd %d, path %s, flags %d) succeeded, but stat failed (%s).\n",
+			pseudo_debug(PDBGF_CONSISTENCY, "open (fd %d, path %s, flags %d) succeeded, but stat failed (%s).\n",
 				rc, path, flags, strerror(errno));
 			pseudo_client_op(OP_OPEN, PSEUDO_ACCESS(flags), rc, -1, path, 0);
 		}

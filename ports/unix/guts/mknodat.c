@@ -8,6 +8,10 @@
 
  	pseudo_msg_t *msg;
 	PSEUDO_STATBUF buf;
+        int save_errno = errno;
+
+	/* mask out mode bits appropriately */
+	mode = mode & ~pseudo_umask;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
@@ -50,10 +54,11 @@
 		rc = -1;
 	} else {
 		/* just pretend we worked */
+                errno = save_errno;
 		rc = 0;
 	}
 	if (rc == -1) {
-		int save_errno = errno;
+                save_errno = errno;
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 		real_unlink(path);
 #else

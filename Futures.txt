@@ -33,3 +33,22 @@ vague implementation thoughts:
 
 * Test cases
   - boy, do we need test cases!
+
+* Clean up *at() functions
+  - The *at() function implementations are gratuitously complicated,
+    I believe because they predate the auto-canonicalization that came
+    with the rewritten pseudo wrappers.
+
+* Memory allocation/deallocation issues.
+  - there's a number of places where results from pseudo_get_value() are
+    strdup'd, then the originals freed, which makes no sense.
+  - there's at least one unchecked realloc() to do with the fd table.
+
+* Benchmarking/performance work.
+  - It'd be nice to get some kind of measurement of how much time is
+    going to which parts of pseudo (database access, filesystem access,
+    IPC overhead, logic, client processing, and so on).
+  - Maybe some work on finding ways to make profiling work, since I was
+    having issues getting good profiling data.
+  - Some moderately-canonical benchmarks would be nice to have for evaluating
+    the costs of various common use cases.

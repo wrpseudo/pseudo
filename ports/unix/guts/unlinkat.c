@@ -9,7 +9,7 @@
 	pseudo_msg_t *msg;
 	int save_errno;
 	PSEUDO_STATBUF buf;
-	int old_db_entry;
+	int old_db_entry = 0;
 
 #ifdef PSEUDO_NO_REAL_AT_FUNCTIONS
 	if (dirfd != AT_FDCWD) {
@@ -53,7 +53,7 @@
 			pseudo_client_op(OP_DID_UNLINK, 0, -1, -1, path, &buf);
 		}
 	} else {
-		pseudo_debug(1, "unlink on <%s>, not in database, no effect.\n", path);
+		pseudo_debug(PDBGF_FILE, "unlink on <%s>, not in database, no effect.\n", path);
 	}
 
 /*	return rc;

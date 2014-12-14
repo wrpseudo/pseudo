@@ -1,3 +1,138 @@
+2014-10-03:
+	* (seebs) in fact, suppress a lot of sanity checks entirely for
+	  did_unlink.
+	* (seebs) merge get_file_path functionality into find_file_dev,
+	  since you never call find_file_dev unless you want to do that.
+	* (seebs) If a file is in the database by inode but not path,
+	  don't try to create a new link for it.
+	* (seebs) when renaming, the link of the "old" file name should be
+	  contingent on whether *it* was in the database, not whether
+	  the *new* name was in the database. Whoops.
+	* (seebs) 1.6.2
+
+2014-10-02:
+	* (seebs) use sqlite3_bind_int64 for inodes.
+	* (seebs) suppress path mismatch warnings for did_unlink.
+
+2014-07-18:
+	* (seebs) Make "server already offline" message into a debugging
+	  message (PDBGF_INVOKE).
+	* (seebs) 1.6.1
+
+2014-07-17:
+	* (seebs) Restrict symbol version restrictions to x86-64 and i386
+	  rather than x86-64 and any old thing. Fixes build problems on ARM.
+
+2014-07-11:
+	* (seebs) merge in symbol version restrictions (slightly tweaked)
+	  for Linux.
+
+2014-07-10:
+	* (seebs) Don't pass -L/usr/lib* for sqlite, because that's probably
+	  the default.
+	* (seebs) include sys/xattr.h explicitly for Darwin, also fix things
+	  up so we aren't relying on seeing a declaration for our dummy
+	  wrapper for fgetgrent_r which doesn't exist here.
+	* (seebs) fix typo in xattr message
+	* (seebs) make xattr work on Darwin, too.
+
+2014-06-13:
+	* (seebs) don't follow symlinks for lutimes.
+	* (seebs) Use sizeof instead of strlen to initialize static value.
+
+2014-05-27:
+	* (seebs) start noticing umask, mask it out from open or mkdir
+	  calls rather than relying on underlying open/mkdir to do it.
+	* (seebs) add a test for umask and filesystem-vs-db modes.
+
+2014-05-16:
+	* (seebs) fchmodat: don't drop flags, report failures, to improve
+	  compatibility/consistency. Cache the knowledge that
+	  AT_SYMLINK_NOFOLLOW gets ENOTSUP.
+	* (seebs) mask out group/other write bits in real filesystem to
+	  reduce risks when assembling a rootfs including world-writeable
+	  directories.
+	* (seebs) send a round-trip message to the server before exiting
+	  if any messages have been sent, so the program won't exit before
+	  the server processed those messages.
+	* (pabigot) Don't memory-leak on checks for PSEUDO_UNLOAD, also
+	  check the correct environment when spawning new things. (Contributed
+	  by Peter A. Bigot).
+	* (seebs) mask 022 back in too, when restoring a database mode.
+
+2014-05-15:
+	* (seebs) drop flags when calling fchmodat() to appease GNU tar.
+
+2014-04-24:
+	* (seebs) extended attribute support
+
+2014-01-23:
+	* (seebs) mknod wasn't calling mknodat.
+	* (seebs) mkdirat wasn't recording the logical DB mode for directories
+
+2014-01-22:
+	* (seebs) notes on some Futures planning.
+	* (seebs) Typo/formatting issue in man page.
+	* (seebs) message formatting/clarity cleanup and typo fixes.
+	* (seebs) First draft of passwd_fallback implementation.
+	* (seebs) bump this all to 1.6.0.
+
+2014-01-15:
+	* (seebs) performance test/test case updates.
+
+2013-06-20:
+	* (seebs) refactor debugging code
+	* (seebs) start using 1.5.2 numbering
+
+2013-06-18:
+	* (seebs) Fix bug in oldclone (reported by rich@noir.com).
+
+2013-02-27:
+	* (seebs) Oh, hey, what if I took out my debug messages?
+	* (seebs) update docs a bit to reduce bitrot
+
+2013-02-26:
+	* (seebs) When built -DNDEBUG, completely drop pseudo_debug calls.
+	* (seebs) Add PSEUDO_ALLOW_FSYNC to allow temporary re-enabling of
+	  fsync to work around filesystem bugs.
+	* (seebs) call that 1.5.1.
+
+2013-02-17:
+	* (seebs) Fix uninitialized variable in unlink, fix force-fsync for
+	  Darwin (off64_t is not a distinct type there).
+
+2013-02-16:
+	* (seebs) Add wrapper setting which automatically returns a fixed
+	  value from some wrappers. Add fixed-value wrappers for all the
+	  *sync() functions. These are all contingent on --enable-force-async.
+
+2013-02-15:
+	* (seebs) Add support for in-memory DB. This, plus upcoming
+	  fsync-related changes, are expected to be big enough to justify
+	  calling this 1.5.
+
+2013-02-13:
+        * (seebs) calling link while chrooted could in some cases result
+          in the root path not being prepended at all. One more try!
+        * (seebs) 1.4.5.
+
+2013-02-12:
+        * (seebs) calling link while chrooted could in some cases result
+          in the root path being double-appended.
+        * (seebs) and tag 1.4.4 so that can get out as a clean update.
+
+2013-01-31:
+        * (seebs) tag 1.4.3 (to avoid any problems with the changes since
+          1.4.2 and old tarballs)
+
+2013-01-30:
+        * (seebs) Subtle tweaks to avoid GLIBC_2.7 dependencies which
+          can cause trouble trying to copy libpseudo.so to older hosts.
+        * (seebs) add "with-sqlite-lib" to simplify cases where sqlite's
+          libdir computation differs from what we otherwise want; for
+          instance, with bitbake, we often end up wanting $lib = lib64,
+          but $sqlite_lib = lib.
+
 2012-12-13:
         * (seebs) tag 1.4.2.
 
