@@ -32,7 +32,9 @@
 #include <sys/fcntl.h>
 #include <sys/file.h>
 #include <sys/wait.h>
+#ifdef WITH_XATTR
 #include <sys/xattr.h>
+#endif
 
 #include "pseudo.h"
 #include "pseudo_ipc.h"
@@ -496,7 +498,9 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 	size_t oldpathlen = 0;
 	int found_path = 0, found_ino = 0;
 	int prefer_ino = 0;
+#ifdef WITH_XATTR
 	int xattr_flags = 0;
+#endif
 
 	if (!msg)
 		return 1;
@@ -996,6 +1000,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 			*response_len = oldpathlen;
 		}
 		break;
+#ifdef WITH_XATTR
 	case OP_CREATE_XATTR:
 	case OP_REPLACE_XATTR: /* fallthrough */
 		if (msg->op == OP_CREATE_XATTR) {
@@ -1016,6 +1021,7 @@ pseudo_op(pseudo_msg_t *msg, const char *program, const char *tag, char **respon
 	case OP_REMOVE_XATTR:
 		pdb_remove_xattr(row, oldpath, oldpathlen);
 		break;
+#endif
 	default:
 		pseudo_diag("unknown op from client %d, op %d [%s]\n",
 			msg->client, msg->op,

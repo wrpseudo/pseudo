@@ -21,7 +21,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef WITH_XATTR
 #include <sys/xattr.h>
+#endif
 #include <time.h>
 #include <unistd.h>
 
@@ -2293,6 +2295,7 @@ pdb_list_xattr(long long file_id, char **value, size_t *len) {
 	return rc != SQLITE_DONE;
 }
 
+#ifdef WITH_XATTR
 int
 pdb_remove_xattr(long long file_id, char *value, size_t len) {
 	static sqlite3_stmt *delete;
@@ -2441,6 +2444,7 @@ pdb_set_xattr(long long file_id, char *value, size_t len, int flags) {
 	}
 	return rc;
 }
+#endif
 
 /* find file using only inode as key.  Unused for now, planned to come
  * in for NFS usage.
