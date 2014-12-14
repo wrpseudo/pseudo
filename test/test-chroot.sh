@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
 }
 EOF
 
-gcc -o chroot_test chroot_test.c
+cc -o chroot_test chroot_test.c
 
 ./chroot_test `pwd`
 

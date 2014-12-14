@@ -6,7 +6,7 @@ int main() {
 }
 EOF
 
-gcc -o execl_test execl_test.c
+cc -o execl_test execl_test.c
 
 ./execl_test | grep -q "C=C"
 

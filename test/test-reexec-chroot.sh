@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 }
 EOF
 
-gcc -o chroot_test chroot_test.c
+cc -o chroot_test chroot_test.c
 
 # The following should just run chroot_test since pseudo is already loaded
 ./bin/pseudo ./chroot_test `pwd`
