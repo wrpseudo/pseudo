@@ -48,6 +48,9 @@
 #include "pseudo_ipc.h"
 #include "pseudo_client.h"
 
+/* Types and declarations we need in advance. */
+#include "pseudo_wrapper_table.c"
+
 static void pseudo_enosys(const char *);
 static int pseudo_check_wrappers(void);
 static volatile int antimagic = 0;
@@ -61,10 +64,6 @@ static void pseudo_sigblock(sigset_t *);
 
 extern char *program_invocation_short_name;
 static sigset_t pseudo_saved_sigmask;
-
-/* the generated code goes here */
-#include "pseudo_wrapper_table.c"
-#include "pseudo_wrapfuncs.c"
 
 /* Constructor only exists in libpseudo */
 static void _libpseudo_init(void) __attribute__ ((constructor));
@@ -252,4 +251,7 @@ pseudo_check_wrappers(void) {
 	return _libpseudo_initted;
 }		
 
+/* the generated code goes here */
 #include "port_wrappers.c"
+#include "pseudo_wrapfuncs.c"
+

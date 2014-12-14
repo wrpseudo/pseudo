@@ -1,7 +1,7 @@
 /*
  * pseudo_client.c, pseudo client library code
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -17,6 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
  *
  */
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -66,13 +68,19 @@ size_t pseudo_chroot_len = 0;
 char *pseudo_cwd_rel = NULL;
 /* used for PSEUDO_DISABLED */
 int pseudo_disabled = 0;
+int pseudo_allow_fsync = 0;
 static int pseudo_local_only = 0;
+
+int pseudo_umask = 022;
 
 static char **fd_paths = NULL;
 static int nfds = 0;
 static int messages = 0;
 static struct timeval message_time = { .tv_sec = 0 };
 static int pseudo_inited = 0;
+
+static int sent_messages = 0;
+
 int pseudo_nosymlinkexp = 0;
 
 /* note: these are int, not uid_t/gid_t, so I can use 'em with scanf */
@@ -84,6 +92,8 @@ gid_t pseudo_rgid;
 gid_t pseudo_egid;
 gid_t pseudo_sgid;
 gid_t pseudo_fgid;
+
+#define PSEUDO_ETC_FILE(filename, realname, flags) pseudo_etc_file(filename, realname, flags, (char *[]) { pseudo_chroot, pseudo_passwd, PSEUDO_PASSWD_FALLBACK }, PSEUDO_PASSWD_FALLBACK ? 3 : 2)
 
 /* helper function to make a directory, just like mkdir -p.
  * Can't use system() because the child shell would end up trying
@@ -161,6 +171,23 @@ pseudo_init_client(void) {
 		pseudo_set_value("PSEUDO_DISABLED", "0");
 	}
 
+	/* ALLOW_FSYNC is here because some crazy hosts will otherwise
+	 * report incorrect values for st_size/st_blocks. I can sort of
+	 * understand st_blocks, but bogus values for st_size? Not cool,
+	 * dudes, not cool.
+	 */
+	env = getenv("PSEUDO_ALLOW_FSYNC");
+	if (!env) {
+		env = pseudo_get_value("PSEUDO_ALLOW_FSYNC");
+	} else {
+		pseudo_set_value("PSEUDO_ALLOW_FSYNC", env);
+	}
+	if (env) {
+		pseudo_allow_fsync = 1;
+	} else {
+		pseudo_allow_fsync = 0;
+	}
+
 	/* in child processes, PSEUDO_UNLOAD may become set to
 	 * some truthy value, in which case we're being asked to
 	 * remove pseudo from the LD_PRELOAD. We need to make sure
@@ -199,13 +226,16 @@ pseudo_init_client(void) {
 	if (!pseudo_disabled && !pseudo_inited) {
 		char *pseudo_path = 0;
 
+		pseudo_umask = umask(022);
+		umask(pseudo_umask);
+
 		pseudo_path = pseudo_prefix_path(NULL);
 		if (pseudo_prefix_dir_fd == -1) {
 			if (pseudo_path) {
 				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
 				/* directory is missing? */
 				if (pseudo_prefix_dir_fd == -1 && errno == ENOENT) {
-					pseudo_debug(1, "prefix directory doesn't exist, trying to create\n");
+					pseudo_debug(PDBGF_CLIENT, "prefix directory '%s' doesn't exist, trying to create\n", pseudo_path);
 					mkdir_p(pseudo_path);
 					pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
 				}
@@ -215,7 +245,7 @@ pseudo_init_client(void) {
 				exit(1);
 			}
 			if (pseudo_prefix_dir_fd == -1) {
-				pseudo_diag("Can't open prefix path (%s) for server: %s\n",
+				pseudo_diag("Can't open prefix path '%s' for server: %s\n",
 					pseudo_path,
 					strerror(errno));
 				exit(1);
@@ -228,17 +258,17 @@ pseudo_init_client(void) {
 				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
 				/* directory is missing? */
 				if (pseudo_localstate_dir_fd == -1 && errno == ENOENT) {
-					pseudo_debug(1, "local state directory doesn't exist, trying to create\n");
+					pseudo_debug(PDBGF_CLIENT, "local state directory '%s' doesn't exist, trying to create\n", pseudo_path);
 					mkdir_p(pseudo_path);
 					pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
 				}
 				pseudo_localstate_dir_fd = pseudo_fd(pseudo_localstate_dir_fd, MOVE_FD);
 			} else {
-				pseudo_diag("No prefix available to to find server.\n");
+				pseudo_diag("No local state directory available for server/file interactions.\n");
 				exit(1);
 			}
 			if (pseudo_localstate_dir_fd == -1) {
-				pseudo_diag("Can't open local state path (%s) for server: %s\n",
+				pseudo_diag("Can't open local state path '%s': %s\n",
 					pseudo_path,
 					strerror(errno));
 				exit(1);
@@ -288,7 +318,7 @@ pseudo_init_client(void) {
 			if (pseudo_chroot) {
 				pseudo_chroot_len = strlen(pseudo_chroot);
 			} else {
-				pseudo_diag("can't store chroot path (%s)\n", env);
+				pseudo_diag("Can't store chroot path '%s'\n", env);
 			}
 		}
 		free(env);
@@ -448,7 +478,7 @@ pseudo_client_chroot(const char *path) {
 	/* free old value */
 	free(pseudo_chroot);
 
-	pseudo_debug(2, "client chroot: %s\n", path);
+	pseudo_debug(PDBGF_CLIENT | PDBGF_CHROOT, "client chroot: %s\n", path);
 	if (!strcmp(path, "/")) {
 		pseudo_chroot_len = 0;
 		pseudo_chroot = 0;
@@ -479,7 +509,7 @@ pseudo_root_path(const char *func, int line, int dirfd, const char *path, int le
 		pseudo_diag("couldn't allocate absolute path for '%s'.\n",
 			path);
 	}
-	pseudo_debug(3, "root_path [%s, %d]: '%s' from '%s'\n",
+	pseudo_debug(PDBGF_CHROOT, "root_path [%s, %d]: '%s' from '%s'\n",
 		func, line,
 		rc ? rc : "<nil>",
 		path ? path : "<nil>");
@@ -494,13 +524,13 @@ pseudo_client_getcwd(void) {
 		pseudo_diag("Can't allocate CWD buffer!\n");
 		return -1;
 	}
-	pseudo_debug(3, "getcwd: trying to find cwd.\n");
+	pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "getcwd: trying to find cwd.\n");
 	if (getcwd(cwd, pseudo_path_max())) {
 		/* cwd now holds a canonical path to current directory */
 		free(pseudo_cwd);
 		pseudo_cwd = cwd;
 		pseudo_cwd_len = strlen(pseudo_cwd);
-		pseudo_debug(3, "getcwd okay: [%s] %d bytes\n", pseudo_cwd, (int) pseudo_cwd_len);
+		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "getcwd okay: [%s] %d bytes\n", pseudo_cwd, (int) pseudo_cwd_len);
 		if (pseudo_chroot_len &&
 			pseudo_cwd_len >= pseudo_chroot_len &&
 			!memcmp(pseudo_cwd, pseudo_chroot, pseudo_chroot_len) &&
@@ -510,9 +540,9 @@ pseudo_client_getcwd(void) {
 		} else {
 			pseudo_cwd_rel = pseudo_cwd;
 		}
-		pseudo_debug(4, "abscwd: <%s>\n", pseudo_cwd);
+		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "abscwd: <%s>\n", pseudo_cwd);
 		if (pseudo_cwd_rel != pseudo_cwd) {
-			pseudo_debug(4, "relcwd: <%s>\n", pseudo_cwd_rel);
+			pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "relcwd: <%s>\n", pseudo_cwd_rel);
 		}
 		return 0;
 	} else {
@@ -539,7 +569,7 @@ pseudo_client_path(int fd, const char *path) {
 
 	if (fd >= nfds) {
 		int i;
-		pseudo_debug(2, "expanding fds from %d to %d\n",
+		pseudo_debug(PDBGF_CLIENT, "expanding fds from %d to %d\n",
 			nfds, fd + 1);
 		fd_paths = realloc(fd_paths, (fd + 1) * sizeof(char *));
 		for (i = nfds; i < fd + 1; ++i)
@@ -547,7 +577,7 @@ pseudo_client_path(int fd, const char *path) {
 		nfds = fd + 1;
 	} else {
 		if (fd_paths[fd]) {
-			pseudo_debug(2, "reopening fd %d [%s] -- didn't see close\n",
+			pseudo_debug(PDBGF_CLIENT, "reopening fd %d [%s] -- didn't see close\n",
 				fd, fd_paths[fd]);
 		}
 		/* yes, it is safe to free null pointers. yay for C89 */
@@ -580,7 +610,7 @@ client_spawn_server(void) {
 			pseudo_diag("couldn't fork server: %s\n", strerror(errno));
 			return 1;
 		}
-		pseudo_debug(4, "spawned server, pid %d\n", server_pid);
+		pseudo_debug(PDBGF_CLIENT | PDBGF_SERVER, "spawned server, pid %d\n", server_pid);
 		/* wait for the child process to terminate, indicating server
 		 * is ready
 		 */
@@ -590,14 +620,14 @@ client_spawn_server(void) {
 		fp = fopen(pseudo_pidfile, "r");
 		if (fp) {
 			if (fscanf(fp, "%d", &server_pid) != 1) {
-				pseudo_debug(1, "Opened server PID file, but didn't get a pid.\n");
+				pseudo_debug(PDBGF_CLIENT, "Opened server PID file, but didn't get a pid.\n");
 			}
 			fclose(fp);
 		} else {
-			pseudo_debug(1, "no pid file (%s): %s\n",
+			pseudo_debug(PDBGF_CLIENT, "no pid file (%s): %s\n",
 				pseudo_pidfile, strerror(errno));
 		}
-		pseudo_debug(2, "read new pid file: %d\n", server_pid);
+		pseudo_debug(PDBGF_CLIENT, "read new pid file: %d\n", server_pid);
 		free(pseudo_pidfile);
 		/* at this point, we should have a new server_pid */
 		return 0;
@@ -659,7 +689,7 @@ client_spawn_server(void) {
 		pseudo_setupenv();
 		pseudo_dropenv(); /* drop PRELINK_LIBRARIES */
 
-		pseudo_debug(4, "calling execv on %s\n", argv[0]);
+		pseudo_debug(PDBGF_CLIENT | PDBGF_SERVER | PDBGF_INVOKE, "calling execv on %s\n", argv[0]);
 
 		execv(argv[0], argv);
 		pseudo_diag("critical failure: exec of pseudo daemon failed: %s\n", strerror(errno));
@@ -687,26 +717,31 @@ client_ping(void) {
 	ping.client = getpid();
 	ping.result = 0;
 	errno = 0;
-	pseudo_debug(4, "sending ping\n");
+	pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "sending ping\n");
 	if (pseudo_msg_send(connect_fd, &ping, ping.pathlen, tagbuf)) {
-		pseudo_debug(3, "error pinging server: %s\n", strerror(errno));
+		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "error pinging server: %s\n", strerror(errno));
 		return 1;
 	}
 	ack = pseudo_msg_receive(connect_fd);
 	if (!ack) {
-		pseudo_debug(2, "no ping response from server: %s\n", strerror(errno));
+		pseudo_debug(PDBGF_CLIENT, "no ping response from server: %s\n", strerror(errno));
 		/* and that's not good, so... */
 		server_pid = 0;
 		return 1;
 	}
 	if (ack->type != PSEUDO_MSG_ACK) {
-		pseudo_debug(1, "invalid ping response from server: expected ack, got %d\n", ack->type);
+		pseudo_debug(PDBGF_CLIENT, "invalid ping response from server: expected ack, got %d\n", ack->type);
 		/* and that's not good, so... */
 		server_pid = 0;
 		return 1;
 	}
-	pseudo_debug(5, "ping ok\n");
+	pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "ping ok\n");
 	return 0;
+}
+
+static void
+void_client_ping(void) {
+	client_ping();
 }
 
 int
@@ -728,7 +763,7 @@ pseudo_fd(int fd, int how) {
 
 	/* Set close on exec, even if we didn't move it. */
 	if ((newfd >= 0) && (fcntl(newfd, F_SETFD, FD_CLOEXEC) < 0))
-		pseudo_diag("can't set close on exec flag: %s\n",
+		pseudo_diag("Can't set close on exec flag: %s\n",
 			strerror(errno));
 
 	return(newfd);
@@ -747,11 +782,11 @@ client_connect(void) {
 	connect_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	connect_fd = pseudo_fd(connect_fd, MOVE_FD);
 	if (connect_fd == -1) {
-		pseudo_diag("can't create socket: %s (%s)\n", sun.sun_path, strerror(errno));
+		pseudo_diag("Can't create socket: %s (%s)\n", sun.sun_path, strerror(errno));
 		return 1;
 	}
 
-	pseudo_debug(3, "connecting socket...\n");
+	pseudo_debug(PDBGF_CLIENT, "connecting socket...\n");
 	cwd_fd = open(".", O_RDONLY);
 	if (cwd_fd == -1) {
 		pseudo_diag("Couldn't stash directory before opening socket: %s",
@@ -769,7 +804,7 @@ client_connect(void) {
 		return 1;
 	}
 	if (connect(connect_fd, (struct sockaddr *) &sun, sizeof(sun)) == -1) {
-		pseudo_debug(3, "can't connect socket to pseudo.socket: (%s)\n", strerror(errno));
+		pseudo_debug(PDBGF_CLIENT, "Can't connect socket to pseudo.socket: (%s)\n", strerror(errno));
 		close(connect_fd);
 		if (fchdir(cwd_fd) == -1) {
 			pseudo_diag("return to previous directory failed: %s\n",
@@ -784,7 +819,7 @@ client_connect(void) {
 			strerror(errno));
 	}
 	close(cwd_fd);
-	pseudo_debug(4, "connected socket.\n");
+	pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "connected socket.\n");
 	return 0;
 }
 
@@ -804,13 +839,13 @@ pseudo_client_setup(void) {
 	fp = fopen(pseudo_pidfile, "r");
 	if (fp) {
 		if (fscanf(fp, "%d", &server_pid) != 1) {
-			pseudo_debug(1, "Opened server PID file, but didn't get a pid.\n");
+			pseudo_debug(PDBGF_CLIENT, "Opened server PID file, but didn't get a pid.\n");
 		}
 		fclose(fp);
 	}
 	if (server_pid) {
 		if (kill(server_pid, 0) == -1) {
-			pseudo_debug(1, "couldn't find server at pid %d: %s\n",
+			pseudo_debug(PDBGF_CLIENT, "couldn't find server at pid %d: %s\n",
 				server_pid, strerror(errno));
 			server_pid = 0;
 		}
@@ -823,20 +858,17 @@ pseudo_client_setup(void) {
 	if (!client_connect() && !client_ping()) {
 		return 0;
 	}
-	pseudo_debug(2, "server seems to be gone, trying to restart\n");
+	pseudo_debug(PDBGF_CLIENT, "server seems to be gone, trying to restart\n");
 	if (client_spawn_server()) {
-		pseudo_debug(1, "failed to spawn server, giving up.\n");
+		pseudo_debug(PDBGF_CLIENT, "failed to spawn server, giving up.\n");
 		return 1;
 	} else {
-		pseudo_debug_verbose();
-		pseudo_debug(2, "restarted, new pid %d\n", server_pid);
+		pseudo_debug(PDBGF_CLIENT, "restarted, new pid %d\n", server_pid);
 		if (!client_connect() && !client_ping()) {
-			pseudo_debug_terse();
 			return 0;
 		}
-		pseudo_debug_terse();
 	}
-	pseudo_debug(1, "couldn't get a server, giving up.\n");
+	pseudo_debug(PDBGF_CLIENT, "couldn't get a server, giving up.\n");
 	return 1;
 }
 
@@ -851,43 +883,47 @@ pseudo_client_request(pseudo_msg_t *msg, size_t len, const char *path) {
 
 	do {
 		do {
-			pseudo_debug(4, "sending a message: ino %llu\n",
+			pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "sending a message: ino %llu\n",
 				(unsigned long long) msg->ino);
 			if (connect_fd < 0) {
-				pseudo_debug(2, "trying to get server\n");
+				pseudo_debug(PDBGF_CLIENT, "trying to get server\n");
 				if (pseudo_client_setup()) {
 					return 0;
 				}
 			}
 			rc = pseudo_msg_send(connect_fd, msg, len, path);
 			if (rc != 0) {
-				pseudo_debug(2, "msg_send: %d%s\n",
+				pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "msg_send: %d%s\n",
 					rc,
 					rc == -1 ? " (sigpipe)" :
 					           " (short write)");
 				pseudo_client_setup();
 				++tries;
 				if (tries > 3) {
-					pseudo_debug(1, "can't get server going again.\n");
+					pseudo_debug(PDBGF_CLIENT, "Can't get server going again.\n");
 					return 0;
 				}
 			}
 		} while (rc != 0);
-		pseudo_debug(5, "sent!\n");
-		response = pseudo_msg_receive(connect_fd);
-		if (!response) {
-			++tries;
-			if (tries > 3) {
-				pseudo_debug(1, "can't get responses.\n");
-				return 0;
-			}
-		}
+		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "sent!\n");
+                if (msg->type != PSEUDO_MSG_FASTOP) {
+                        response = pseudo_msg_receive(connect_fd);
+                        if (!response) {
+                                ++tries;
+                                if (tries > 3) {
+                                        pseudo_debug(PDBGF_CLIENT, "Can't get responses.\n");
+                                        return 0;
+                                }
+                        }
+                } else {
+                        return 0;
+                }
 	} while (response == 0);
 	if (response->type != PSEUDO_MSG_ACK) {
-		pseudo_debug(2, "got non-ack response %d\n", response->type);
+		pseudo_debug(PDBGF_CLIENT, "got non-ack response %d\n", response->type);
 		return 0;
 	} else {
-		pseudo_debug(4, "got response type %d\n", response->type);
+		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "got response type %d\n", response->type);
 	}
 	return response;
 }
@@ -898,13 +934,14 @@ pseudo_client_shutdown(void) {
 	pseudo_msg_t *ack;
 	char *pseudo_path;
 
+	pseudo_debug(PDBGF_INVOKE, "attempting to shut down server.\n");
 	pseudo_path = pseudo_prefix_path(NULL);
 	if (pseudo_prefix_dir_fd == -1) {
 		if (pseudo_path) {
 			pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
 			/* directory is missing? */
 			if (pseudo_prefix_dir_fd == -1 && errno == ENOENT) {
-				pseudo_debug(1, "prefix directory doesn't exist, trying to create\n");
+				pseudo_debug(PDBGF_CLIENT, "prefix directory doesn't exist, trying to create\n");
 				mkdir_p(pseudo_path);
 				pseudo_prefix_dir_fd = open(pseudo_path, O_RDONLY);
 			}
@@ -928,7 +965,7 @@ pseudo_client_shutdown(void) {
 			pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
 			/* directory is missing? */
 			if (pseudo_localstate_dir_fd == -1 && errno == ENOENT) {
-				pseudo_debug(1, "local state dir doesn't exist, trying to create\n");
+				pseudo_debug(PDBGF_CLIENT, "local state dir doesn't exist, trying to create\n");
 				mkdir_p(pseudo_path);
 				pseudo_localstate_dir_fd = open(pseudo_path, O_RDONLY);
 			}
@@ -946,16 +983,16 @@ pseudo_client_shutdown(void) {
 		}
 	}
 	if (client_connect()) {
-		pseudo_diag("Pseudo server seems to be already offline.\n");
+		pseudo_debug(PDBGF_INVOKE, "Pseudo server seems to be already offline.\n");
 		return 0;
 	}
 	memset(&msg, 0, sizeof(pseudo_msg_t));
 	msg.type = PSEUDO_MSG_SHUTDOWN;
 	msg.op = OP_NONE;
 	msg.client = getpid();
-	pseudo_debug(2, "sending shutdown request\n");
+	pseudo_debug(PDBGF_CLIENT | PDBGF_SERVER, "sending shutdown request\n");
 	if (pseudo_msg_send(connect_fd, &msg, 0, NULL)) {
-		pseudo_debug(1, "error requesting shutdown: %s\n", strerror(errno));
+		pseudo_debug(PDBGF_CLIENT | PDBGF_SERVER, "error requesting shutdown: %s\n", strerror(errno));
 		return 1;
 	}
 	ack = pseudo_msg_receive(connect_fd);
@@ -1019,7 +1056,7 @@ base_path(int dirfd, const char *path, int leave_last) {
 	}
 
 	newpath = pseudo_fix_path(basepath, path, minlen, baselen, NULL, leave_last);
-	pseudo_debug(4, "base_path: %s</>%s\n",
+	pseudo_debug(PDBGF_PATH, "base_path: %s</>%s\n",
 		basepath ? basepath : "<nil>",
 		path ? path : "<nil>");
 	return newpath;
@@ -1031,33 +1068,84 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	pseudo_msg_t msg = { .type = PSEUDO_MSG_OP };
 	size_t pathlen = -1;
 	int do_request = 0;
-	char *oldpath = 0;
-	char *alloced_path = 0;
+	char *path_extra_1 = 0;
+	size_t path_extra_1len = 0;
+	char *path_extra_2 = 0;
+	size_t path_extra_2len = 0;
+	static char *alloced_path = 0;
+	static size_t alloced_len = 0;
+	int strip_slash;
 
 	/* disable wrappers */
 	pseudo_antimagic();
 
+	if (!sent_messages) {
+		sent_messages = 1;
+		atexit(void_client_ping);
+	}
+
 	if (op == OP_RENAME) {
 		va_list ap;
-		va_start(ap, buf);
-		oldpath = va_arg(ap, char *);
-		va_end(ap);
-		/* last argument is the previous path of the file */
-		if (!oldpath) {
-			pseudo_diag("rename (%s) without old path.\n",
-				path ? path : "<nil>");
-			pseudo_magic();
-			return 0;
-		}
 		if (!path) {
 			pseudo_diag("rename (%s) without new path.\n",
 				path ? path : "<nil>");
 			pseudo_magic();
 			return 0;
 		}
+		va_start(ap, buf);
+		path_extra_1 = va_arg(ap, char *);
+		va_end(ap);
+		/* last argument is the previous path of the file */
+		if (!path_extra_1) {
+			pseudo_diag("rename (%s) without old path.\n",
+				path ? path : "<nil>");
+			pseudo_magic();
+			return 0;
+		}
+		path_extra_1len = strlen(path_extra_1);
+		pseudo_debug(PDBGF_PATH | PDBGF_FILE, "rename: %s -> %s\n",
+			path_extra_1, path);
+	}
+
+	/* we treat the "create" and "replace" flags as logically
+	 * distinct operations, because they can fail when set can't.
+	 */
+	if (op == OP_SET_XATTR || op == OP_CREATE_XATTR || op == OP_REPLACE_XATTR) {
+		va_list ap;
+		va_start(ap, buf);
+		path_extra_1 = va_arg(ap, char *);
+		path_extra_1len = strlen(path_extra_1);
+		path_extra_2 = va_arg(ap, char *);
+		path_extra_2len = va_arg(ap, size_t);
+		va_end(ap);
+		pseudo_debug(PDBGF_XATTR, "setxattr, name '%s', value %d bytes\n",
+			path_extra_1, (int) path_extra_2len);
+		pseudo_debug_call(PDBGF_XATTR | PDBGF_VERBOSE, pseudo_dump_data, "xattr value", path_extra_2, path_extra_2len);
+	}
+	if (op == OP_GET_XATTR || op == OP_REMOVE_XATTR) {
+		va_list ap;
+		va_start(ap, buf);
+		path_extra_1 = va_arg(ap, char *);
+		path_extra_1len = strlen(path_extra_1);
+		va_end(ap);
+		pseudo_debug(PDBGF_XATTR, "%sxattr, name '%s'\n",
+			op == OP_GET_XATTR ? "get" : "remove", path_extra_1);
+	}
+
+	/* if path isn't available, try to find one? */
+	if (!path && fd >= 0 && fd <= nfds) {
+		path = fd_path(fd);
+		if (!path) {
+			pathlen = 0;
+		} else {
+			pathlen = strlen(path) + 1;
+		}
 	}
 
 	if (path) {
+		if (pathlen == (size_t) -1) {
+			pathlen = strlen(path) + 1;
+		}
 		/* path fixup has to happen in the specific functions,
 		 * because they may have to make calls which have to be
 		 * fixed up for chroot stuff already.
@@ -1066,65 +1154,88 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		 * (no attempt is made to handle a rename of "/" occurring
 		 * in a chroot...)
 		 */
-		pathlen = strlen(path) + 1;
-		int strip_slash = (pathlen > 2 && (path[pathlen - 2]) == '/');
-		if (oldpath) {
-			size_t full_len = strlen(oldpath) + 1 + pathlen;
-			char *both_paths = malloc(full_len);
-			if (!both_paths) {
-				pseudo_diag("can't allocate space for paths for a rename operation.  Sorry.\n");
+		strip_slash = (pathlen > 2 && (path[pathlen - 2]) == '/');
+	} else {
+		path = "";
+		pathlen = 0;
+		strip_slash = 0;
+	}
+
+	/* f*xattr operations can result in needing to send a path
+	 * value even though we don't have one available. We use an
+	 * empty path for that.
+	 */
+	if (path_extra_1) {
+		size_t full_len = path_extra_1len + 1 + pathlen;
+		size_t partial_len = pathlen - 1 - strip_slash;
+		if (path_extra_2) {
+			full_len += path_extra_2len + 1;
+		}
+		if (full_len > alloced_len) {
+			free(alloced_path);
+			alloced_path = malloc(full_len);
+			alloced_len = full_len;
+			if (!alloced_path) {
+				pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
+				alloced_len = 0;
 				pseudo_magic();
 				return 0;
 			}
-			snprintf(both_paths, full_len, "%.*s%c%s",
-				(int) (pathlen - 1 - strip_slash),
-				path, 0, oldpath);
-			pseudo_debug(2, "rename: %s -> %s [%d]\n",
-				both_paths + pathlen, both_paths, (int) full_len);
-			alloced_path = both_paths;
-			path = alloced_path;
-			pathlen = full_len;
-		} else {
-			if (strip_slash) {
-				alloced_path = strdup(path);
-				alloced_path[pathlen - 2] = '\0';
-				path = alloced_path;
-			}
 		}
-	} else if (fd >= 0 && fd <= nfds) {
-		path = fd_path(fd);
-		if (!path)
-			msg.pathlen = 0;
-		else
-			msg.pathlen = strlen(path) + 1;
+		memcpy(alloced_path, path, partial_len);
+		alloced_path[partial_len] = '\0';
+		memcpy(alloced_path + partial_len + 1, path_extra_1, path_extra_1len);
+		alloced_path[partial_len + path_extra_1len + 1] = '\0';
+		if (path_extra_2) {
+			memcpy(alloced_path + partial_len + path_extra_1len + 2, path_extra_2, path_extra_2len);
+		}
+		alloced_path[full_len - 1] = '\0';
+		path = alloced_path;
+		pathlen = full_len;
+		pseudo_debug_call(PDBGF_IPC | PDBGF_VERBOSE, pseudo_dump_data, "combined path buffer", path, pathlen);
 	} else {
-		path = 0;
-		msg.pathlen = 0;
+		if (strip_slash) {
+			if (pathlen > alloced_len) {
+				free(alloced_path);
+				alloced_path = malloc(pathlen);
+				alloced_len = pathlen;
+				if (!alloced_path) {
+					pseudo_diag("Can't allocate space for paths for a rename operation.  Sorry.\n");
+					alloced_len = 0;
+					pseudo_magic();
+					return 0;
+				}
+			}
+			memcpy(alloced_path, path, pathlen);
+			alloced_path[pathlen - 2] = '\0';
+			path = alloced_path;
+		}
 	}
-	pseudo_debug(2, "%s%s", pseudo_op_name(op),
+
+	pseudo_debug(PDBGF_OP, "%s%s", pseudo_op_name(op),
 		(dirfd != -1 && dirfd != AT_FDCWD && op != OP_DUP) ? "at" : "");
-	if (oldpath) {
-		pseudo_debug(2, " %s ->", (char *) oldpath);
+	if (path_extra_1) {
+		pseudo_debug(PDBGF_OP, " %s ->", path_extra_1);
 	}
 	if (path) {
-		pseudo_debug(2, " %s", path);
+		pseudo_debug(PDBGF_OP, " %s", path);
 	}
 	/* for OP_RENAME in renameat, "fd" is also used for the
 	 * second dirfd.
 	 */
 	if (fd != -1 && op != OP_RENAME) {
-		pseudo_debug(2, " [fd %d]", fd);
+		pseudo_debug(PDBGF_OP, " [fd %d]", fd);
 	}
 	if (buf) {
-		pseudo_debug(2, " (+buf)");
+		pseudo_debug(PDBGF_OP, " (+buf)");
 		pseudo_msg_stat(&msg, buf);
 		if (buf && fd != -1) {
-			pseudo_debug(2, " [dev/ino: %d/%llu]",
+			pseudo_debug(PDBGF_OP, " [dev/ino: %d/%llu]",
 				(int) buf->st_dev, (unsigned long long) buf->st_ino);
 		}
-		pseudo_debug(2, " (0%o)", (int) buf->st_mode);
+		pseudo_debug(PDBGF_OP, " (0%o)", (int) buf->st_mode);
 	}
-	pseudo_debug(2, ": ");
+	pseudo_debug(PDBGF_OP, ": ");
 	msg.type = PSEUDO_MSG_OP;
 	msg.op = op;
 	msg.fd = fd;
@@ -1133,7 +1244,7 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	msg.client = getpid();
 
 	/* do stuff */
-	pseudo_debug(4, "processing request [ino %llu]\n", (unsigned long long) msg.ino);
+	pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "processing request [ino %llu]\n", (unsigned long long) msg.ino);
 	switch (msg.op) {
 	case OP_CHDIR:
 		pseudo_client_getcwd();
@@ -1183,7 +1294,7 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 		break;
 	case OP_DUP:
 		/* just copy the path over */
-		pseudo_debug(2, "dup: fd_path(%d) = %p [%s], dup to %d\n",
+		pseudo_debug(PDBGF_CLIENT, "dup: fd_path(%d) = %p [%s], dup to %d\n",
 			fd, fd_path(fd), fd_path(fd) ? fd_path(fd) : "<nil>",
 			dirfd);
 		pseudo_client_path(dirfd, fd_path(fd));
@@ -1197,7 +1308,7 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	case OP_SYMLINK:
 		msg.uid = pseudo_fuid;
 		msg.gid = pseudo_fgid;
-		pseudo_debug(2, "fuid: %d ", pseudo_fuid);
+		pseudo_debug(PDBGF_OP, "fuid: %d ", pseudo_fuid);
 		/* FALLTHROUGH */
 		/* chown/fchown uid/gid already calculated, and
 		 * a link or rename should not change a file's ownership.
@@ -1215,6 +1326,10 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	case OP_DID_UNLINK:
 	case OP_CANCEL_UNLINK:
 	case OP_MAY_UNLINK:
+	case OP_GET_XATTR:
+	case OP_LIST_XATTR:
+	case OP_SET_XATTR:
+	case OP_REMOVE_XATTR:
 		do_request = 1;
 		break;
 	default:
@@ -1223,7 +1338,9 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 	}
 	if (do_request) {
 		struct timeval tv1, tv2;
-		pseudo_debug(4, "sending request [ino %llu]\n", (unsigned long long) msg.ino);
+                if (!pseudo_op_wait(msg.op))
+                        msg.type = PSEUDO_MSG_FASTOP;
+		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "sending request [ino %llu]\n", (unsigned long long) msg.ino);
 		gettimeofday(&tv1, NULL);
 		if (pseudo_local_only) {
 			/* disable server */
@@ -1243,35 +1360,30 @@ pseudo_client_op(pseudo_op_t op, int access, int fd, int dirfd, const char *path
 			++message_time.tv_sec;
 		}
 		if (result) {
-			pseudo_debug(2, "(%d) %s", getpid(), pseudo_res_name(result->result));
+			pseudo_debug(PDBGF_OP, "(%d) %s", getpid(), pseudo_res_name(result->result));
 			if (op == OP_STAT || op == OP_FSTAT) {
-				pseudo_debug(2, " mode 0%o uid %d:%d",
+				pseudo_debug(PDBGF_OP, " mode 0%o uid %d:%d",
 					(int) result->mode,
 					(int) result->uid,
 					(int) result->gid);
 			} else if (op == OP_CHMOD || op == OP_FCHMOD) {
-				pseudo_debug(2, " mode 0%o",
+				pseudo_debug(PDBGF_OP, " mode 0%o",
 					(int) result->mode);
 			} else if (op == OP_CHOWN || op == OP_FCHOWN) {
-				pseudo_debug(2, " uid %d:%d",
+				pseudo_debug(PDBGF_OP, " uid %d:%d",
 					(int) result->uid,
 					(int) result->gid);
 			}
 		} else {
-			pseudo_debug(2, "(%d) no answer", getpid());
+			pseudo_debug(PDBGF_OP, "(%d) no answer", getpid());
 		}
 	} else {
-		pseudo_debug(2, "(%d) (no request)", getpid());
+		pseudo_debug(PDBGF_OP, "(%d) (no request)", getpid());
 	}
-	pseudo_debug(2, "\n");
-
-	/* if not NULL, alloced_path is an allocated buffer for both
-	 * paths, or for modified paths...
-	 */
-	free(alloced_path);
+	pseudo_debug(PDBGF_OP, "\n");
 
 	if (do_request && (messages % 1000 == 0)) {
-		pseudo_debug(2, "%d messages handled in %.4f seconds\n",
+		pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE | PDBGF_BENCHMARK, "%d messages handled in %.4f seconds\n",
 			messages,
 			(double) message_time.tv_sec +
 			(double) message_time.tv_usec / 1000000.0);
@@ -1392,21 +1504,21 @@ pseudo_exec_path(const char *filename, int search_path) {
 
 	for (i = 0; path_segs[i]; ++i) {
 		path = path_segs[i];
-		pseudo_debug(2, "exec_path: checking %s for %s\n", path, filename);
+		pseudo_debug(PDBGF_CLIENT, "exec_path: checking %s for %s\n", path, filename);
 		if (!*path || (*path == '.' && path_lens[i] == 1)) {
 			/* empty path or . is cwd */
 			candidate = pseudo_fix_path(pseudo_cwd, filename, 0, pseudo_cwd_len, NULL, 0);
-			pseudo_debug(2, "exec_path: in cwd, got %s\n", candidate);
+			pseudo_debug(PDBGF_CLIENT, "exec_path: in cwd, got %s\n", candidate);
 		} else if (*path == '/') {
 			candidate = pseudo_fix_path(path, filename, 0, path_lens[i], NULL, 0);
-			pseudo_debug(2, "exec_path: got %s\n", candidate);
+			pseudo_debug(PDBGF_CLIENT, "exec_path: got %s\n", candidate);
 		} else {
 			/* oh you jerk, making me do extra work */
 			size_t len;
 			char *dir = pseudo_fix_path(pseudo_cwd, path, 0, pseudo_cwd_len, &len, 0);
 			if (dir) {
 				candidate = pseudo_fix_path(dir, filename, 0, len, NULL, 0);
-				pseudo_debug(2, "exec_path: got %s for non-absolute path\n", candidate);
+				pseudo_debug(PDBGF_CLIENT, "exec_path: got %s for non-absolute path\n", candidate);
 			} else {
 				pseudo_diag("couldn't allocate intermediate path.\n");
 				candidate = NULL;
@@ -1414,7 +1526,7 @@ pseudo_exec_path(const char *filename, int search_path) {
 			free(dir);
 		}
 		if (candidate && !stat(candidate, &buf) && !S_ISDIR(buf.st_mode) && (buf.st_mode & 0111)) {
-			pseudo_debug(1, "exec_path: %s => %s\n", filename, candidate);
+			pseudo_debug(PDBGF_CLIENT | PDBGF_VERBOSE, "exec_path: %s => %s\n", filename, candidate);
 			pseudo_magic();
 			return candidate;
 		} else {

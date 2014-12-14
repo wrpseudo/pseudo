@@ -13,29 +13,15 @@ int fcntl(int fd, int cmd, ...{struct flock *lock});
 # just so we know the inums of symlinks
 char *canonicalize_file_name(const char *filename);
 int eaccess(const char *path, int mode);
-# we use "pathname" to avoid canonicalizing paths, because these functions are
-# unimplemented
-ssize_t getxattr(const char *pathname, const char *name, void *value, size_t size);
-ssize_t lgetxattr(const char *pathname, const char *name, void *value, size_t size);
-ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size);
-ssize_t listxattr(const char *pathname, char *list, size_t size);
-ssize_t llistxattr(const char *pathname, char *list, size_t size);
-ssize_t flistxattr(int filedes, char *list, size_t size);
-int setxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
-int lsetxattr(const char *pathname, const char *name, const void *value, size_t size, int flags);
-int fsetxattr(int filedes, const char *name, const void *value, size_t size, int flags);
-int removexattr(const char *pathname, const char *name);
-int lremovexattr(const char *pathname, const char *name);
-int fremovexattr(int filedes, const char *name);
 int open64(const char *path, int flags, ...{mode_t mode}); /* flags=0 */
 int openat64(int dirfd, const char *path, int flags, ...{mode_t mode}); /* flags=0 */
 int __openat64_2(int dirfd, const char *path, int flags); /* flags=0 */
 int creat64(const char *path, mode_t mode);
 int stat(const char *path, struct stat *buf); /* real_func=pseudo_stat */
-int lstat(const char *path, struct stat *buf); /* real_func=pseudo_lstat */
+int lstat(const char *path, struct stat *buf); /* real_func=pseudo_lstat, flags=AT_SYMLINK_NOFOLLOW */
 int fstat(int fd, struct stat *buf); /* real_func=pseudo_fstat */
 int stat64(const char *path, struct stat64 *buf); /* real_func=pseudo_stat64 */
-int lstat64(const char *path, struct stat64 *buf); /* real_func=pseudo_lstat64 */
+int lstat64(const char *path, struct stat64 *buf); /* real_func=pseudo_lstat64, flags=AT_SYMLINK_NOFOLLOW */
 int fstat64(int fd, struct stat64 *buf); /* real_func=pseudo_fstat64 */
 int __xstat64(int ver, const char *path, struct stat64 *buf);
 int __lxstat64(int ver, const char *path, struct stat64 *buf); /* flags=AT_SYMLINK_NOFOLLOW */

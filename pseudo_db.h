@@ -37,10 +37,11 @@ typedef struct {
 	char *program;
 } log_entry;
 
+extern int pdb_maybe_backup(void);
 extern int pdb_cancel_unlink_file(pseudo_msg_t *msg);
 extern int pdb_did_unlink_file(char *path, int deleting);
 extern int pdb_did_unlink_files(int deleting);
-extern int pdb_link_file(pseudo_msg_t *msg);
+extern int pdb_link_file(pseudo_msg_t *msg, long long *row);
 extern int pdb_may_unlink_file(pseudo_msg_t *msg, int deleting);
 extern int pdb_unlink_file(pseudo_msg_t *msg);
 extern int pdb_unlink_file_dev(pseudo_msg_t *msg);
@@ -50,11 +51,15 @@ extern int pdb_update_inode(pseudo_msg_t *msg);
 extern int pdb_unlink_contents(pseudo_msg_t *msg);
 extern int pdb_rename_file(const char *oldpath, pseudo_msg_t *msg);
 extern int pdb_renumber_all(dev_t from, dev_t to);
-extern int pdb_find_file_exact(pseudo_msg_t *msg);
-extern int pdb_find_file_path(pseudo_msg_t *msg);
-extern int pdb_find_file_dev(pseudo_msg_t *msg);
-extern int pdb_find_file_ino(pseudo_msg_t *msg);
+extern int pdb_find_file_exact(pseudo_msg_t *msg, long long *row);
+extern int pdb_find_file_path(pseudo_msg_t *msg, long long *row);
+extern int pdb_find_file_dev(pseudo_msg_t *msg, long long *row, char **path);
+extern int pdb_find_file_ino(pseudo_msg_t *msg, long long *row);
 extern char *pdb_get_file_path(pseudo_msg_t *msg);
+extern int pdb_get_xattr(long long file_id, char **value, size_t *len);
+extern int pdb_list_xattr(long long file_id, char **value, size_t *len);
+extern int pdb_remove_xattr(long long file_id, char *value, size_t len);
+extern int pdb_set_xattr(long long file_id, char *value, size_t len, int flags);
 
 struct log_history;
 typedef struct log_history *log_history;

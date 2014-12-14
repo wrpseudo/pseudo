@@ -1,7 +1,7 @@
 /*
  * pseudo_db.c, sqlite3 interface
  * 
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2010,2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -50,6 +51,10 @@ struct pdb_file_list {
 	sqlite3_stmt *stmt;
 };
 
+static int file_db_dirty = 0;
+#ifdef USE_MEMORY_DB
+static sqlite3 *real_file_db = 0;
+#endif
 static sqlite3 *file_db = 0;
 static sqlite3 *log_db = 0;
 
@@ -81,6 +86,13 @@ static struct sql_table {
 	    "rdev INTEGER",
 	  NULL,
 	  NULL },
+	{ "xattrs",
+	  "id INTEGER PRIMARY KEY, "
+	    "file_id INTEGER REFERENCES files(id) ON DELETE CASCADE, "
+	    "name VARCHAR, "
+	    "value VARCHAR",
+	  NULL,
+	  NULL },
 	{ NULL, NULL, NULL, NULL },
 }, log_tables[] = {
 	{ "logs",
@@ -110,6 +122,7 @@ static struct sql_index {
 /*	{ "files__path", "files", "path" }, */
 	{ "files__path_dev_ino", "files", "path, dev, ino" },
 	{ "files__dev_ino", "files", "dev, ino" },
+	{ "xattrs__file", "xattrs", "file_id" },
 	{ NULL, NULL, NULL },
 }, log_indexes[] = {
 	{ NULL, NULL, NULL },
@@ -118,6 +131,10 @@ static struct sql_index {
 static char *file_pragmas[] = {
 	"PRAGMA legacy_file_format = OFF;",
 	"PRAGMA journal_mode = OFF;",
+	/* the default page size produces painfully bad behavior
+	 * for memory databases with some versions of sqlite.
+	 */
+	"PRAGMA page_size = 8192;",
 	"PRAGMA locking_mode = EXCLUSIVE;",
 	/* Setting this to NORMAL makes pseudo noticably slower
 	 * than fakeroot, but is perhaps more secure.  However,
@@ -128,6 +145,7 @@ static char *file_pragmas[] = {
 	 * need.
 	 */
 	"PRAGMA synchronous = OFF;",
+	"PRAGMA foreign_keys = ON;",
 	NULL
 };
 
@@ -138,7 +156,6 @@ static char *log_pragmas[] = {
 	"PRAGMA synchronous = OFF;",
 	NULL
 };
-
 
 /* table migrations: */
 /* If there is no migration table, we assume "version -1" -- the
@@ -239,6 +256,17 @@ static struct database_info db_infos[] = {
 		file_migrations,
 		file_pragmas,
 		file_setups,
+#ifdef USE_MEMORY_DB
+		&real_file_db
+	},
+	{
+		":memory:",
+		file_indexes,
+		file_tables,
+		file_migrations,
+		file_pragmas,
+		file_setups,
+#endif
 		&file_db
 	},
 	{ 0, 0, 0, 0, 0, 0, 0 }
@@ -263,6 +291,67 @@ dberr(sqlite3 *db, char *fmt, ...) {
 	}
 }
 
+#ifdef USE_MEMORY_DB
+
+static void
+pdb_backup() {
+        sqlite3_backup *pBackup;
+        /* no point in doing this if we don't have a database to back up,
+	 * or nothing's changed.
+	 */
+        if (!file_db || !real_file_db || !file_db_dirty)
+                return;
+
+	pBackup = sqlite3_backup_init(real_file_db, "main", file_db, "main");
+	if (pBackup) {
+		int rc;
+		(void)sqlite3_backup_step(pBackup, -1);
+		rc = sqlite3_backup_finish(pBackup);
+		if (rc != SQLITE_OK) {
+			dberr(real_file_db, "error during flush to disk");
+		}
+	}
+	file_db_dirty = 0;
+}
+
+static void
+pdb_restore() {
+        sqlite3_backup *pBackup;
+        /* no point in doing this if we don't have a database to back up */
+        if (!file_db || !real_file_db)
+                return;
+
+	pBackup = sqlite3_backup_init(file_db, "main", real_file_db, "main");
+	if (pBackup) {
+		int rc;
+		(void)sqlite3_backup_step(pBackup, -1);
+		rc = sqlite3_backup_finish(pBackup);
+		if (rc != SQLITE_OK) {
+			dberr(file_db, "error during load from disk");
+		}
+	}
+	file_db_dirty = 0;
+}
+
+int
+pdb_maybe_backup(void) {
+        static int occasional = 0;
+        if (file_db && real_file_db) {
+                occasional = (occasional + 1) % 10;
+                if (occasional == 0) {
+                        pdb_backup();
+                        return 1;
+                }
+        }
+        return 0;
+}
+#else /* USE_MEMORY_DB */
+int
+pdb_maybe_backup(void) {
+	return 0;
+}
+#endif
+
 /* those who enjoy children, sausages, and databases, should not watch
  * them being made.
  */
@@ -286,6 +375,7 @@ make_tables(sqlite3 *db,
 
 	for (i = 0; sql_tables[i].name; ++i) {
 		found = 0;
+		printf("considering table %s\n", sql_tables[i].name);
 		for (j = 1; j <= rows; ++j) {
 			if (!strcmp(existing[j], sql_tables[i].name)) {
 				found = 1;
@@ -362,14 +452,14 @@ make_tables(sqlite3 *db,
 			dberr(db, "not done after the single row we expected?", rc);
 			return 1;
 		}
-		pseudo_debug(2, "existing database version: %d\n", version);
+		pseudo_debug(PDBGF_DB, "existing database version: %d\n", version);
 		rc = sqlite3_finalize(stmt);
 		if (rc) {
 			dberr(db, "couldn't finalize version check");
 			return 1;
 		}
 	} else {
-		pseudo_debug(2, "no existing database version\n");
+		pseudo_debug(PDBGF_DB, "no existing database version\n");
 		version = -1;
 	}
 	for (m = sql_migrations; m->sql; ++m)
@@ -383,10 +473,10 @@ make_tables(sqlite3 *db,
 		version = available_migrations - 1;
 	for (m = sql_migrations + (version + 1); m->sql; ++m) {
 		int migration = (m - sql_migrations);
-		pseudo_debug(3, "considering migration %d\n", migration);
+		pseudo_debug(PDBGF_DB, "considering migration %d\n", migration);
 		if (version >= migration)
 			continue;
-		pseudo_debug(2, "running migration %d\n", migration);
+		pseudo_debug(PDBGF_DB, "running migration %d\n", migration);
 		rc = sqlite3_prepare_v2(db,
 				m->sql,
 				strlen(m->sql),
@@ -433,7 +523,7 @@ make_tables(sqlite3 *db,
 			sqlite3_finalize(update_version);
 			return 1;
 		} else {
-			pseudo_debug(3, "update of migrations (after %d) fine.\n",
+			pseudo_debug(PDBGF_DB, "update of migrations (after %d) fine.\n",
 				migration);
 		}
 		sqlite3_finalize(update_version);
@@ -447,7 +537,13 @@ make_tables(sqlite3 *db,
 /* registered with atexit */
 static void
 cleanup_db(void) {
-	pseudo_debug(1, "server exiting\n");
+	pseudo_debug(PDBGF_SERVER, "server exiting\n");
+#ifdef USE_MEMORY_DB
+        if (real_file_db) {
+                pdb_backup();
+                sqlite3_close(real_file_db);
+	}
+#endif
 	if (file_db)
 		sqlite3_close(file_db);
 	if (log_db)
@@ -478,7 +574,12 @@ get_db(struct database_info *dbinfo) {
 		return 0;
 
 	dbfile = pseudo_localstatedir_path(dbinfo->pathname);
-	rc = sqlite3_open(dbfile, &db);
+#ifdef USE_MEMORY_DB
+        if (!strcmp(dbinfo->pathname, ":memory:")) {
+                rc = sqlite3_open(dbinfo->pathname, &db);
+        } else
+#endif
+                rc = sqlite3_open(dbfile, &db);
 	free(dbfile);
 	if (rc) {
 		pseudo_diag("Failed: %s\n", sqlite3_errmsg(db));
@@ -497,6 +598,8 @@ get_db(struct database_info *dbinfo) {
 	if (dbinfo->pragmas) {
 		for (i = 0; dbinfo->pragmas[i]; ++i) {
 			rc = sqlite3_exec(db, dbinfo->pragmas[i], NULL, NULL, &errmsg);
+			pseudo_debug(PDBGF_SQL | PDBGF_VERBOSE, "executed pragma: '%s', rc %d.\n",
+				dbinfo->pragmas[i], rc);
 			if (rc) {
 				dberr(db, dbinfo->pragmas[i]);
 			}
@@ -528,6 +631,11 @@ static int
 get_dbs(void) {
 	int err = 0;
 	int i;
+#ifdef USE_MEMORY_DB
+        int already_loaded = 0;
+        if (file_db)
+                already_loaded = 1;
+#endif
 	for (i = 0; db_infos[i].db; ++i) {
 		if (get_db(&db_infos[i])) {
 			pseudo_diag("Error getting '%s' database.\n",
@@ -535,6 +643,10 @@ get_dbs(void) {
 			err = 1;
 		}
 	}
+#ifdef USE_MEMORY_DB
+        if (!already_loaded && file_db)
+                pdb_restore();
+#endif
 	return err;
 }
 
@@ -668,7 +780,7 @@ pdb_log_entry(log_entry *e) {
 		sqlite3_bind_int(insert, field++, e->client);
 		sqlite3_bind_int(insert, field++, e->dev);
 		sqlite3_bind_int(insert, field++, e->gid);
-		sqlite3_bind_int(insert, field++, e->ino);
+		sqlite3_bind_int64(insert, field++, e->ino);
 		sqlite3_bind_int(insert, field++, e->mode);
 		if (e->path) {
 			sqlite3_bind_text(insert, field++, e->path, -1, SQLITE_STATIC);
@@ -762,7 +874,7 @@ pdb_log_msg(pseudo_sev_t severity, pseudo_msg_t *msg, const char *program, const
 		sqlite3_bind_int(insert, field++, msg->client);
 		sqlite3_bind_int(insert, field++, msg->dev);
 		sqlite3_bind_int(insert, field++, msg->gid);
-		sqlite3_bind_int(insert, field++, msg->ino);
+		sqlite3_bind_int64(insert, field++, msg->ino);
 		sqlite3_bind_int(insert, field++, msg->mode);
 		if (msg->pathlen) {
 			sqlite3_bind_text(insert, field++, msg->path, -1, SQLITE_STATIC);
@@ -1025,7 +1137,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 	}
 	if (want_results)
 		frag(sql, "ORDER BY %s %s;", order_by, order_dir);
-	pseudo_debug(1, "created SQL: <%s>\n", sql->data);
+	pseudo_debug(PDBGF_SQL, "created SQL: <%s>\n", sql->data);
 
 	/* second, prepare it */
 	rc = sqlite3_prepare_v2(log_db, sql->data, strlen(sql->data), &stmt, NULL);
@@ -1063,7 +1175,7 @@ pdb_query(char *stmt_type, pseudo_query_t *traits, unsigned long fields, int uni
 		case PSQF_STAMP:
 		case PSQF_TYPE:
 		case PSQF_UID:
-			sqlite3_bind_int(stmt, field++, trait->data.ivalue);
+			sqlite3_bind_int64(stmt, field++, trait->data.ivalue);
 			break;
 		default:
 			pseudo_diag("Inexplicably invalid field type %d\n", trait->field);
@@ -1082,6 +1194,7 @@ pdb_delete(pseudo_query_t *traits, unsigned long fields) {
 
 	/* no need to return it, so... */
 	if (stmt) {
+		file_db_dirty = 1;
 		int rc = sqlite3_step(stmt);
 		if (rc != SQLITE_DONE) {
 			dberr(log_db, "deletion failed");
@@ -1256,7 +1369,7 @@ log_entry_free(log_entry *e) {
  * or 'NAMELESS FILE'.
  */
 int
-pdb_link_file(pseudo_msg_t *msg) {
+pdb_link_file(pseudo_msg_t *msg, long long *row) {
 	static sqlite3_stmt *insert;
 	int rc;
 	char *sql = "INSERT INTO files "
@@ -1283,18 +1396,23 @@ pdb_link_file(pseudo_msg_t *msg) {
 		sqlite3_bind_text(insert, 1, "NAMELESS FILE", -1, SQLITE_STATIC);
 	}
 	sqlite3_bind_int(insert, 2, msg->dev);
-	sqlite3_bind_int(insert, 3, msg->ino);
+	sqlite3_bind_int64(insert, 3, msg->ino);
 	sqlite3_bind_int(insert, 4, msg->uid);
 	sqlite3_bind_int(insert, 5, msg->gid);
 	sqlite3_bind_int(insert, 6, msg->mode);
 	sqlite3_bind_int(insert, 7, msg->rdev);
-	pseudo_debug(2, "linking %s: dev %llu, ino %llu, mode %o, owner %d\n",
+	pseudo_debug(PDBGF_DB | PDBGF_FILE, "linking %s: dev %llu, ino %llu, mode %o, owner %d\n",
 		(msg->pathlen ? msg->path : "<nil> (as NAMELESS FILE)"),
 		(unsigned long long) msg->dev, (unsigned long long) msg->ino,
 		(int) msg->mode, msg->uid);
+	file_db_dirty = 1;
 	rc = sqlite3_step(insert);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "insert may have failed (rc %d)", rc);
+	}
+	/* some users care what the row ID is */
+	if (row) {
+		*row = sqlite3_last_insert_rowid(file_db);
 	}
 	sqlite3_reset(insert);
 	sqlite3_clear_bindings(insert);
@@ -1323,7 +1441,8 @@ pdb_unlink_file_dev(pseudo_msg_t *msg) {
 		return 1;
 	}
 	sqlite3_bind_int(sql_delete, 1, msg->dev);
-	sqlite3_bind_int(sql_delete, 2, msg->ino);
+	sqlite3_bind_int64(sql_delete, 2, msg->ino);
+	file_db_dirty = 1;
 	rc = sqlite3_step(sql_delete);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete by inode may have failed");
@@ -1353,12 +1472,13 @@ pdb_update_file_path(pseudo_msg_t *msg) {
 		}
 	}
 	if (!msg || !msg->pathlen) {
-		pseudo_debug(1, "can't update a file without a message or path.\n");
+		pseudo_debug(PDBGF_DB, "can't update a file without a message or path.\n");
 		return 1;
 	}
 	sqlite3_bind_text(update, 1, msg->path, -1, SQLITE_STATIC);
 	sqlite3_bind_int(update, 2, msg->dev);
-	sqlite3_bind_int(update, 3, msg->ino);
+	sqlite3_bind_int64(update, 3, msg->ino);
+	file_db_dirty = 1;
 	rc = sqlite3_step(update);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "update path by inode may have failed");
@@ -1393,16 +1513,17 @@ pdb_may_unlink_file(pseudo_msg_t *msg, int deleting) {
 		sqlite3_bind_int(mark_file, 1, deleting);
 		sqlite3_bind_text(mark_file, 2, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot mark a file for pending deletion without a path.");
+		pseudo_debug(PDBGF_DB, "cannot mark a file for pending deletion without a path.");
 		return 1;
 	}
+	file_db_dirty = 1;
 	rc = sqlite3_step(mark_file);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "mark for deletion may have failed");
 		return 1;
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d) ", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d) ", exact);
 	sqlite3_reset(mark_file);
 	sqlite3_clear_bindings(mark_file);
 	/* indicate whether we marked something */
@@ -1436,15 +1557,16 @@ pdb_cancel_unlink_file(pseudo_msg_t *msg) {
 	if (msg->pathlen) {
 		sqlite3_bind_text(mark_file, 1, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot unmark a file for pending deletion without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unmark a file for pending deletion without a path.");
 		return 1;
 	}
+	file_db_dirty = 1;
 	rc = sqlite3_step(mark_file);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "unmark for deletion may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d) ", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d) ", exact);
 	sqlite3_reset(mark_file);
 	sqlite3_clear_bindings(mark_file);
 	return rc != SQLITE_DONE;
@@ -1475,12 +1597,13 @@ pdb_did_unlink_files(int deleting) {
 		return 0;
 	}
 	sqlite3_bind_int(delete_exact, 1, deleting);
+	file_db_dirty = 1;
 	rc = sqlite3_step(delete_exact);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "cleanup of files marked for deletion may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d)\n", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d)\n", exact);
 	sqlite3_reset(delete_exact);
 	sqlite3_clear_bindings(delete_exact);
 	return rc != SQLITE_DONE;
@@ -1505,17 +1628,18 @@ pdb_did_unlink_file(char *path, int deleting) {
 		}
 	}
 	if (!path) {
-		pseudo_debug(1, "cannot unlink a file without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unlink a file without a path.");
 		return 1;
 	}
 	sqlite3_bind_text(delete_exact, 1, path, -1, SQLITE_STATIC);
 	sqlite3_bind_int(delete_exact, 2, deleting);
+	file_db_dirty = 1;
 	rc = sqlite3_step(delete_exact);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "cleanup of file marked for deletion may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d)\n", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d)\n", exact);
 	sqlite3_reset(delete_exact);
 	sqlite3_clear_bindings(delete_exact);
 	return rc != SQLITE_DONE;
@@ -1545,15 +1669,16 @@ pdb_unlink_file(pseudo_msg_t *msg) {
 	if (msg->pathlen) {
 		sqlite3_bind_text(delete_exact, 1, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot unlink a file without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unlink a file without a path.");
 		return 1;
 	}
+	file_db_dirty = 1;
 	rc = sqlite3_step(delete_exact);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete exact by path may have failed");
 	}
 	exact = sqlite3_changes(file_db);
-	pseudo_debug(3, "(exact %d) ", exact);
+	pseudo_debug(PDBGF_DB, "(exact %d) ", exact);
 	sqlite3_reset(delete_exact);
 	sqlite3_clear_bindings(delete_exact);
 	return rc != SQLITE_DONE;
@@ -1592,15 +1717,16 @@ pdb_unlink_contents(pseudo_msg_t *msg) {
 		sqlite3_bind_text(delete_sub, 1, msg->path, -1, SQLITE_STATIC);
 		sqlite3_bind_text(delete_sub, 2, msg->path, -1, SQLITE_STATIC);
 	} else {
-		pseudo_debug(1, "cannot unlink a file without a path.");
+		pseudo_debug(PDBGF_DB, "cannot unlink a file without a path.");
 		return 1;
 	}
+	file_db_dirty = 1;
 	rc = sqlite3_step(delete_sub);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "delete sub by path may have failed");
 	}
 	sub = sqlite3_changes(file_db);
-	pseudo_debug(3, "(sub %d) ", sub);
+	pseudo_debug(PDBGF_DB, "(sub %d) ", sub);
 	sqlite3_reset(delete_sub);
 	sqlite3_clear_bindings(delete_sub);
 	return rc != SQLITE_DONE;
@@ -1645,14 +1771,14 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 		return 1;
 	}
 	if (!msg->pathlen) {
-		pseudo_debug(1, "rename: No path provided (ino %llu)\n", (unsigned long long) msg->ino);
+		pseudo_debug(PDBGF_DB, "rename: No path provided (ino %llu)\n", (unsigned long long) msg->ino);
 		return 1;
 	}
 	if (!oldpath) {
-		pseudo_debug(1, "rename: No old path for %s\n", msg->path);
+		pseudo_debug(PDBGF_DB, "rename: No old path for %s\n", msg->path);
 		return 1;
 	}
-	pseudo_debug(2, "rename: Changing %s to %s\n", oldpath, msg->path);
+	pseudo_debug(PDBGF_DB, "rename: Changing %s to %s\n", oldpath, msg->path);
 	rc = sqlite3_bind_text(update_exact, 1, msg->path, -1, SQLITE_STATIC);
 	rc = sqlite3_bind_text(update_exact, 2, oldpath, -1, SQLITE_STATIC);
 	rc = sqlite3_bind_text(update_sub, 1, oldpath, -1, SQLITE_STATIC);
@@ -1662,6 +1788,7 @@ pdb_rename_file(const char *oldpath, pseudo_msg_t *msg) {
 
 	rc = sqlite3_exec(file_db, "BEGIN;", NULL, NULL, NULL);
 
+	file_db_dirty = 1;
 	rc = sqlite3_step(update_exact);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "update exact may have failed: rc %d", rc);
@@ -1712,13 +1839,14 @@ pdb_renumber_all(dev_t from, dev_t to) {
 		dberr(file_db, "error binding device numbers to update");
 	}
 
+	file_db_dirty = 1;
 	rc = sqlite3_step(update);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "update may have failed: rc %d", rc);
 	}
 	sqlite3_reset(update);
 	sqlite3_clear_bindings(update);
-	pseudo_debug(2, "updating device dev %llu to %llu\n",
+	pseudo_debug(PDBGF_DB, "updating device dev %llu to %llu\n",
 		(unsigned long long) from, (unsigned long long) to);
 	return rc != SQLITE_DONE;
 }
@@ -1752,7 +1880,7 @@ pdb_update_inode(pseudo_msg_t *msg) {
 		return 1;
 	}
 	sqlite3_bind_int(update, 1, msg->dev);
-	sqlite3_bind_int(update, 2, msg->ino);
+	sqlite3_bind_int64(update, 2, msg->ino);
 	rc = sqlite3_bind_text(update, 3, msg->path, -1, SQLITE_STATIC);
 	if (rc) {
 		/* msg->path can never be null, and if msg didn't
@@ -1762,13 +1890,14 @@ pdb_update_inode(pseudo_msg_t *msg) {
 		dberr(file_db, "error binding %s to select", msg->path);
 	}
 
+	file_db_dirty = 1;
 	rc = sqlite3_step(update);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "update may have failed: rc %d", rc);
 	}
 	sqlite3_reset(update);
 	sqlite3_clear_bindings(update);
-	pseudo_debug(2, "updating path %s to dev %llu, ino %llu\n",
+	pseudo_debug(PDBGF_DB, "updating path %s to dev %llu, ino %llu\n",
 		msg->path,
 		(unsigned long long) msg->dev, (unsigned long long) msg->ino);
 	return rc != SQLITE_DONE;
@@ -1804,15 +1933,16 @@ pdb_update_file(pseudo_msg_t *msg) {
 	sqlite3_bind_int(update, 3, msg->mode);
 	sqlite3_bind_int(update, 4, msg->rdev);
 	sqlite3_bind_int(update, 5, msg->dev);
-	sqlite3_bind_int(update, 6, msg->ino);
+	sqlite3_bind_int64(update, 6, msg->ino);
 
+	file_db_dirty = 1;
 	rc = sqlite3_step(update);
 	if (rc != SQLITE_DONE) {
 		dberr(file_db, "update may have failed: rc %d", rc);
 	}
 	sqlite3_reset(update);
 	sqlite3_clear_bindings(update);
-	pseudo_debug(2, "updating dev %llu, ino %llu, new mode %o, owner %d\n",
+	pseudo_debug(PDBGF_DB, "updating dev %llu, ino %llu, new mode %o, owner %d\n",
 		(unsigned long long) msg->dev, (unsigned long long) msg->ino,
 		(int) msg->mode, msg->uid);
 	return rc != SQLITE_DONE;
@@ -1820,7 +1950,7 @@ pdb_update_file(pseudo_msg_t *msg) {
 
 /* find file using both path AND dev/inode as key */
 int
-pdb_find_file_exact(pseudo_msg_t *msg) {
+pdb_find_file_exact(pseudo_msg_t *msg, long long *row) {
 	static sqlite3_stmt *select;
 	int rc;
 	char *sql = "SELECT * FROM files WHERE path = ? AND dev = ? AND ino = ?;";
@@ -1844,10 +1974,13 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 		dberr(file_db, "error binding %s to select", msg->pathlen ? msg->path : "<nil>");
 	}
 	sqlite3_bind_int(select, 2, msg->dev);
-	sqlite3_bind_int(select, 3, msg->ino);
+	sqlite3_bind_int64(select, 3, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
+		if (row) {
+			*row = sqlite3_column_int64(select, 0);
+		}
 		msg->uid = (unsigned long) sqlite3_column_int64(select, 4);
 		msg->gid = (unsigned long) sqlite3_column_int64(select, 5);
 		msg->mode = (unsigned long) sqlite3_column_int64(select, 6);
@@ -1856,7 +1989,7 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_exact: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_exact: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -1871,7 +2004,7 @@ pdb_find_file_exact(pseudo_msg_t *msg) {
 
 /* find file using path as a key */
 int
-pdb_find_file_path(pseudo_msg_t *msg) {
+pdb_find_file_path(pseudo_msg_t *msg, long long *row) {
 	static sqlite3_stmt *select;
 	int rc;
 	char *sql = "SELECT * FROM files WHERE path = ?;";
@@ -1902,6 +2035,9 @@ pdb_find_file_path(pseudo_msg_t *msg) {
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
+		if (row) {
+			*row = sqlite3_column_int64(select, 0);
+		}
 		msg->dev = sqlite3_column_int64(select, 2);
 		msg->ino = sqlite3_column_int64(select, 3);
 		msg->uid = sqlite3_column_int64(select, 4);
@@ -1912,7 +2048,7 @@ pdb_find_file_path(pseudo_msg_t *msg) {
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_path: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_path: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -1948,7 +2084,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 		return 0;
 	}
 	sqlite3_bind_int(select, 1, msg->dev);
-	sqlite3_bind_int(select, 2, msg->ino);
+	sqlite3_bind_int64(select, 2, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
@@ -1962,7 +2098,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 		}
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_dev: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_dev: sqlite_done on first row\n");
 		response = 0;
 		break;
 	default:
@@ -1977,7 +2113,7 @@ pdb_get_file_path(pseudo_msg_t *msg) {
 
 /* find file using dev/inode as key */
 int
-pdb_find_file_dev(pseudo_msg_t *msg) {
+pdb_find_file_dev(pseudo_msg_t *msg, long long *row, char **path) {
 	static sqlite3_stmt *select;
 	int rc;
 	char *sql = "SELECT * FROM files WHERE dev = ? AND ino = ?;";
@@ -1997,19 +2133,28 @@ pdb_find_file_dev(pseudo_msg_t *msg) {
 		return 1;
 	}
 	sqlite3_bind_int(select, 1, msg->dev);
-	sqlite3_bind_int(select, 2, msg->ino);
+	sqlite3_bind_int64(select, 2, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
+		if (row) {
+			*row = sqlite3_column_int64(select, 0);
+		}
 		msg->uid = (unsigned long) sqlite3_column_int64(select, 4);
 		msg->gid = (unsigned long) sqlite3_column_int64(select, 5);
 		msg->mode = (unsigned long) sqlite3_column_int64(select, 6);
 		msg->rdev = (unsigned long) sqlite3_column_int64(select, 7);
 		msg->deleting = (int) sqlite3_column_int64(select, 8);
+		/* stash path */
+		if (path) {
+			*path = strdup((char *) sqlite3_column_text(select, 1));
+			pseudo_debug(PDBGF_FILE, "find_file_dev: path %s\n",
+				*path ? *path : "<nil>");
+		}
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_dev: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_dev: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -2022,11 +2167,286 @@ pdb_find_file_dev(pseudo_msg_t *msg) {
 	return rc;
 }
 
+int
+pdb_get_xattr(long long file_id, char **value, size_t *len) {
+	static sqlite3_stmt *select;
+	int rc;
+	char *response;
+	size_t length;
+	char *sql = "SELECT value FROM xattrs WHERE file_id = ? AND name = ?;";
+
+	if (!file_db && get_dbs()) {
+		pseudo_diag("%s: database error.\n", __func__);
+		return 0;
+	}
+	if (!select) {
+		rc = sqlite3_prepare_v2(file_db, sql, strlen(sql), &select, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare SELECT statement");
+			return 1;
+		}
+	}
+	pseudo_debug(PDBGF_XATTR, "requested xattr named '%s' for file %lld\n", *value, file_id);
+	sqlite3_bind_int(select, 1, file_id);
+	rc = sqlite3_bind_text(select, 2, *value, -1, SQLITE_STATIC);
+	if (rc) {
+		dberr(file_db, "couldn't bind xattr name to SELECT.");
+		return 1;
+	}
+	rc = sqlite3_step(select);
+	switch (rc) {
+	case SQLITE_ROW:
+		response = (char *) sqlite3_column_text(select, 0);
+		length = sqlite3_column_bytes(select, 0);
+		pseudo_debug(PDBGF_XATTR, "got %d-byte results: '%s'\n",
+			(int) length, response);
+		if (response && length >= 1) {
+			/* not a strdup because the values can contain
+			 * arbitrary bytes.
+			 */
+			*value = malloc(length);
+			memcpy(*value, response, length);
+			*len = length;
+			rc = 0;
+		} else {
+			*value = NULL;
+			*len = 0;
+			rc = 1;
+		}
+		break;
+	case SQLITE_DONE:
+		pseudo_debug(PDBGF_DB, "find_exact: sqlite_done on first row\n");
+		rc = 1;
+		break;
+	default:
+		dberr(file_db, "find_exact: select returned neither a row nor done");
+		rc = 1;
+		break;
+	}
+	sqlite3_reset(select);
+	sqlite3_clear_bindings(select);
+	return rc;
+}
+
+int
+pdb_list_xattr(long long file_id, char **value, size_t *len) {
+	static sqlite3_stmt *select;
+	size_t allocated = 0;
+	size_t used = 0;
+	char *buffer = 0;
+	int rc;
+	char *sql = "SELECT name FROM xattrs WHERE file_id = ?;";
+
+	/* if we don't have a record of the file, it must not have
+	 * any extended attributes...
+	 */
+	if (file_id == -1) {
+		*value = NULL;
+		*len = 0;
+		return 0;
+	}
+
+	if (!file_db && get_dbs()) {
+		pseudo_diag("%s: database error.\n", __func__);
+		return 0;
+	}
+	if (!select) {
+		rc = sqlite3_prepare_v2(file_db, sql, strlen(sql), &select, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare SELECT statement");
+			return 1;
+		}
+	}
+	sqlite3_bind_int(select, 1, file_id);
+	do {
+		rc = sqlite3_step(select);
+		if (rc == SQLITE_ROW) {
+			char *value = (char *) sqlite3_column_text(select, 0);
+			size_t len = sqlite3_column_bytes(select, 0);
+			if (!buffer) {
+				allocated = round_up(len, 256);
+				buffer = malloc(allocated);
+			}
+			if (used + len + 2 > allocated) {
+				size_t new_allocated = round_up(used + len + 2, 256);
+				char *new_buffer = malloc(new_allocated);
+				memcpy(new_buffer, buffer, used);
+				free(buffer);
+				allocated = new_allocated;
+				buffer = new_buffer;
+			}
+			memcpy(buffer + used, value, len);
+			buffer[used + len] = '\0';
+			used = used + len + 1;
+		} else if (rc == SQLITE_DONE) {
+			*value = buffer;
+			*len = used;
+		} else {
+			dberr(file_db, "non-row response from select?");
+			free(buffer);
+			*value = NULL;
+			*len = 0;
+		}
+	} while (rc == SQLITE_ROW);
+	sqlite3_reset(select);
+	sqlite3_clear_bindings(select);
+	return rc != SQLITE_DONE;
+}
+
+int
+pdb_remove_xattr(long long file_id, char *value, size_t len) {
+	static sqlite3_stmt *delete;
+	int rc;
+	char *sql = "DELETE FROM xattrs WHERE file_id = ? AND name = ?;";
+
+	if (!file_db && get_dbs()) {
+		pseudo_diag("%s: database error.\n", __func__);
+		return 0;
+	}
+	if (!delete) {
+		rc = sqlite3_prepare_v2(file_db, sql, strlen(sql), &delete, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare DELETE statement");
+			return 1;
+		}
+	}
+	sqlite3_bind_int(delete, 1, file_id);
+	rc = sqlite3_bind_text(delete, 2, value, len, SQLITE_STATIC);
+	if (rc) {
+		dberr(file_db, "couldn't bind xattr name to DELETE.");
+		return 1;
+	}
+	file_db_dirty = 1;
+	rc = sqlite3_step(delete);
+	if (rc != SQLITE_DONE) {
+		dberr(file_db, "delete xattr may have failed");
+	}
+	sqlite3_reset(delete);
+	sqlite3_clear_bindings(delete);
+	return rc != SQLITE_DONE;
+}
+
+int
+pdb_set_xattr(long long file_id, char *value, size_t len, int flags) {
+	static sqlite3_stmt *select, *update, *insert;
+	int rc;
+	long long existing_row = -1;
+	char *select_sql = "SELECT id FROM xattrs WHERE file_id = ? AND name = ?;";
+	char *insert_sql = "INSERT INTO xattrs "
+		    " ( file_id, name, value ) "
+		    " VALUES (?, ?, ?);";
+	char *update_sql = "UPDATE xattrs SET value = ? WHERE id = ?;";
+	char *vname = value;
+	size_t vlen;
+
+	if (!file_db && get_dbs()) {
+		pseudo_diag("%s: database error.\n", __func__);
+		return 0;
+	}
+	if (!select) {
+		rc = sqlite3_prepare_v2(file_db, select_sql, strlen(select_sql), &select, NULL);
+		if (rc) {
+			dberr(file_db, "couldn't prepare SELECT statement");
+			return 1;
+		}
+	}
+	sqlite3_bind_int(select, 1, file_id);
+	rc = sqlite3_bind_text(select, 2, value, -1, SQLITE_STATIC);
+	if (rc) {
+		dberr(file_db, "couldn't bind xattr name to SELECT.");
+		return 1;
+	}
+	rc = sqlite3_step(select);
+	switch (rc) {
+	case SQLITE_ROW:
+		existing_row = sqlite3_column_int64(select, 0);
+		break;
+	case SQLITE_DONE:
+		pseudo_debug(PDBGF_DB | PDBGF_VERBOSE, "find_exact: sqlite_done on first row\n");
+		existing_row = -1;
+		break;
+	default:
+		dberr(file_db, "set_xattr: select returned neither a row nor done");
+		rc = 1;
+		break;
+	}
+	sqlite3_reset(select);
+	sqlite3_clear_bindings(select);
+	if (flags == XATTR_CREATE && existing_row != -1) {
+		pseudo_debug(PDBGF_DB, "XATTR_CREATE with an existing row, failing.");
+		return 1;
+	}
+	if (flags == XATTR_REPLACE && existing_row == -1) {
+		pseudo_debug(PDBGF_DB, "XATTR_REPLACE with no existing row, failing.");
+		return 1;
+	}
+	/* the material after the name is the value */
+	vlen = strlen(value);
+	len = len - (vlen + 1);
+	value = value + vlen + 1;
+	pseudo_debug(PDBGF_XATTR, "trying to set a value for %lld: name is '%s' [%d/%d bytes], value is '%s' [%d bytes]. Existing row %lld.\n",
+		file_id, vname, (int) vlen, (int) (len + vlen + 1), value, (int) len, existing_row);
+	if (existing_row != -1) {
+		/* update */
+		if (!update) {
+			rc = sqlite3_prepare_v2(file_db, update_sql, strlen(update_sql), &update, NULL);
+			if (rc) {
+				dberr(file_db, "couldn't prepare UPDATE statement");
+				return 1;
+			}
+		}
+		rc = sqlite3_bind_text(update, 1, value, len, SQLITE_STATIC);
+		if (rc) {
+			dberr(file_db, "couldn't bind xattr value to UPDATE.");
+			return 1;
+		}
+		sqlite3_bind_int(update, 2, existing_row);
+		file_db_dirty = 1;
+		rc = sqlite3_step(update);
+		if (rc != SQLITE_DONE) {
+			dberr(file_db, "update xattr may have failed");
+		}
+		sqlite3_reset(update);
+		sqlite3_clear_bindings(update);
+		return rc != SQLITE_DONE;
+	} else {
+		/* insert */
+		if (!insert) {
+			rc = sqlite3_prepare_v2(file_db, insert_sql, strlen(insert_sql), &insert, NULL);
+			if (rc) {
+				dberr(file_db, "couldn't prepare INSERT statement");
+				return 1;
+			}
+		}
+		pseudo_debug(PDBGF_XATTR, "insert should be getting ID %lld\n", file_id);
+		sqlite3_bind_int64(insert, 1, file_id);
+		rc = sqlite3_bind_text(insert, 2, vname, -1, SQLITE_STATIC);
+		if (rc) {
+			dberr(file_db, "couldn't bind xattr name to INSERT statement");
+			return 1;
+		}
+		rc = sqlite3_bind_text(insert, 3, value, len, SQLITE_STATIC);
+		if (rc) {
+			dberr(file_db, "couldn't bind xattr value to INSERT statement");
+			return 1;
+		}
+		file_db_dirty = 1;
+		rc = sqlite3_step(insert);
+		if (rc != SQLITE_DONE) {
+			dberr(file_db, "insert xattr may have failed");
+		}
+		sqlite3_reset(insert);
+		sqlite3_clear_bindings(insert);
+		return rc != SQLITE_DONE;
+	}
+	return rc;
+}
+
 /* find file using only inode as key.  Unused for now, planned to come
  * in for NFS usage.
  */
 int
-pdb_find_file_ino(pseudo_msg_t *msg) {
+pdb_find_file_ino(pseudo_msg_t *msg, long long *row) {
 	static sqlite3_stmt *select;
 	int rc;
 	char *sql = "SELECT * FROM files WHERE ino = ?;";
@@ -2045,10 +2465,13 @@ pdb_find_file_ino(pseudo_msg_t *msg) {
 	if (!msg) {
 		return 1;
 	}
-	sqlite3_bind_int(select, 1, msg->ino);
+	sqlite3_bind_int64(select, 1, msg->ino);
 	rc = sqlite3_step(select);
 	switch (rc) {
 	case SQLITE_ROW:
+		if (row) {
+			*row = sqlite3_column_int64(select, 0);
+		}
 		msg->dev = (unsigned long) sqlite3_column_int64(select, 2);
 		msg->uid = (unsigned long) sqlite3_column_int64(select, 4);
 		msg->gid = (unsigned long) sqlite3_column_int64(select, 5);
@@ -2058,7 +2481,7 @@ pdb_find_file_ino(pseudo_msg_t *msg) {
 		rc = 0;
 		break;
 	case SQLITE_DONE:
-		pseudo_debug(3, "find_ino: sqlite_done on first row\n");
+		pseudo_debug(PDBGF_DB, "find_ino: sqlite_done on first row\n");
 		rc = 1;
 		break;
 	default:
@@ -2118,7 +2541,7 @@ pdb_file(pdb_file_list l) {
 		pseudo_diag("couldn't allocate file message.\n");
 		return NULL;
 	}
-	pseudo_debug(2, "pdb_file: '%s'\n", s ? (const char *) s : "<nil>");
+	pseudo_debug(PDBGF_DB, "pdb_file: '%s'\n", s ? (const char *) s : "<nil>");
 	m->dev = sqlite3_column_int64(l->stmt, column++);
 	m->ino = sqlite3_column_int64(l->stmt, column++);
 	m->uid = sqlite3_column_int64(l->stmt, column++);

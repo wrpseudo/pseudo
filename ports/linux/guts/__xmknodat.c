@@ -9,6 +9,9 @@
  	pseudo_msg_t *msg;
 	struct stat64 buf;
 
+	/* mask out mode bits appropriately */
+	mode = mode & ~pseudo_umask;
+
 	/* we don't use underlying call, so _ver is irrelevant to us */
 	(void) ver;
 

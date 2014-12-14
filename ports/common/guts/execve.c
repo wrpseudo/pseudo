@@ -20,7 +20,7 @@
         }
 
 	new_environ = pseudo_setupenvp(envp);
-	if (pseudo_get_value("PSEUDO_UNLOAD"))
+	if (pseudo_has_unload(new_environ))
 		new_environ = pseudo_dropenvp(new_environ);
 
 	/* if exec() fails, we may end up taking signals unexpectedly...

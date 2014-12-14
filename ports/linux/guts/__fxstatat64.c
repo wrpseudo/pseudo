@@ -37,7 +37,7 @@
 	save_errno = errno;
 
 	if (ver != _STAT_VER) {
-		pseudo_debug(1, "version mismatch: got stat version %d, only supporting %d\n", ver, _STAT_VER);
+		pseudo_debug(PDBGF_CLIENT, "version mismatch: got stat version %d, only supporting %d\n", ver, _STAT_VER);
 		errno = save_errno;
 		return rc;
 	}

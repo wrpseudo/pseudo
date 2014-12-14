@@ -1,7 +1,7 @@
 /*
  * pseudo.h, shared definitions and structures for pseudo
  *
- * Copyright (c) 2008-2010 Wind River Systems, Inc.
+ * Copyright (c) 2008-2010, 2013 Wind River Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -28,21 +28,44 @@ extern void pseudo_init_client(void);
 void pseudo_dump_env(char **envp);
 int pseudo_set_value(const char *key, const char *value);
 char *pseudo_get_value(const char *key);
+int pseudo_has_unload(char * const *envp);
 
 #include "pseudo_tables.h"
 
 extern void pseudo_debug_verbose(void);
 extern void pseudo_debug_terse(void);
+extern void pseudo_debug_set(char *);
+extern void pseudo_debug_clear(char *);
+extern void pseudo_debug_flags_finalize(void);
+extern unsigned long pseudo_util_debug_flags;
 extern int pseudo_util_debug_fd;
 extern int pseudo_disabled;
-#ifndef NDEBUG
-extern int pseudo_debug_real(int, char *, ...) __attribute__ ((format (printf, 2, 3)));
-#define pseudo_debug pseudo_debug_real
-#else
-/* oh no, mister compiler, please don't optimize me away! */
-static inline void pseudo_debug(int level, char *text, ...) { }
-#endif
+extern int pseudo_allow_fsync;
 extern int pseudo_diag(char *, ...) __attribute__ ((format (printf, 1, 2)));
+#ifndef NDEBUG
+#define pseudo_debug(x, ...) do { \
+	if ((x) & PDBGF_VERBOSE) { \
+		if ((pseudo_util_debug_flags & PDBGF_VERBOSE) && (pseudo_util_debug_flags & ((x) & ~PDBGF_VERBOSE))) { pseudo_diag(__VA_ARGS__); } \
+	} else { \
+		if (pseudo_util_debug_flags & (x)) { pseudo_diag(__VA_ARGS__); } \
+	} \
+} while (0) 
+#define pseudo_debug_call(x, fn, ...) do { \
+	if ((x) & PDBGF_VERBOSE) { \
+		if ((pseudo_util_debug_flags & PDBGF_VERBOSE) && (pseudo_util_debug_flags & ((x) & ~PDBGF_VERBOSE))) { fn(__VA_ARGS__); } \
+	} else { \
+		if (pseudo_util_debug_flags & (x)) { fn(__VA_ARGS__); } \
+	} \
+} while (0) 
+#else
+/* this used to be a static inline function, but that meant that arguments
+ * were still evaluated for side effects. We don't want that. The ...
+ * is a C99ism, also supported by GNU C.
+ */
+#define pseudo_debug(...) 0
+#define pseudo_debug_call(...) 0
+#endif
+extern void pseudo_dump_data(char *, const void *, size_t);
 void pseudo_new_pid(void);
 /* pseudo_fix_path resolves symlinks up to this depth */
 #define PSEUDO_MAX_LINK_RECURSION 16
@@ -63,8 +86,7 @@ extern int pseudo_logfile(char *defname);
 extern ssize_t pseudo_sys_path_max(void);
 extern ssize_t pseudo_path_max(void);
 #define PSEUDO_PWD_MAX 4096
-extern int pseudo_etc_file(const char *filename, char *realname, int flags, char **search, int dircount);
-#define PSEUDO_ETC_FILE(name, realname, flags) pseudo_etc_file((name), (realname), (flags), (char *[]) { pseudo_chroot, pseudo_passwd }, 2)
+extern int pseudo_etc_file(const char *filename, char *realname, int flags, char *path[], int dircount);
 extern void pseudo_stat32_from64(struct stat *, const struct stat64 *);
 extern void pseudo_stat64_from32(struct stat64 *, const struct stat *);
 
@@ -121,5 +143,13 @@ extern char *pseudo_version;
  * to set this to AT_SYMLINK_FOLLOW. Darwin does.
  */
 #define PSEUDO_LINK_SYMLINK_BEHAVIOR 0
+
+/* given n, pick a multiple of block enough bigger than n
+ * to give us some breathing room.
+ */
+static inline size_t
+round_up(size_t n, size_t block) {
+	return block * (((n + block / 4) / block) + 1);
+}
 
 #include "pseudo_ports.h"

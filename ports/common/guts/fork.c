@@ -12,7 +12,7 @@
 	 */
 	if (rc == 0) {
 		pseudo_setupenv();
-		if (!pseudo_get_value("PSEUDO_UNLOAD")) {
+		if (!pseudo_has_unload(NULL)) {
 			pseudo_reinit_libpseudo();
 		} else {
 			pseudo_dropenv();

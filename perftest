@@ -1,5 +1,19 @@
 #!/bin/sh
 # do a quick performance test of pseudo
+opt_f=false
+flag_f=
+
+while getopts "f" o
+do
+	case $o in
+	f)	opt_f=true
+		flag_f=-f
+		;;
+	\?)	die "Usage: perftest [-f] [directory]";;
+	esac;
+done
+shift `expr $OPTIND - 1`
+
 die() {
     printf "%s\n" "$*" >&2
     exit 1
@@ -20,25 +34,24 @@ doit() (
 [ -x bin/pseudo ] || die "You need a bin/pseudo to test."
 case $# in
 0)	dir="perftest.d";;
-1)	[ -d "$1" ] || die "Specify an existing directory to test in."
+1)	[ -d "$1" ] || die "Specify an existing directory to test in. '%s' is not a directory." "$1"
 	dir="$1/perftest.d"
 	;;
 *)	die "Usage: perftest [directory]"
 	;;
 esac
 
-case `id -u` in
-0)	printf "%s\n" "Running test."
+if $opt_f || [ `id -u` = x0 ]; then
+	printf "Running test in %s.\n" "$dir"
 	doit
-	printf "%s\n" "Done."
-	;;
-*)	[ -d $dir ] && die "$dir directory already exists, delete it if you're done."
+	printf "Done.\n"
+else
+	[ -d $dir ] && die "Directory '$dir' already exists, delete it if you're done."
 	mkdir $dir
-        mkdir $dir/new
+        mkdir -p $dir/new
 	cc -o $dir/makedata makedata.c
 	printf "%s\n" "Running performance test (total time at end)"
-	time bin/pseudo ./perftest $1
+	time bin/pseudo ./perftest -f ${dir%perftest.d}
 	rm -rf $dir
-	rm -f makedata
-	;;
-esac
+fi
+

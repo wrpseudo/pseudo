@@ -23,6 +23,8 @@ ${name}(${decl_args}) {
 	${variadic_decl}
 	${rc_decl}
 
+${maybe_async_skip}
+
 	if (!pseudo_check_wrappers() || !real_$name) {
 		/* rc was initialized to the "failure" value */
 		pseudo_enosys("${name}");
@@ -37,17 +39,20 @@ ${name}(${decl_args}) {
 		${rc_return}
 	}
 
-	pseudo_debug(4, "called: ${name}\n");
+	pseudo_debug(PDBGF_WRAPPER, "wrapper called: ${name}\n");
 	pseudo_sigblock(&saved);
+	pseudo_debug(PDBGF_WRAPPER | PDBGF_VERBOSE, "${name} - signals blocked, obtaining lock\n");
 	if (pseudo_getlock()) {
 		errno = EBUSY;
 		sigprocmask(SIG_SETMASK, &saved, NULL);
+		pseudo_debug(PDBGF_WRAPPER, "${name} failed to get lock, giving EBUSY.\n");
 		${def_return}
 	}
 
 	int save_errno;
 	if (antimagic > 0) {
 		/* call the real syscall */
+		pseudo_debug(PDBGF_SYSCALL, "${name} calling real syscall.\n");
 		${rc_assign} (*real_${name})(${call_args});
 	} else {
 		${alloc_paths}
@@ -60,13 +65,14 @@ ${name}(${decl_args}) {
 	save_errno = errno;
 	pseudo_droplock();
 	sigprocmask(SIG_SETMASK, &saved, NULL);
+	pseudo_debug(PDBGF_WRAPPER | PDBGF_VERBOSE, "${name} - yielded lock, restored signals\n");
 #if 0
 /* This can cause hangs on some recentish systems which use locale
  * stuff for strerror...
  */
-	pseudo_debug(4, "completed: $name (maybe: %s)\n", strerror(save_errno));
+	pseudo_debug(PDBGF_WRAPPER, "wrapper completed: ${name} (maybe: %s)\n", strerror(save_errno));
 #endif
-	pseudo_debug(4, "completed: $name (errno: %d)\n", save_errno);
+	pseudo_debug(PDBGF_WRAPPER, "wrapper completed: ${name} (errno: %d)\n", save_errno);
 	errno = save_errno;
 	${rc_return}
 }

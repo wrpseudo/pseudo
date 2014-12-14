@@ -6,7 +6,7 @@
  * wrap_chdir(const char *path) {
  *	int rc = -1;
  */
-	pseudo_debug(2, "chdir: '%s'\n",
+	pseudo_debug(PDBGF_CLIENT, "chdir: '%s'\n",
 		path ? path : "<nil>");
 
 	if (!path) {

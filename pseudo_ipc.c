@@ -56,12 +56,12 @@ allow_sigpipe(void) {
 /* useful only when debugging crazy stuff */
 static void
 display_msg_header(pseudo_msg_t *msg) {
-	pseudo_debug(4, "type: %d\n", msg->type);
-	pseudo_debug(4, "inode: %llu\n", (unsigned long long) msg->ino);
-	pseudo_debug(4, "uid: %d\n", msg->uid);
-	pseudo_debug(4, "pathlen: %d\n", (int) msg->pathlen);
+	pseudo_debug(PDBGF_IPC | PDBGF_VERBOSE, "type: %d\n", msg->type);
+	pseudo_debug(PDBGF_IPC | PDBGF_VERBOSE, "inode: %llu\n", (unsigned long long) msg->ino);
+	pseudo_debug(PDBGF_IPC | PDBGF_VERBOSE, "uid: %d\n", msg->uid);
+	pseudo_debug(PDBGF_IPC | PDBGF_VERBOSE, "pathlen: %d\n", (int) msg->pathlen);
 	if (msg->pathlen) {
-		pseudo_debug(4, "path: %s\n", msg->path);
+		pseudo_debug(PDBGF_IPC | PDBGF_VERBOSE, "path: %s\n", msg->path);
 	}
 }
 #endif
@@ -84,7 +84,7 @@ pseudo_msg_send(int fd, pseudo_msg_t *msg, size_t len, const char *path) {
 		return -1;
 
 	if (path) {
-		pseudo_debug(4, "msg type %d (%s), external path %s, mode 0%o\n",
+		pseudo_debug(PDBGF_IPC, "msg type %d (%s), external path %s, mode 0%o\n",
 			msg->type, pseudo_op_name(msg->op), path, (int) msg->mode);
 		if (len == (size_t) -1)
 			len = strlen(path) + 1;
@@ -95,12 +95,12 @@ pseudo_msg_send(int fd, pseudo_msg_t *msg, size_t len, const char *path) {
 			r += write(fd, path, len);
 		}
 		allow_sigpipe();
-		pseudo_debug(5, "wrote %d bytes\n", r);
+		pseudo_debug(PDBGF_IPC | PDBGF_VERBOSE, "wrote %d bytes\n", r);
 		if (pipe_error || (r == -1 && errno == EBADF))
 			return -1;
 		return ((size_t) r != PSEUDO_HEADER_SIZE + len);
 	} else {
-		pseudo_debug(4, "msg type %d (%s), result %d (%s), path %.*s, mode 0%o\n",
+		pseudo_debug(PDBGF_IPC, "msg type %d (%s), result %d (%s), path %.*s, mode 0%o\n",
 			msg->type, pseudo_op_name(msg->op),
 			msg->result, pseudo_res_name(msg->result),
 			msg->pathlen, msg->path, (int) msg->mode);
@@ -108,7 +108,7 @@ pseudo_msg_send(int fd, pseudo_msg_t *msg, size_t len, const char *path) {
 		ignore_sigpipe();
 		r = write(fd, msg, PSEUDO_HEADER_SIZE + msg->pathlen);
 		allow_sigpipe();
-		pseudo_debug(5, "wrote %d bytes\n", r);
+		pseudo_debug(PDBGF_IPC | PDBGF_VERBOSE, "wrote %d bytes\n", r);
 		if (pipe_error || (r == -1 && errno == EBADF))
 			return -1;
 		return ((size_t) r != PSEUDO_HEADER_SIZE + msg->pathlen);
@@ -130,14 +130,14 @@ pseudo_msg_receive(int fd) {
 	errno = 0;
 	r = read(fd, &header, PSEUDO_HEADER_SIZE);
 	if (r == -1) {
-		pseudo_debug(2, "read failed: %s\n", strerror(errno));
+		pseudo_debug(PDBGF_IPC, "read failed: %s\n", strerror(errno));
 		return 0;
 	}
 	if (r < (int) PSEUDO_HEADER_SIZE) {
-		pseudo_debug(2, "got only %d bytes (%s)\n", r, strerror(errno));
+		pseudo_debug(PDBGF_IPC, "got only %d bytes (%s)\n", r, strerror(errno));
 		return 0;
 	}
-	pseudo_debug(4, "got header, type %d, pathlen %d\n", header.type, (int) header.pathlen);
+	pseudo_debug(PDBGF_IPC, "got header, type %d, pathlen %d\n", header.type, (int) header.pathlen);
 	// display_msg_header(&header);
 	if (!incoming || header.pathlen >= incoming_pathlen) {
 		newmsg = pseudo_msg_new(header.pathlen + 128, 0);
@@ -154,7 +154,7 @@ pseudo_msg_receive(int fd) {
 	if (incoming->pathlen) {
 		r = read(fd, incoming->path, incoming->pathlen);
 		if (r < (int) incoming->pathlen) {
-			pseudo_debug(2, "short read on path, expecting %d, got %d\n",
+			pseudo_debug(PDBGF_IPC, "short read on path, expecting %d, got %d\n",
 				(int) incoming->pathlen, r);
 			return 0;
 		}

@@ -1,7 +1,7 @@
 #
 # Makefile.in/Makefile, build rules for pseudo
 #
-# Copyright (c) 2008-2012 Wind River Systems, Inc.
+# Copyright (c) 2008-2013 Wind River Systems, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the Lesser GNU General Public License version 2.1 as
@@ -22,11 +22,16 @@ PREFIX=@PREFIX@
 LIBDIR=@LIBDIR@
 SUFFIX=@SUFFIX@
 SQLITE=@SQLITE@
+SQLITE_LIB=@SQLITE_LIB@
+SQLITE_MEMORY=@SQLITE_MEMORY@
+FORCE_ASYNC=@FORCE_ASYNC@
+XATTR=@XATTR@
+PASSWD_FALLBACK=@PASSWD_FALLBACK@
 BITS=@BITS@
 ARCH_FLAGS=@ARCH_FLAGS@
 MARK64=@MARK64@
 RPATH=@RPATH@
-VERSION=1.4.2
+VERSION=1.6.2
 
 LIB=@LIB@
 BIN=bin
@@ -36,9 +41,9 @@ LOCALSTATEDIR=$(PREFIX)/$(LOCALSTATE)
 
 CFLAGS_BASE=-pipe -std=gnu99 -Wall -W -Wextra
 CFLAGS_CODE=-fPIC -D_LARGEFILE64_SOURCE -D_ATFILE_SOURCE $(ARCH_FLAGS)
-CFLAGS_DEFS=-DPSEUDO_PREFIX='"$(PREFIX)"' -DPSEUDO_SUFFIX='"$(SUFFIX)"' -DPSEUDO_BINDIR='"$(BIN)"' -DPSEUDO_LIBDIR='"$(LIB)"' -DPSEUDO_LOCALSTATEDIR='"$(LOCALSTATE)"' -DPSEUDO_VERSION='"$(VERSION)"'
+CFLAGS_DEFS=-DPSEUDO_PREFIX='"$(PREFIX)"' -DPSEUDO_SUFFIX='"$(SUFFIX)"' -DPSEUDO_BINDIR='"$(BIN)"' -DPSEUDO_LIBDIR='"$(LIB)"' -DPSEUDO_LOCALSTATEDIR='"$(LOCALSTATE)"' -DPSEUDO_VERSION='"$(VERSION)"' $(SQLITE_MEMORY) $(FORCE_ASYNC) -DPSEUDO_PASSWD_FALLBACK='$(PASSWD_FALLBACK)'
 CFLAGS_DEBUG=-O2 -g
-CFLAGS_SQL=-L$(SQLITE)/$(LIB) -I$(SQLITE)/include $(RPATH)
+@DEFAULT_SQLITE@CFLAGS_SQL=-L$(SQLITE)/$(SQLITE_LIB) -I$(SQLITE)/include $(RPATH)
 CFLAGS_PSEUDO=$(CFLAGS_BASE) $(CFLAGS_CODE) $(CFLAGS_DEFS) \
 	$(CFLAGS_DEBUG) $(CFLAGS_SQL)
 
@@ -129,7 +134,7 @@ tables: enums/*.in maketables templatefile.py $(TABLES)
 	./maketables enums/*.in
 
 wrappers: makewrappers templatefile.py $(TEMPLATES) ports/*/wrapfuncs.in
-	./makewrappers
+	CC="$(CC) $(CFLAGS) $(CFLAGS_PSEUDO)" ./makewrappers "xattr=$(XATTR)"
 
 .SECONDARY: tables wrappers
 
@@ -156,7 +161,9 @@ clean:
 		pseudo_wrapper_table.c \
 		pseudo_tables.c pseudo_tables.h \
 		pseudo_ports.h port_wrappers.c \
-		offsets32 offsets64
+		offsets32 offsets64 \
+		port_deps.mk func_deps.mk
+	touch port_deps.mk func_deps.mk
 
 distclean: clean
 	rm -f Makefile
@@ -179,3 +186,8 @@ tarball:
 	  rmdir pseudo \
 	)
 	tar cjf pseudo-$(VERSION).tar.bz2 pseudo-$(VERSION)
+
+# Note when we need to rebuild pseudo_wrappers.o
+include port_deps.mk
+include func_deps.mk
+

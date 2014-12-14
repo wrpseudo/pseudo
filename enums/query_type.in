@@ -1,9 +1,9 @@
-query_type: PSQT; sql = LITTLE BOBBY TABLES
-exact, =
-less, <
-greater, >
-bitand, &
-notequal, !=
-like, LIKE
-notlike, NOT LIKE
-sqlpat, LIKE
+query_type: PSQT; const char * sql = "LITTLE BOBBY TABLES"
+exact, "="
+less, "<"
+greater, ">"
+bitand, "&"
+notequal, "!="
+like, "LIKE"
+notlike, "NOT LIKE"
+sqlpat, "LIKE"

@@ -23,6 +23,10 @@
 .B \-E
 .I timeformat
 ]
+[
+.B \-x
+.I flags
+]
 .RI [ SPECIFICATIONS ]
 .PP
 .B pseudolog
@@ -35,6 +39,10 @@
 .B \-F
 .I format
 ]
+[
+.B \-x
+.I flags
+]
 .PP
 .B pseudolog \-h
 .PP
@@ -43,6 +51,10 @@
 [
 .B \-E
 .I timeformat
+]
+[
+.B \-x
+.I flags
 ]
 .RI [ SPECIFICATIONS ]
 .RI [ SPECIFICATIONS ]
@@ -110,6 +122,11 @@ is displayed.  Applies only to queries.
 .TP 8
 .B \-v
 Increase verbosity (debug level).  Not useful except when debugging pseudo.
+Deprecated; use 
+.BR \-x .
+.TP 8
+.BI \-x flags
+Specify debugging flags of interest. Not useful except when debugging pseudo.
 
 Other option characters are defined as specifications, and all of those
 require arguments to specify their values.

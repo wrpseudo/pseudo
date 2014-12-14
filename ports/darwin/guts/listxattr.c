@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2011 Wind River Systems; see
+ * Copyright (c) 2014 Wind River Systems; see
  * guts/COPYRIGHT for information.
  *
- * ssize_t listxattr(const char *pathname, char *list, size_t size, int options)
+ * ssize_t listxattr(const char *path, char *list, size_t size, int options)
  *	ssize_t rc = -1;
  */
 
-	rc = real_listxattr(pathname, list, size, options);
+	rc = shared_listxattr(path, -1, list, size, options);
 
 /*	return rc;
  * }

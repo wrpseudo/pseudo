@@ -7,7 +7,6 @@
  *	char * rc = NULL;
  */
 
-	pseudo_debug(3, "get_current_dir_name (getcwd)\n");
 	/* this relies on a Linux extension, but we dutifully
 	 * emulated that extension. 
 	 */

@@ -11,3 +11,5 @@ pseudo_tables.h
 port_wrappers.c
 pseudo_ports.h
 templatefile.pyc
+func_deps.mk
+port_deps.mk
