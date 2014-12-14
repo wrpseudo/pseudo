@@ -33,7 +33,7 @@ do
     filename=${file#test/}
     let num_tests++
     mkdir -p var/pseudo
-    ./bin/pseudo $file ${opt_verbose}
+    ./bin/pseudo ${opt_verbose} $file
     if [ "$?" -eq "0" ]; then
         let num_passed_tests++
         if [ "${opt_verbose}" == "-v" ]; then
