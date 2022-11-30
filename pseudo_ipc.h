@@ -40,7 +40,7 @@ typedef struct {
 	char path[];
 } pseudo_msg_t;
 
-enum {
+typedef enum {
 	PSA_EXEC = 1,
 	PSA_WRITE = (PSA_EXEC << 1),
 	PSA_READ = (PSA_WRITE << 1),
